@@ -308,12 +308,17 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-cache")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
-            try:
+                      try:
                 while True:
                     with lock:
                         s = dict(state)
                     s["age"] = time.time() - s.get("t", 0)
+                    s['flightPhase'] = get_flight_phase()
                     self.wfile.write(("data: " + json.dumps(s) + "\n\n").encode())
+                    self.wfile.flush()
+                    time.sleep(0.2)
+            except Exception:
+                return
                     self.wfile.flush()
                     time.sleep(0.2)
             except Exception:
