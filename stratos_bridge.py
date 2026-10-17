@@ -302,7 +302,7 @@ class H(BaseHTTPRequestHandler):
         _handle_logbook(self)
         return
     
-        if self.path.startswith("/stream"):
+    if self.path.startswith("/stream"):
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache")
