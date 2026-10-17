@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b1118">
+<title>Stratos — Pilot Logbook</title>
+<style>
+:root {
+  --bg:#0b1118; --land:#121a23; --coast:#3a4a5c;
+  --txt:#e6edf4; --ui:rgba(13,18,25,.94); --ui2:#1a2330; --mut:#8696a8;
+  --acc:#22d3ee; --red:#f87171; --grn:#34d399; --warn:#fbbf24; --mag:#c084fc;
+  color-scheme: dark; box-sizing: border-box;
+  padding-top: env(safe-area-inset-top,0px);
+  padding-bottom: env(safe-area-inset-bottom,0px);
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body {
+  margin: 0; height: 100%; background: var(--bg); color: var(--txt);
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  overscroll-behavior: none;
+}
+a { color: var(--acc); }
+
+/* ── Layout ── */
+#app { display: flex; flex-direction: column; min-height: 100dvh; }
+
+/* ── Topbar ── */
+#topbar {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  padding-top: calc(10px + env(safe-area-inset-top,0px));
+  background: var(--ui); border-bottom: 1px solid var(--ui2);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  position: sticky; top: 0; z-index: 20;
+}
+#topbar a.home { font-size: 20px; font-weight: 800; letter-spacing: .03em; color: var(--txt); text-decoration: none; }
+#topbar a.home span { color: var(--acc); }
+#topbar h1 { font-size: 13px; font-weight: 600; color: var(--mut); margin: 0;
+  letter-spacing: .04em; text-transform: uppercase; border-left: 1px solid var(--ui2); padding-left: 10px; }
+.spacer { flex: 1; }
+.topbar-btn {
+  background: var(--ui2); border: 1px solid var(--coast); border-radius: 8px;
+  color: var(--txt); font: inherit; font-size: 12px; padding: 6px 10px; cursor: pointer;
+}
+
+/* ── Tab bar ── */
+#tab-bar {
+  display: flex; background: var(--ui2); border-bottom: 1px solid var(--coast);
+  overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+#tab-bar::-webkit-scrollbar { display: none; }
+.tab-btn {
+  flex-shrink: 0; padding: 12px 16px; font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--mut); background: none; border: none; border-bottom: 2px solid transparent;
+  cursor: pointer; white-space: nowrap;
+}
+.tab-btn.act { color: var(--acc); border-bottom-color: var(--acc); }
+
+/* ── Live status bar ── */
+#live-bar {
+  display: none; align-items: center; gap: 8px; padding: 8px 14px;
+  background: rgba(34,211,238,.07); border-bottom: 1px solid rgba(34,211,238,.2);
+  font-size: 12px;
+}
+#live-bar.show { display: flex; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--grn);
+  box-shadow: 0 0 8px var(--grn); animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+#live-state-label { font-weight: 700; color: var(--acc); }
+
+/* ── Main ── */
+#main { flex: 1; padding: 14px; max-width: 900px; width: 100%; margin: 0 auto; }
+
+/* ── Grid stat tiles ── */
+.stat-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 10px; margin-bottom: 14px;
+}
+.stat-tile {
+  background: var(--ui2); border: 1px solid var(--coast); border-radius: 12px;
+  padding: 12px 14px;
+}
+.stat-tile b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.stat-tile.big b { font-size: 32px; }
+.stat-tile span { font-size: 11px; color: var(--mut); letter-spacing: .04em; }
+
+/* ── Section ── */
+.section { background: var(--ui2); border: 1px solid var(--coast); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
+.section h2 { margin: 0 0 10px; font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--mut); text-transform: uppercase; }
+
+/* ── Flight list ── */
+.flight-row {
+  display: flex; gap: 10px; align-items: flex-start; padding: 10px 0;
+  border-bottom: 1px solid rgba(58,74,92,.35); cursor: pointer;
+}
+.flight-row:last-child { border-bottom: none; }
+.flight-row:hover { background: rgba(34,211,238,.04); border-radius: 8px; margin: 0 -8px; padding: 10px 8px; }
+.fl-badge {
+  background: var(--land); border: 1px solid var(--coast); border-radius: 8px;
+  padding: 6px 10px; font-size: 11px; font-weight: 700; color: var(--acc);
+  min-width: 56px; text-align: center; letter-spacing: .05em;
+}
+.fl-main { flex: 1; min-width: 0; }
+.fl-route { font-size: 15px; font-weight: 700; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fl-sub { font-size: 12px; color: var(--mut); }
+.fl-right { text-align: right; font-size: 12px; color: var(--mut); }
+.fl-right b { display: block; font-size: 13px; color: var(--txt); }
+.fl-incomplete { opacity: .55; }
+.fl-incomplete .fl-badge { color: var(--warn); border-color: var(--warn); }
+
+/* ── Aircraft / Airport cards ── */
+.ac-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 10px; }
+.ac-card {
+  background: var(--land); border: 1px solid var(--coast); border-radius: 12px;
+  padding: 12px 14px; cursor: pointer;
+}
+.ac-card:hover { border-color: var(--acc); }
+.ac-card .ac-type { font-size: 18px; font-weight: 800; letter-spacing: .02em; margin-bottom: 4px; }
+.ac-card .ac-reg { font-size: 11px; color: var(--mut); font-variant-numeric: tabular-nums; }
+.ac-card .ac-stats { display: flex; gap: 10px; margin-top: 8px; }
+.ac-stat { text-align: center; flex: 1; background: var(--ui2); border-radius: 8px; padding: 6px; }
+.ac-stat b { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
+.ac-stat span { font-size: 10px; color: var(--mut); }
+
+/* ── Achievements ── */
+.ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 10px; }
+.ach-card {
+  background: var(--land); border: 1px solid var(--coast); border-radius: 12px;
+  padding: 12px; text-align: center;
+}
+.ach-card.earned { border-color: var(--warn); background: rgba(251,191,36,.06); }
+.ach-icon { font-size: 32px; line-height: 1; margin-bottom: 6px; }
+.ach-card.locked .ach-icon { filter: grayscale(1) opacity(.4); }
+.ach-name { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+.ach-card.locked .ach-name { color: var(--mut); }
+.ach-desc { font-size: 11px; color: var(--mut); }
+.ach-card.earned .ach-date { font-size: 10px; color: var(--warn); margin-top: 4px; }
+.ach-prog { height: 3px; background: var(--ui2); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.ach-prog-fill { height: 100%; background: var(--acc); border-radius: 2px; }
+
+/* ── Bar chart ── */
+.bar-chart { display: flex; align-items: flex-end; gap: 3px; height: 60px; margin-top: 8px; }
+.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.bar-fill { width: 100%; background: var(--acc); border-radius: 3px 3px 0 0; min-height: 2px; opacity: .7; }
+.bar-label { font-size: 9px; color: var(--mut); }
+
+/* ── Detail panel ── */
+#detail-panel {
+  display: none; position: fixed; inset: 0; z-index: 30;
+  background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
+}
+#detail-panel.show { display: flex; align-items: flex-end; }
+#detail-inner {
+  background: var(--bg); border-top: 1px solid var(--coast);
+  border-radius: 20px 20px 0 0; width: 100%; max-height: 80dvh; overflow-y: auto;
+  padding: 20px 16px; padding-bottom: calc(20px + env(safe-area-inset-bottom,0px));
+}
+#detail-inner h2 { margin: 0 0 12px; font-size: 18px; }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.detail-cell { background: var(--ui2); border-radius: 10px; padding: 10px 12px; }
+.detail-cell b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+.detail-cell span { font-size: 11px; color: var(--mut); }
+
+/* ── Profile edit ── */
+#profile-section input, #profile-section textarea, #profile-section select {
+  width: 100%; background: var(--land); border: 1px solid var(--coast); border-radius: 8px;
+  color: var(--txt); font: inherit; padding: 10px 12px; margin-top: 4px; outline: none;
+}
+#profile-section input:focus, #profile-section textarea:focus { border-color: var(--acc); }
+#profile-section label { font-size: 12px; color: var(--mut); display: block; margin-top: 10px; }
+.save-btn {
+  background: var(--acc); color: #04212b; border: none; border-radius: 10px;
+  font: inherit; font-size: 14px; font-weight: 700; padding: 12px 24px;
+  cursor: pointer; margin-top: 14px; width: 100%;
+}
+.save-btn:hover { filter: brightness(1.1); }
+.share-btn {
+  background: var(--ui2); border: 1px solid var(--coast); border-radius: 10px;
+  font: inherit; font-size: 13px; font-weight: 600; padding: 10px 16px;
+  cursor: pointer; color: var(--txt); margin-top: 8px; width: 100%;
+}
+.avatar-circle {
+  width: 72px; height: 72px; border-radius: 50%; background: var(--coast);
+  display: flex; align-items: center; justify-content: center; font-size: 28px;
+  border: 2px solid var(--acc); margin-bottom: 10px;
+}
+.pilot-header { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+.pilot-info h3 { margin: 0 0 4px; font-size: 20px; font-weight: 800; }
+.pilot-info p { margin: 0; font-size: 13px; color: var(--mut); }
+
+/* ── Empty / Bridge state ── */
+.empty-block { text-align: center; padding: 40px 20px; color: var(--mut); }
+.empty-block .big-icon { font-size: 44px; margin-bottom: 10px; }
+
+/* ── Bottom nav ── */
+#bottom-nav {
+  position: sticky; bottom: 0; display: flex;
+  background: var(--ui); border-top: 1px solid var(--ui2);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  padding-bottom: env(safe-area-inset-bottom,0px);
+}
+.bnav-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 0; font-size: 10px; font-weight: 600; color: var(--mut);
+  text-decoration: none; letter-spacing: .03em;
+}
+.bnav-item .icon { font-size: 20px; line-height: 1; }
+.bnav-item.act { color: var(--acc); }
+
+@media (max-width: 480px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .detail-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- Topbar -->
+<header id="topbar">
+  <a class="home" href="stratos.html">STRA<span>T</span>OS</a>
+  <h1>Logbook</h1>
+  <div class="spacer"></div>
+  <button class="topbar-btn" onclick="exportCSV()">Export CSV</button>
+</header>
+
+<!-- Live flight status bar -->
+<div id="live-bar">
+  <div class="live-dot"></div>
+  <span>Flight in progress</span>
+  <span id="live-state-label">PARKED</span>
+  <span class="spacer"></span>
+  <span id="live-timer">0:00</span>
+</div>
+
+<!-- Tab bar -->
+<div id="tab-bar">
+  <button class="tab-btn act" data-tab="overview" onclick="switchTab(this)">Overview</button>
+  <button class="tab-btn" data-tab="flights" onclick="switchTab(this)">Flights</button>
+  <button class="tab-btn" data-tab="aircraft" onclick="switchTab(this)">Aircraft</button>
+  <button class="tab-btn" data-tab="airports" onclick="switchTab(this)">Airports</button>
+  <button class="tab-btn" data-tab="achievements" onclick="switchTab(this)">Achievements</button>
+  <button class="tab-btn" data-tab="profile" onclick="switchTab(this)">Profile</button>
+</div>
+
+<div id="main">
+  <!-- Overview tab -->
+  <div id="tab-overview" class="tab-panel">
+    <div id="profile-header-mini" style="margin-bottom:14px"></div>
+    <div class="stat-grid" id="stat-grid"></div>
+    <div class="section" id="activity-chart-section" style="display:none">
+      <h2>Monthly hours (last 12 months)</h2>
+      <div class="bar-chart" id="monthly-chart"></div>
+    </div>
+    <div id="recent-flights-overview"></div>
+    <div id="bridge-status-block"></div>
+  </div>
+
+  <!-- Flights tab -->
+  <div id="tab-flights" class="tab-panel" style="display:none">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <input id="flight-search" placeholder="Search route, aircraft, airport…" style="flex:1;min-width:160px;background:var(--ui2);border:1px solid var(--coast);border-radius:8px;color:var(--txt);font:inherit;padding:8px 12px;outline:none" oninput="renderFlights()">
+      <select id="flight-sort" style="background:var(--ui2);border:1px solid var(--coast);border-radius:8px;color:var(--txt);font:inherit;padding:8px 10px;outline:none" onchange="renderFlights()">
+        <option value="date-desc">Newest first</option>
+        <option value="date-asc">Oldest first</option>
+        <option value="dur-desc">Longest first</option>
+        <option value="dist-desc">Farthest first</option>
+      </select>
+    </div>
+    <div id="flight-list"></div>
+  </div>
+
+  <!-- Aircraft tab -->
+  <div id="tab-aircraft" class="tab-panel" style="display:none">
+    <div class="ac-grid" id="aircraft-grid"></div>
+  </div>
+
+  <!-- Airports tab -->
+  <div id="tab-airports" class="tab-panel" style="display:none">
+    <div id="airports-list"></div>
+  </div>
+
+  <!-- Achievements tab -->
+  <div id="tab-achievements" class="tab-panel" style="display:none">
+    <div class="ach-grid" id="ach-grid"></div>
+  </div>
+
+  <!-- Profile tab -->
+  <div id="tab-profile" class="tab-panel" style="display:none">
+    <div id="profile-section"></div>
+  </div>
+</div>
+
+<!-- Detail panel -->
+<div id="detail-panel" onclick="if(event.target===this)closeDetail()">
+  <div id="detail-inner"></div>
+</div>
+
+<!-- Bottom nav -->
+<nav id="bottom-nav">
+  <a class="bnav-item" href="stratos.html"><span class="icon">⊕</span>Map</a>
+  <a class="bnav-item" href="weather.html"><span class="icon">⛅</span>Weather</a>
+  <a class="bnav-item act" href="#overview" onclick="switchTab(document.querySelector('.tab-btn[data-tab=overview]')); return false;"><span class="icon">📋</span>Logbook</a>
+  <a class="bnav-item" href="#profile" onclick="switchTab(document.querySelector('.tab-btn[data-tab=profile]')); return false;"><span class="icon">✈</span>Profile</a>
+</nav>
+
+</div>
+<script>
+'use strict';
+
+/* ════════════════════════════════════════════════════════════════════
+   STORAGE  (IndexedDB with localStorage fallback)
+═══════════════════════════════════════════════════════════════════════ */
+const DB_NAME = 'stratos_logbook', DB_VER = 2;
+let db = null;
+
+function idbOpen() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('flights')) {
+        const fs = d.createObjectStore('flights', { keyPath: 'id' });
+        fs.createIndex('startTime', 'startTime');
+        fs.createIndex('state', 'state');
+      }
+      if (!d.objectStoreNames.contains('profile')) {
+        d.createObjectStore('profile', { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = e => { db = e.target.result; res(db); };
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function dbAll(store) {
+  await ensureDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function dbPut(store, obj) {
+  await ensureDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).put(obj);
+    tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+  });
+}
+
+async function dbDelete(store, key) {
+  await ensureDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).delete(key);
+    tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+  });
+}
+
+async function ensureDB() {
+  if (!db) await idbOpen();
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PROFILE  (name, callsign, avatar, bio, prefs)
+═══════════════════════════════════════════════════════════════════════ */
+let profile = {
+  displayName: '', username: '', avatar: '✈', bio: '',
+  sim: 'X-Plane 12', units: 'aviation', public: false, showFlights: true
+};
+
+async function loadProfile() {
+  const rows = await dbAll('profile');
+  rows.forEach(r => { if (r.key === 'main') profile = { ...profile, ...r.value }; });
+}
+
+async function saveProfile() {
+  await dbPut('profile', { key: 'main', value: profile });
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   FLIGHT STATE MACHINE
+   States: PARKED → TAXI → AIRBORNE → LANDED → COMPLETE
+═══════════════════════════════════════════════════════════════════════ */
+const THRESHOLDS = {
+  taxiSpd: 2,       // kt — above this = TAXI (not parked)
+  airborneAGL: 30,  // ft AGL — above this and spd > takeoffSpd = AIRBORNE
+  takeoffSpd: 40,   // kt GS — used with AGL to confirm takeoff
+  landedAGL: 20,    // ft AGL — below this again after flight = possible landing
+  landedSpd: 60,    // kt — below this = landed (not touch-and-go)
+  parkedSpd: 2,     // kt — below this on ground = parked
+  parkedSec: 30,    // seconds of being parked to confirm LANDED→COMPLETE
+  minFlightSec: 60  // seconds airborne to count as a real flight
+};
+
+let currentFlight = null; // live tracking object
+let parkedTimer   = null;
+let liveTimerInt  = null;
+
+function newFlight(data) {
+  return {
+    id: 'flt_' + Date.now(),
+    state: 'PARKED',
+    startTime: Date.now(),
+    takeoffTime: null,
+    landingTime: null,
+    endTime: null,
+    depAirport: null,
+    arrAirport: null,
+    aircraft: data.aircraft || 'Unknown',
+    registration: data.registration || '',
+    callsign: data.callsign || '',
+    sim: data.sim || 'Unknown',
+    maxAlt: 0,
+    track: [],         // [{lat,lon,alt,t}]
+    fuelDep: null,
+    fuelArr: null,
+    landingVS: null,   // fpm at touchdown
+    complete: false,
+    incomplete: false
+  };
+}
+
+function processTelemetry(data) {
+  // data: { lat, lon, alt, agl, gs, hdg, vs, src, fuel }
+  if (!data || data.lat == null) return;
+
+  // Start new flight if none active
+  if (!currentFlight) {
+    currentFlight = newFlight({ sim: data.src || 'Simulator' });
+  }
+
+  const f = currentFlight;
+  const now = Date.now();
+
+  // Update maximums
+  if (data.alt > (f.maxAlt || 0)) f.maxAlt = data.alt;
+
+  // Add to track (every ~10 seconds or 1nm moved)
+  const last = f.track[f.track.length - 1];
+  if (!last || now - last.t > 10000 || (f.state === 'AIRBORNE' && haversineNm(last, data) > 0.5)) {
+    f.track.push({ lat: data.lat, lon: data.lon, alt: data.alt, t: now });
+    if (f.track.length > 3000) f.track.splice(0, f.track.length - 3000);
+  }
+
+  const onGround = (data.agl || 0) < THRESHOLDS.landedAGL;
+  const gs = data.gs || 0;
+
+  switch (f.state) {
+    case 'PARKED':
+      if (gs > THRESHOLDS.taxiSpd) {
+        f.state = 'TAXI';
+        f.depAirport = nearestAirport(data.lat, data.lon);
+        f.fuelDep = data.fuel || null;
+      }
+      break;
+
+    case 'TAXI':
+      if (data.agl > THRESHOLDS.airborneAGL && gs > THRESHOLDS.takeoffSpd) {
+        f.state = 'AIRBORNE';
+        f.takeoffTime = now;
+        updateLiveBar();
+      }
+      if (gs < THRESHOLDS.parkedSpd && onGround) f.state = 'PARKED';
+      break;
+
+    case 'AIRBORNE':
+      if (onGround && gs < THRESHOLDS.landedSpd) {
+        f.state = 'LANDED';
+        f.landingTime = now;
+        f.arrAirport = nearestAirport(data.lat, data.lon);
+        f.fuelArr = data.fuel || null;
+        if (data.vs !== undefined) f.landingVS = data.vs; // fpm, negative = descent
+        clearTimeout(parkedTimer);
+        parkedTimer = setTimeout(() => completeFlight(f), THRESHOLDS.parkedSec * 1000);
+      }
+      break;
+
+    case 'LANDED':
+      // Re-airborne (touch-and-go)
+      if (data.agl > THRESHOLDS.airborneAGL && gs > THRESHOLDS.takeoffSpd) {
+        clearTimeout(parkedTimer);
+        f.state = 'AIRBORNE';
+        f.landingTime = null;
+        f.arrAirport = null;
+        f.landingVS = null;
+      }
+      break;
+  }
+
+  updateLiveBar(f);
+}
+
+async function completeFlight(f) {
+  if (f.complete) return; // idempotent
+  f.complete = true;
+  f.state = 'COMPLETE';
+  f.endTime = Date.now();
+
+  const flightSec = f.takeoffTime && f.landingTime
+    ? (f.landingTime - f.takeoffTime) / 1000 : 0;
+
+  if (flightSec < THRESHOLDS.minFlightSec) {
+    f.incomplete = true;
+  }
+
+  // Distance from track
+  f.distanceNm = trackDistance(f.track);
+
+  // Save
+  await dbPut('flights', f);
+  currentFlight = null;
+
+  // Check achievements
+  const all = await dbAll('flights');
+  await checkAchievements(all);
+
+  // Refresh UI
+  await loadAndRender();
+  showToast('Flight logged: ' + (f.depAirport || '?') + ' → ' + (f.arrAirport || '?'));
+}
+
+function trackDistance(track) {
+  let d = 0;
+  for (let i = 1; i < track.length; i++) d += haversineNm(track[i-1], track[i]);
+  return Math.round(d * 10) / 10;
+}
+
+function haversineNm(a, b) {
+  if (!a || !b) return 0;
+  const R = 3440.065, dLat = (b.lat - a.lat) * Math.PI/180, dLon = (b.lon - a.lon) * Math.PI/180;
+  const h = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.asin(Math.sqrt(h));
+}
+
+function nearestAirport(lat, lon) {
+  // Uses airport data embedded in stratos.html if available on same origin
+  // Fallback: reverse-geocode guess from coordinates
+  return null; // Will be populated when bridge sends airport ID
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   BRIDGE CONNECTION  (EventSource to stratos_bridge.py)
+═══════════════════════════════════════════════════════════════════════ */
+let bridgeES = null, bridgeConnected = false;
+let liveFlightSeconds = 0;
+
+function connectBridge(base) {
+  if (bridgeES) bridgeES.close();
+  try {
+    bridgeES = new EventSource(base + '/stream');
+    bridgeES.onmessage = e => {
+      try {
+        const data = JSON.parse(e.data);
+        bridgeConnected = true;
+        processTelemetry(data);
+      } catch(_) {}
+    };
+    bridgeES.onerror = () => { bridgeConnected = false; };
+  } catch(_) {}
+}
+
+// Auto-connect if on local bridge
+if (location.protocol === 'http:') {
+  connectBridge(location.origin);
+}
+
+function updateLiveBar(f) {
+  const bar = document.getElementById('live-bar');
+  if (!f || !currentFlight) { bar.classList.remove('show'); return; }
+  bar.classList.add('show');
+  document.getElementById('live-state-label').textContent = f.state;
+  if (f.takeoffTime && !f.landingTime) {
+    liveFlightSeconds = Math.floor((Date.now() - f.takeoffTime) / 1000);
+    clearInterval(liveTimerInt);
+    liveTimerInt = setInterval(() => {
+      liveFlightSeconds++;
+      document.getElementById('live-timer').textContent = fmtDurSec(liveFlightSeconds);
+    }, 1000);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   STATISTICS
+═══════════════════════════════════════════════════════════════════════ */
+function calcStats(flights) {
+  const done = flights.filter(f => f.complete && !f.incomplete);
+
+  let totalFlights = done.length;
+  let totalHours = 0, totalAirborne = 0, totalDist = 0;
+  let longestFlight = null, longestDur = 0;
+  const acMap = {}, aptMap = {};
+  const monthMap = {};
+  const rates = [];
+
+  const now = new Date(), weekStart = new Date();
+  weekStart.setDate(now.getDate() - now.getDay());
+  let thisWeek=0, thisMonth=0, thisYear=0;
+
+  done.forEach(f => {
+    const dur = f.takeoffTime && f.landingTime
+      ? (f.landingTime - f.takeoffTime) / 3600000 : 0;
+    const airDur = dur; // same if we're only counting airborne
+    const dist = f.distanceNm || 0;
+
+    totalHours += dur;
+    totalAirborne += airDur;
+    totalDist += dist;
+
+    if (dur > longestDur) { longestDur = dur; longestFlight = f; }
+
+    // Aircraft
+    const acKey = f.aircraft || 'Unknown';
+    if (!acMap[acKey]) acMap[acKey] = { flights:0, hours:0, last:0, reg: f.registration || '' };
+    acMap[acKey].flights++;
+    acMap[acKey].hours += dur;
+    if (f.startTime > acMap[acKey].last) acMap[acKey].last = f.startTime;
+
+    // Airports
+    [f.depAirport, f.arrAirport].filter(Boolean).forEach(apt => {
+      if (!aptMap[apt]) aptMap[apt] = { dep:0, arr:0, last:0 };
+      if (apt === f.depAirport) aptMap[apt].dep++;
+      if (apt === f.arrAirport) aptMap[apt].arr++;
+      if (f.startTime > aptMap[apt].last) aptMap[apt].last = f.startTime;
+    });
+
+    // Monthly chart
+    if (f.startTime) {
+      const d = new Date(f.startTime);
+      const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+      monthMap[key] = (monthMap[key] || 0) + dur;
+    }
+
+    // Time windows
+    if (f.startTime) {
+      const d = new Date(f.startTime);
+      if (d >= weekStart) thisWeek++;
+      if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) thisMonth++;
+      if (d.getFullYear() === now.getFullYear()) thisYear++;
+    }
+
+    // Landing rates
+    if (f.landingVS !== null && f.landingVS !== undefined) rates.push(f.landingVS);
+  });
+
+  const sortedAC = Object.entries(acMap).sort((a,b) => b[1].flights - a[1].flights);
+  const sortedApt = Object.entries(aptMap).sort((a,b) => (b[1].dep+b[1].arr) - (a[1].dep+a[1].arr));
+
+  return {
+    totalFlights, totalHours, totalAirborne, totalDist, longestFlight, longestDur,
+    acMap, aptMap, sortedAC, sortedApt, monthMap, thisWeek, thisMonth, thisYear,
+    avgDur: totalFlights ? totalHours / totalFlights : 0,
+    uniqueAircraft: Object.keys(acMap).length,
+    uniqueAirports: Object.keys(aptMap).length,
+    mostFlownAC: sortedAC[0] ? sortedAC[0][0] : '—',
+    mostVisitedApt: sortedApt[0] ? sortedApt[0][0] : '—',
+    avgLandingRate: rates.length ? rates.reduce((a,b)=>a+b,0)/rates.length : null,
+    bestLandingRate: rates.length ? Math.min(...rates) : null,
+    landingRates: rates,
+    allFlights: flights // includes incomplete
+  };
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   ACHIEVEMENTS
+═══════════════════════════════════════════════════════════════════════ */
+const ACHIEVEMENTS = [
+  { id:'first_flight',    icon:'🏅', name:'First Flight',          desc:'Complete your first flight.',              check: s => s.totalFlights >= 1 },
+  { id:'ten_flights',     icon:'🌟', name:'Ten Flights',           desc:'Complete 10 flights.',                     check: s => s.totalFlights >= 10, prog: s => s.totalFlights, max: 10 },
+  { id:'fifty_flights',   icon:'💎', name:'Fifty Flights',         desc:'Complete 50 flights.',                     check: s => s.totalFlights >= 50, prog: s => s.totalFlights, max: 50 },
+  { id:'hundred_hours',   icon:'⏱', name:'100 Hours',             desc:'Log 100 flight hours.',                    check: s => s.totalHours >= 100,  prog: s => s.totalHours,   max: 100 },
+  { id:'five_hundred_hr', icon:'🎖', name:'500 Hours',             desc:'Log 500 flight hours.',                    check: s => s.totalHours >= 500,  prog: s => s.totalHours,   max: 500 },
+  { id:'long_haul',       icon:'🌍', name:'Long-Haul Pilot',       desc:'Complete a flight over 6 hours.',          check: s => s.longestDur >= 6 },
+  { id:'fleet_3',         icon:'✈', name:'Fleet Collector',       desc:'Fly 3 different aircraft.',                check: s => s.uniqueAircraft >= 3, prog: s => s.uniqueAircraft, max: 3 },
+  { id:'explorer_5',      icon:'🗺', name:'Airport Explorer',      desc:'Visit 5 different airports.',              check: s => s.uniqueAirports >= 5, prog: s => s.uniqueAirports, max: 5 },
+  { id:'explorer_20',     icon:'🌐', name:'International Explorer',desc:'Visit 20 different airports.',             check: s => s.uniqueAirports >= 20, prog: s => s.uniqueAirports, max: 20 },
+  { id:'consistent',      icon:'📅', name:'Consistent Flyer',      desc:'Fly at least once every week for a month.',check: s => s.thisMonth >= 4 },
+  { id:'smooth_land',     icon:'🎯', name:'Smooth Lander',         desc:'Record a landing under -100 fpm.',         check: s => s.bestLandingRate !== null && s.bestLandingRate > -100 },
+  { id:'thousand_nm',     icon:'🧭', name:'1000 nm',               desc:'Fly 1,000 nautical miles total.',          check: s => s.totalDist >= 1000, prog: s => s.totalDist, max: 1000 },
+];
+
+let earnedAchievements = {}; // id -> { earnedAt }
+
+async function loadAchievements() {
+  const rows = await dbAll('profile');
+  const row = rows.find(r => r.key === 'achievements');
+  if (row) earnedAchievements = row.value || {};
+}
+
+async function checkAchievements(flights) {
+  const stats = calcStats(flights);
+  let changed = false;
+  ACHIEVEMENTS.forEach(a => {
+    if (!earnedAchievements[a.id] && a.check(stats)) {
+      earnedAchievements[a.id] = { earnedAt: Date.now() };
+      changed = true;
+    }
+  });
+  if (changed) {
+    await dbPut('profile', { key: 'achievements', value: earnedAchievements });
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   RENDERING
+═══════════════════════════════════════════════════════════════════════ */
+let allFlights = [], stats = null, activeTab = 'overview';
+
+async function loadAndRender() {
+  allFlights = await dbAll('flights');
+  allFlights.sort((a,b) => (b.startTime||0) - (a.startTime||0));
+  stats = calcStats(allFlights);
+  renderActiveTab();
+}
+
+function switchTab(btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('act'));
+  btn.classList.add('act');
+  activeTab = btn.dataset.tab;
+  document.querySelectorAll('.tab-panel').forEach(el => el.style.display = 'none');
+  document.getElementById('tab-' + activeTab).style.display = '';
+  renderActiveTab();
+}
+
+function renderActiveTab() {
+  switch(activeTab) {
+    case 'overview':     renderOverview(); break;
+    case 'flights':      renderFlights(); break;
+    case 'aircraft':     renderAircraft(); break;
+    case 'airports':     renderAirportsTab(); break;
+    case 'achievements': renderAchievements(); break;
+    case 'profile':      renderProfileTab(); break;
+  }
+}
+
+/* ── Overview ── */
+function renderOverview() {
+  const s = stats;
+
+  // Mini profile header
+  document.getElementById('profile-header-mini').innerHTML = `
+    <div class="pilot-header">
+      <div class="avatar-circle">${profile.avatar || '✈'}</div>
+      <div class="pilot-info">
+        <h3>${profile.displayName || 'Pilot'}</h3>
+        <p>${profile.sim || 'Flight Simulator'} · ${s.totalFlights} flights logged</p>
+      </div>
+    </div>`;
+
+  // Stat tiles
+  document.getElementById('stat-grid').innerHTML = [
+    { label:'Total Flights', val: s.totalFlights },
+    { label:'Flight Hours', val: fmtHours(s.totalHours) },
+    { label:'Total Distance', val: s.totalDist.toFixed(0) + ' nm' },
+    { label:'Longest Flight', val: s.longestDur ? fmtHours(s.longestDur) : '—' },
+    { label:'Aircraft Types', val: s.uniqueAircraft },
+    { label:'Airports Visited', val: s.uniqueAirports },
+    { label:'Avg Duration', val: s.avgDur ? fmtHours(s.avgDur) : '—' },
+    { label:'This Month', val: s.thisMonth },
+  ].map(t => `<div class="stat-tile"><b>${t.val}</b><span>${t.label}</span></div>`).join('');
+
+  // Monthly chart
+  const monthKeys = Object.keys(s.monthMap).sort().slice(-12);
+  if (monthKeys.length) {
+    const maxH = Math.max(...monthKeys.map(k => s.monthMap[k]));
+    document.getElementById('activity-chart-section').style.display = '';
+    document.getElementById('monthly-chart').innerHTML = monthKeys.map(k => {
+      const frac = maxH ? s.monthMap[k] / maxH : 0;
+      const lbl = k.slice(5); // MM
+      return `<div class="bar-col">
+        <div class="bar-fill" style="height:${Math.max(4, frac*52)}px" title="${k}: ${fmtHours(s.monthMap[k])}"></div>
+        <div class="bar-label">${lbl}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Recent flights
+  const recent = allFlights.filter(f=>f.complete).slice(0,5);
+  document.getElementById('recent-flights-overview').innerHTML =
+    recent.length ? `<div class="section"><h2>Recent Flights</h2>${recent.map(flightRowHtml).join('')}</div>` : '';
+
+  // Bridge status
+  if (allFlights.length === 0) {
+    document.getElementById('bridge-status-block').innerHTML = `
+      <div class="empty-block">
+        <div class="big-icon">✈</div>
+        <p style="font-size:16px;font-weight:700;margin:0 0 8px">No flights logged yet</p>
+        <p style="margin:0;font-size:13px">Flights are automatically recorded when you fly in X-Plane 12 or MSFS with the Stratos bridge running.</p>
+        <div style="background:var(--ui2);border:1px solid var(--coast);border-radius:12px;padding:14px;margin-top:14px;text-align:left;font-size:13px">
+          <b style="display:block;margin-bottom:8px">To start logging:</b>
+          1. Run <code style="background:var(--land);padding:2px 6px;border-radius:4px">python3 stratos_bridge.py</code> on your PC<br>
+          2. Open X-Plane 12 or MSFS and start a flight<br>
+          3. Open this page via <code style="background:var(--land);padding:2px 6px;border-radius:4px">http://[your-PC-IP]:8765/logbook.html</code>
+        </div>
+      </div>`;
+  } else {
+    document.getElementById('bridge-status-block').innerHTML = '';
+  }
+}
+
+/* ── Flights tab ── */
+function renderFlights() {
+  const q = (document.getElementById('flight-search')?.value || '').toLowerCase();
+  const sort = document.getElementById('flight-sort')?.value || 'date-desc';
+
+  let flights = allFlights.filter(f => {
+    if (!q) return true;
+    return (f.depAirport||'').toLowerCase().includes(q) ||
+           (f.arrAirport||'').toLowerCase().includes(q) ||
+           (f.aircraft||'').toLowerCase().includes(q) ||
+           (f.callsign||'').toLowerCase().includes(q);
+  });
+
+  flights = flights.slice().sort((a,b) => {
+    if (sort === 'date-desc') return (b.startTime||0)-(a.startTime||0);
+    if (sort === 'date-asc')  return (a.startTime||0)-(b.startTime||0);
+    const ad = a.takeoffTime&&a.landingTime?(a.landingTime-a.takeoffTime):0;
+    const bd = b.takeoffTime&&b.landingTime?(b.landingTime-b.takeoffTime):0;
+    if (sort === 'dur-desc')  return bd-ad;
+    if (sort === 'dist-desc') return (b.distanceNm||0)-(a.distanceNm||0);
+    return 0;
+  });
+
+  const el = document.getElementById('flight-list');
+  if (!flights.length) {
+    el.innerHTML = '<div class="empty-block"><div class="big-icon">🗒</div><p>No flights match your search.</p></div>';
+    return;
+  }
+  el.innerHTML = flights.map(flightRowHtml).join('');
+}
+
+function flightRowHtml(f) {
+  const dep = f.depAirport || '?';
+  const arr = f.arrAirport || '?';
+  const dur = f.takeoffTime && f.landingTime ? fmtHours((f.landingTime-f.takeoffTime)/3600000) : '—';
+  const dist = f.distanceNm ? f.distanceNm.toFixed(0) + ' nm' : '—';
+  const date = f.startTime ? new Date(f.startTime).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}) : '—';
+  const incomplete = f.incomplete || !f.complete;
+  return `<div class="flight-row ${incomplete?'fl-incomplete':''}" onclick="openFlight('${f.id}')">
+    <div class="fl-badge">${dep}→${arr}</div>
+    <div class="fl-main">
+      <div class="fl-route">${dep} → ${arr}</div>
+      <div class="fl-sub">${f.aircraft || '—'} ${f.callsign ? '· ' + f.callsign : ''} ${incomplete ? '· <span style="color:var(--warn)">Incomplete</span>' : ''}</div>
+    </div>
+    <div class="fl-right"><b>${dur}</b>${dist}<br><span>${date}</span></div>
+  </div>`;
+}
+
+/* ── Aircraft tab ── */
+function renderAircraft() {
+  const { acMap, totalHours } = stats;
+  const el = document.getElementById('aircraft-grid');
+  const sorted = Object.entries(acMap).sort((a,b) => b[1].flights - a[1].flights);
+  if (!sorted.length) {
+    el.innerHTML = '<div class="empty-block"><div class="big-icon">✈</div><p>No aircraft in your logbook yet.</p></div>';
+    return;
+  }
+  el.innerHTML = sorted.map(([name, data]) => `
+    <div class="ac-card" onclick="openAircraft('${name.replace(/'/g,"\\'")}')">
+      <div class="ac-type">${name}</div>
+      <div class="ac-reg">${data.reg || ''} · Last flown ${data.last ? new Date(data.last).toLocaleDateString(undefined,{month:'short',day:'numeric'}) : '—'}</div>
+      <div class="ac-stats">
+        <div class="ac-stat"><b>${data.flights}</b><span>FLIGHTS</span></div>
+        <div class="ac-stat"><b>${fmtHours(data.hours)}</b><span>HOURS</span></div>
+        <div class="ac-stat"><b>${totalHours ? Math.round(data.hours/totalHours*100) : 0}%</b><span>OF TOTAL</span></div>
+      </div>
+    </div>`).join('');
+}
+
+/* ── Airports tab ── */
+function renderAirportsTab() {
+  const { aptMap } = stats;
+  const el = document.getElementById('airports-list');
+  const sorted = Object.entries(aptMap).sort((a,b)=>(b[1].dep+b[1].arr)-(a[1].dep+a[1].arr));
+  if (!sorted.length) {
+    el.innerHTML = '<div class="empty-block"><div class="big-icon">🗺</div><p>No airports in your logbook yet.</p></div>';
+    return;
+  }
+  el.innerHTML = '<div class="section"><h2>Airports Visited</h2>' +
+    sorted.map(([id, data]) => `
+    <div class="flight-row" onclick="window.open('stratos.html','_blank')">
+      <div class="fl-badge">${id}</div>
+      <div class="fl-main">
+        <div class="fl-route">${id}</div>
+        <div class="fl-sub">${data.dep} departures · ${data.arr} arrivals</div>
+      </div>
+      <div class="fl-right"><span>${data.last ? new Date(data.last).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}) : '—'}</span></div>
+    </div>`).join('') + '</div>';
+}
+
+/* ── Achievements tab ── */
+function renderAchievements() {
+  const s = stats;
+  document.getElementById('ach-grid').innerHTML = ACHIEVEMENTS.map(a => {
+    const earned = earnedAchievements[a.id];
+    const prog = a.prog ? Math.min(1, a.prog(s) / a.max) : (earned ? 1 : 0);
+    return `<div class="ach-card ${earned ? 'earned' : 'locked'}">
+      <div class="ach-icon">${a.icon}</div>
+      <div class="ach-name">${a.name}</div>
+      <div class="ach-desc">${a.desc}</div>
+      ${earned ? `<div class="ach-date">Earned ${new Date(earned.earnedAt).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}</div>` : ''}
+      ${!earned && a.prog !== undefined ? `<div class="ach-prog"><div class="ach-prog-fill" style="width:${(prog*100).toFixed(0)}%"></div></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+/* ── Profile tab ── */
+function renderProfileTab() {
+  const shareUrl = location.origin + '/pilot/' + (profile.username || 'me');
+  document.getElementById('profile-section').innerHTML = `
+    <div class="section">
+      <h2>Your Profile</h2>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+        <div class="avatar-circle">${profile.avatar || '✈'}</div>
+        <div>
+          <div style="font-size:18px;font-weight:800">${profile.displayName || 'Pilot'}</div>
+          <div style="font-size:12px;color:var(--mut)">${profile.username ? '@' + profile.username : 'Set a username below'}</div>
+        </div>
+      </div>
+
+      <label>Display Name
+        <input id="p-name" value="${profile.displayName || ''}" placeholder="Your name">
+      </label>
+      <label>Username (for your shareable link)
+        <input id="p-user" value="${profile.username || ''}" placeholder="e.g. nyclyy" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_-]/g,'')">
+      </label>
+      <label>Avatar (emoji)
+        <input id="p-avatar" value="${profile.avatar || '✈'}" placeholder="✈" maxlength="4">
+      </label>
+      <label>Bio
+        <textarea id="p-bio" rows="3" placeholder="A few words about your flying">${profile.bio || ''}</textarea>
+      </label>
+      <label>Preferred Simulator
+        <select id="p-sim">
+          ${['X-Plane 12','MSFS 2020','MSFS 2024','P3D','X-Plane 11','Other'].map(s=>`<option ${s===profile.sim?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </label>
+
+      <button class="save-btn" onclick="saveProfileForm()">Save Profile</button>
+    </div>
+
+    <div class="section" style="margin-top:12px">
+      <h2>Shareable Profile</h2>
+      <p style="font-size:13px;color:var(--mut);margin:0 0 10px">Your public profile can be shared with other pilots. Only information you choose to make public is visible.</p>
+      <div style="background:var(--land);border:1px solid var(--coast);border-radius:8px;padding:10px 12px;font-size:13px;font-variant-numeric:tabular-nums;word-break:break-all">
+        ${shareUrl}
+      </div>
+      <button class="share-btn" onclick="copyShareUrl('${shareUrl}')">📋 Copy profile link</button>
+      <div style="margin-top:10px;font-size:12px;color:var(--mut)">
+        Note: Public profiles require a backend. Currently your logbook is stored locally in this browser.
+        To make it shareable across devices, see the <a href="#" onclick="showCloudSetup()">cloud setup guide</a>.
+      </div>
+    </div>
+
+    <div class="section" style="margin-top:12px">
+      <h2>Data</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="topbar-btn" onclick="exportCSV()" style="flex:1">Export CSV</button>
+        <button class="topbar-btn" onclick="clearAllFlights()" style="flex:1;color:var(--red)">Clear All Flights</button>
+      </div>
+    </div>`;
+}
+
+function saveProfileForm() {
+  profile.displayName = document.getElementById('p-name').value.trim();
+  profile.username    = document.getElementById('p-user').value.trim().toLowerCase().replace(/[^a-z0-9_-]/g,'');
+  profile.avatar      = document.getElementById('p-avatar').value.trim() || '✈';
+  profile.bio         = document.getElementById('p-bio').value.trim();
+  profile.sim         = document.getElementById('p-sim').value;
+  saveProfile();
+  showToast('Profile saved.');
+  renderOverview();
+}
+
+function copyShareUrl(url) {
+  navigator.clipboard?.writeText(url).then(() => showToast('Link copied!')).catch(() => showToast(url));
+}
+
+function showCloudSetup() {
+  alert('To enable cross-device sync and public profiles:\n\n1. Set up Cloudflare D1 (free tier) via the Cloudflare dashboard.\n2. Deploy a Cloudflare Worker that reads/writes your logbook.\n3. Add your Worker URL as VITE_API_URL in your environment.\n\nDetailed instructions coming in the next update.');
+}
+
+/* ── Detail panel ── */
+function openFlight(id) {
+  const f = allFlights.find(x => x.id === id);
+  if (!f) return;
+  const dur = f.takeoffTime && f.landingTime ? fmtHours((f.landingTime-f.takeoffTime)/3600000) : '—';
+  const dist = f.distanceNm ? f.distanceNm.toFixed(1) + ' nm' : '—';
+  const vs = f.landingVS !== null && f.landingVS !== undefined ? Math.round(f.landingVS) + ' fpm' : '—';
+  const date = f.startTime ? new Date(f.startTime).toLocaleString() : '—';
+  const incomplete = f.incomplete || !f.complete;
+
+  document.getElementById('detail-inner').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h2 style="margin:0">${f.depAirport||'?'} → ${f.arrAirport||'?'}</h2>
+      <button onclick="closeDetail()" style="background:var(--ui2);border:1px solid var(--coast);border-radius:8px;color:var(--txt);font:inherit;padding:6px 10px;cursor:pointer">✕</button>
+    </div>
+    ${incomplete ? '<div style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--warn);margin-bottom:10px">⚠ This flight was incomplete (bridge disconnected or flight shorter than 60 s airborne).</div>' : ''}
+    <div class="detail-grid">
+      <div class="detail-cell"><span>DURATION</span><b>${dur}</b></div>
+      <div class="detail-cell"><span>DISTANCE</span><b>${dist}</b></div>
+      <div class="detail-cell"><span>AIRCRAFT</span><b>${f.aircraft||'—'}</b></div>
+      <div class="detail-cell"><span>MAX ALTITUDE</span><b>${f.maxAlt ? Math.round(f.maxAlt).toLocaleString() + ' ft' : '—'}</b></div>
+      <div class="detail-cell"><span>LANDING RATE</span><b>${vs}</b></div>
+      <div class="detail-cell"><span>SIMULATOR</span><b>${f.sim||'—'}</b></div>
+      ${f.callsign ? `<div class="detail-cell"><span>CALLSIGN</span><b>${f.callsign}</b></div>` : ''}
+      ${f.registration ? `<div class="detail-cell"><span>REGISTRATION</span><b>${f.registration}</b></div>` : ''}
+    </div>
+    <div style="font-size:12px;color:var(--mut);margin-top:8px">Departed: ${date}</div>
+    ${f.track.length > 2 ? `<div style="margin-top:8px;font-size:12px;color:var(--mut)">Track: ${f.track.length} points recorded</div>` : ''}
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onclick="deleteFlight('${f.id}')" style="flex:1;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3);border-radius:8px;color:var(--red);font:inherit;padding:10px;cursor:pointer">Delete flight</button>
+    </div>`;
+  document.getElementById('detail-panel').classList.add('show');
+}
+
+function openAircraft(name) {
+  const flights = allFlights.filter(f => f.aircraft === name && f.complete && !f.incomplete);
+  const hours = flights.reduce((a,f) => {
+    return a + (f.takeoffTime && f.landingTime ? (f.landingTime-f.takeoffTime)/3600000 : 0);
+  }, 0);
+  document.getElementById('detail-inner').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h2 style="margin:0">✈ ${name}</h2>
+      <button onclick="closeDetail()" style="background:var(--ui2);border:1px solid var(--coast);border-radius:8px;color:var(--txt);font:inherit;padding:6px 10px;cursor:pointer">✕</button>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-cell"><span>FLIGHTS</span><b>${flights.length}</b></div>
+      <div class="detail-cell"><span>HOURS</span><b>${fmtHours(hours)}</b></div>
+    </div>
+    <div class="section" style="margin-top:12px">
+      <h2>Flight History</h2>
+      ${flights.slice(0,20).map(flightRowHtml).join('')}
+    </div>`;
+  document.getElementById('detail-panel').classList.add('show');
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').classList.remove('show');
+}
+
+async function deleteFlight(id) {
+  if (!confirm('Delete this flight record? This cannot be undone.')) return;
+  await dbDelete('flights', id);
+  closeDetail();
+  await loadAndRender();
+  showToast('Flight deleted.');
+}
+
+async function clearAllFlights() {
+  if (!confirm('Delete ALL flight records? This cannot be undone.')) return;
+  const all = await dbAll('flights');
+  for (const f of all) await dbDelete('flights', f.id);
+  await loadAndRender();
+  showToast('All flights cleared.');
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   EXPORT
+═══════════════════════════════════════════════════════════════════════ */
+function exportCSV() {
+  const headers = ['ID','Date','Departure','Arrival','Aircraft','Registration','Callsign',
+    'Duration (h)','Distance (nm)','Max Altitude (ft)','Landing Rate (fpm)','Simulator','Complete'];
+  const rows = allFlights.map(f => [
+    f.id,
+    f.startTime ? new Date(f.startTime).toISOString() : '',
+    f.depAirport || '',
+    f.arrAirport || '',
+    f.aircraft || '',
+    f.registration || '',
+    f.callsign || '',
+    f.takeoffTime && f.landingTime ? ((f.landingTime-f.takeoffTime)/3600000).toFixed(2) : '',
+    f.distanceNm || '',
+    f.maxAlt ? Math.round(f.maxAlt) : '',
+    f.landingVS !== null && f.landingVS !== undefined ? Math.round(f.landingVS) : '',
+    f.sim || '',
+    f.complete && !f.incomplete ? 'Yes' : 'No'
+  ]);
+  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = 'stratos_logbook_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   DEMO FLIGHT IMPORT  (for testing without simulator)
+   Opens a test entry — remove in production
+═══════════════════════════════════════════════════════════════════════ */
+async function addDemoFlight() {
+  const demo = {
+    id: 'flt_demo_' + Date.now(),
+    state: 'COMPLETE',
+    startTime: Date.now() - 7200000,
+    takeoffTime: Date.now() - 7000000,
+    landingTime: Date.now() - 3800000,
+    endTime: Date.now() - 3700000,
+    depAirport: 'CYUL',
+    arrAirport: 'KJFK',
+    aircraft: 'Boeing 737-800',
+    registration: 'C-FNND',
+    callsign: 'AC901',
+    sim: 'X-Plane 12',
+    maxAlt: 37000,
+    distanceNm: 292,
+    fuelDep: 14200, fuelArr: 8400,
+    landingVS: -148,
+    track: [],
+    complete: true, incomplete: false
+  };
+  await dbPut('flights', demo);
+  await loadAndRender();
+  showToast('Demo flight added.');
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════════════════════════════ */
+function fmtHours(h) {
+  if (!h || !isFinite(h)) return '0:00';
+  const hr = Math.floor(h), mn = Math.round((h - hr) * 60);
+  return hr + ':' + String(mn).padStart(2,'0');
+}
+
+function fmtDurSec(s) {
+  const hr = Math.floor(s/3600), mn = Math.floor((s%3600)/60), sc = s%60;
+  return hr ? hr+':'+String(mn).padStart(2,'0')+':'+String(sc).padStart(2,'0')
+            : mn+':'+String(sc).padStart(2,'0');
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:calc(70px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:var(--acc);color:#04212b;font-weight:700;font-size:13px;padding:10px 18px;border-radius:999px;z-index:100;transition:opacity .4s';
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity=0; setTimeout(()=>t.remove(),400); }, 2500);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════════════ */
+(async () => {
+  await loadProfile();
+  await loadAchievements();
+  await loadAndRender();
+})();
+
+// Expose for inline event handlers
+window.openFlight   = openFlight;
+window.openAircraft = openAircraft;
+window.closeDetail  = closeDetail;
+window.deleteFlight = deleteFlight;
+window.addDemoFlight = addDemoFlight;
+window.clearAllFlights = clearAllFlights;
+window.exportCSV    = exportCSV;
+window.saveProfileForm = saveProfileForm;
+window.copyShareUrl = copyShareUrl;
+window.showCloudSetup = showCloudSetup;
+window.renderFlights = renderFlights;
+window.switchTab = switchTab;
+window.fetchMini = typeof fetchMini !== 'undefined' ? fetchMini : () => {};
+</script>
+</body>
+</html>
