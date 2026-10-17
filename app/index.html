@@ -92,8 +92,7 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 <div id="fc" class="box"></div><div id="fab"><button id="bTheme" class="fab" title="Theme">Day</button>
 <button id="bLay" class="fab" title="Layers">&#9776;</button><button id="bPlan" class="fab" title="Add waypoints">&#9998;</button><button id="bFol" class="fab" title="Follow aircraft">&#9992;</button><button id="bZi" class="fab" title="Zoom in">+</button><button id="bZo" class="fab" title="Zoom out">−</button>
 </div><div id="lay"><b>Map layers</b><button data-l="apt" class="on">Airports</button><button data-l="nav" class="on">Navaids</button><button data-l="trf" class="on">Traffic</button><button data-l="trl">All trails</button><button data-l="grid">Grid</button><b>Map style</b><div id="ms"></div></div>
-<div id="tabs" class="box"><button class="tab" id="bMap"><b>&#8982;</b>Map</button><button class="tab" id="bCh"><b>&#9707;</b>Charts</button><button class="tab" id="bRoute"><b>&#8599;</b>Route</button><button class="tab" id="bWx"><b>&#9729;</b>METAR</button><button class="tab" id="bLive"><b>&#9673;</b>Live</button>
-<button class="tab" id="bLogbook"><b>▤</b>Logbook</button><button class="tab" id="bData"><b>&#9636;</b>Data</button><button class="tab" id="bSet"><b>&#9881;</b>Settings</button></div>
+<div id="tabs" class="box"><button class="tab" id="bMap"><b>&#8982;</b>Map</button><button class="tab" id="bCh"><b>&#9707;</b>Charts</button><button class="tab" id="bRoute"><b>&#8599;</b>Route</button><button class="tab" id="bWx"><b>&#9729;</b>METAR</button><button class="tab" id="bLive"><b>&#9673;</b>Live</button><button class="tab" id="bData"><b>&#9636;</b>Data</button><button class="tab" id="bSet"><b>&#9881;</b>Settings</button><button class="tab" id="bLog" onclick="location.href='logbook.html'"><b>&#128203;</b>Logbook</button></div>
 <div id="cv"><div class="cvh"><button id="cvx" aria-label="Back">&#8592;</button><div class="cvt"><b id="cvi"></b><span id="cvn"></span><span id="cvm"></span></div><button id="cvf">Fit</button></div><div class="seg" id="cvs"></div></div><div id="ci"></div>
 <div id="pdf"><div class="pdh"><button id="pdx" aria-label="Back">&#8592;</button><b id="pdt"></b><a id="pda" target="_blank" rel="noopener">Open outside app</a></div><div class="pdb"><iframe id="pdf2" title="Chart"></iframe></div></div>
 <div id="chart"></div>
@@ -282,7 +281,7 @@ function pairs(a){const o=[];a.rw.forEach(n=>{if(!o.some(p=>p[0]==n||p[1]==n))o.
 function liveOk(){return live.on&&live.d&&live.d.lat!=null&&live.d.age<3&&performance.now()-live.at<3000}
 const cv=$('#map'),cx=cv.getContext('2d');let W,H,dpr,C={};
 const V={lon:-119.5,lat:38.8,z:6,fol:false},L={apt:1,nav:1,trf:1,grid:0,style:(function(){try{return localStorage.getItem('dl.style')||'sat'}catch(e){return'sat'}})()};
-let plan=false,panel=null,sel=null,route=[],trav=0,own={lat:0,lon:0,hdg:0,alt:0,vs:0};
+let plan=false,panel=new URLSearchParams(location.search).get('panel')==='wx'?'wx':null,sel=null,route=[],trav=0,own={lat:0,lon:0,hdg:0,alt:0,vs:0};
 const byId=id=>A.find(a=>a.id==id)||N.find(a=>a.id==id);
 const wp=o=>({id:o.id,name:o.name,lat:o.lat,lon:o.lon,k:o.k||'fix',elev:o.elev||0});
 const wpx=(lon,lat)=>{const k=SZ*2**V.z,s=Math.sin(lat*R);return[(lon+180)/360*k,(.5-Math.log((1+s)/(1-s))/(4*Math.PI))*k]};
@@ -369,10 +368,11 @@ if(CH.on)chartFx();if(sel&&!CH.on){const q=sel.k=='own'?own:sel,[x,y]=sc(q.lon,q
 let last=performance.now();(function loop(t){step(Math.min((t-last)/1000,.2));last=t;draw();requestAnimationFrame(loop)})(last);
 /* interaction */
 let drag=null;
-cv.onpointerdown=e=>{V.in=null;cv.setPointerCapture(e.pointerId);drag={x:e.clientX,y:e.clientY,c:wpx(V.lon,V.lat),m:0}};
-cv.onpointermove=e=>{if(!drag||pd)return;{const nw=performance.now();if(drag.t){const k=Math.max(1,nw-drag.t);drag.vx=(e.clientX-drag.px)/k*1000;drag.vy=(e.clientY-drag.py)/k*1000}drag.t=nw;drag.px=e.clientX;drag.py=e.clientY}const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.m=Math.max(drag.m,Math.hypot(dx,dy));if(drag.m>5){setFol(false);tk=false;const p=wun(drag.c[0]-dx,drag.c[1]-dy);V.lon=p[0];V.lat=p[1]}};
-cv.onpointerup=e=>{if(drag&&drag.m>5&&drag.vx!=null&&performance.now()-drag.t<90)V.in=[drag.vx,drag.vy];if(drag&&drag.m<=5&&!pd)tap(e.clientX,e.clientY);drag=null};
-let pd=0;cv.addEventListener('touchmove',e=>{if(e.touches.length==2){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if(pd){const base=V.tz==null?V.z:V.tz;V.tz=Math.max(2.5,Math.min(17.5,base+Math.log2(d/pd)))}pd=d;drag=null}},{passive:true});cv.addEventListener('touchend',e=>{if(e.touches.length<2)setTimeout(()=>pd=0,80)});
+function mapPoint(x,y){const r=cv.getBoundingClientRect();return[(x-r.left)*W/(r.width||W),(y-r.top)*H/(r.height||H)]}
+cv.onpointerdown=e=>{V.in=null;cv.setPointerCapture(e.pointerId);const[x,y]=mapPoint(e.clientX,e.clientY);drag={x,y,c:wpx(V.lon,V.lat),m:0}};
+cv.onpointermove=e=>{if(!drag||pd)return;const[x,y]=mapPoint(e.clientX,e.clientY);{const nw=performance.now();if(drag.t){const k=Math.max(1,nw-drag.t);drag.vx=(x-drag.px)/k*1000;drag.vy=(y-drag.py)/k*1000}drag.t=nw;drag.px=x;drag.py=y}const dx=x-drag.x,dy=y-drag.y;drag.m=Math.max(drag.m,Math.hypot(dx,dy));if(drag.m>5){setFol(false);tk=false;const p=wun(drag.c[0]-dx,drag.c[1]-dy);V.lon=p[0];V.lat=p[1]}};
+cv.onpointerup=e=>{if(drag&&drag.m>5&&drag.vx!=null&&performance.now()-drag.t<90)V.in=[drag.vx,drag.vy];if(drag&&drag.m<=5&&!pd)tap(...mapPoint(e.clientX,e.clientY));drag=null};
+let pd=0;cv.addEventListener('touchstart',e=>{if(e.touches.length===2){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;pd=Math.hypot(dx,dy);drag=null;V.in=null;setFol(false)}},{passive:true});cv.addEventListener('touchmove',e=>{if(e.touches.length===2){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if(pd){const base=V.tz==null?V.z:V.tz;V.tz=Math.max(2.5,Math.min(17.5,base+Math.log2(d/pd)))}pd=d;drag=null;setFol(false)}},{passive:true});cv.addEventListener('touchend',e=>{if(e.touches.length<2)pd=0});cv.addEventListener('touchcancel',()=>{pd=0;drag=null});
 cv.onwheel=e=>{e.preventDefault();const base=V.tz==null?V.z:V.tz;V.tz=Math.max(2.5,Math.min(17.5,base-e.deltaY*.0025));setFol(false)};
 $('#bZi').onclick=()=>{V.tz=Math.min(17.5,(V.tz==null?V.z:V.tz)+.7);setFol(false)};$('#bZo').onclick=()=>{V.tz=Math.max(2.5,(V.tz==null?V.z:V.tz)-.7);setFol(false)};
 function setFol(v){V.fol=v;$('#bFol').classList.toggle('on',v)}
@@ -395,14 +395,7 @@ function wind(m){const r=m.match(/(\d{3}|VRB)(\d{2,3})(G(\d{2,3}))?KT/);return r
 function rwTable(a){const w=wind(a.metar);if(!w)return'<div class="m">No wind data without a live METAR.</div>';if(w.d==null)return'<div class="m">Variable wind – no component.</div>';const sp=Math.max(w.s,w.g);let h='<table><tr><th>Runway</th><th>Head/tail</th><th>Cross</th></tr>';
 pairs(a).forEach(pr=>pr.forEach(r=>{const an=(w.d-r*10)*R,hw=Math.round(sp*Math.cos(an)),xw=Math.round(sp*Math.sin(an));h+=`<tr><td>${String(r).padStart(2,'0')}</td><td>${Math.abs(hw)} kt ${hw>=0?'head':'tail'}</td><td>${Math.abs(xw)} kt ${xw>0?'from R':xw<0?'from L':''}</td></tr>`}));return h+'</table>'}
 function render(){const s=$('#sheet');tabHi();if(!panel){s.style.display='none';return}s.style.display='block';
-if(panel=='live'){s.innerHTML=liveHtml();return}
-if(panel=='data'){s.innerHTML=dataHtml();return}
-if(panel=='logbook'){
-  s.innerHTML='<iframe src="logbook.html?embedded=1" style="width:100%;height:70vh;min-height:500px;border:0;background:#0b1118;border-radius:12px"></iframe>';
-  return;
-}
-if(panel=='wx'){s.innerHTML=wxHtml();return}
-if(panel=='charts'){s.innerHTML=chHtml();return}if(panel=='settings'){s.innerHTML=settingsHtml();return}if(panel=='sel'&&sel){const o=sel;if(o.k=='trf'||o.k=='own'){s.innerHTML=planeHtml(o);updPl();return}if(o.k=='apt'){getMetar(o);s.innerHTML=aptHtml(o);return}
+if(panel=='live'){s.innerHTML=liveHtml();return}if(panel=='data'){s.innerHTML=dataHtml();return}if(panel=='wx'){s.innerHTML=wxHtml();return}if(panel=='charts'){s.innerHTML=chHtml();return}if(panel=='settings'){s.innerHTML=settingsHtml();return}if(panel=='sel'&&sel){const o=sel;if(o.k=='trf'||o.k=='own'){s.innerHTML=planeHtml(o);updPl();return}if(o.k=='apt'){getMetar(o);s.innerHTML=aptHtml(o);return}
 if(o.k=='apt')getMetar(o);if(o.k=='apt')s.innerHTML=`<h3>${o.id} · ${o.name}</h3><div class="m">Elev ${o.elev} ft · TWR ${o.twr} · ATIS ${o.atis}</div><div class="m">Runways: ${pairs(o).map(p=>p.map(x=>String(x).padStart(2,'0')).join('/')).join(', ')}</div><code>${o.metar}</code><div class="m">${dec(o.metar)}</div><div class="m">${mAge(o)}</div><div class="m">Real-time reports from AviationWeather.gov via the bridge. Wind uses gusts.</div><div class="m">${o.rws?'':'Unverified placeholder data. Import the data pack (Data tab) for real runways, frequencies and layout.<br>'}${o.lat.toFixed(3)}, ${o.lon.toFixed(3)}${liveOk()?' - '+Math.round(dist(own,o))+' nm from you':''}</div>${rwTable(o)}<div class="row"><button onclick="openChart(sel)">Layout</button><button onclick="chSel=sel;panel='charts';render()">Charts</button><button onclick="addSel()">Add to route</button><button onclick="chartMap()">Zoom in</button></div>`;
 else if(o.k=='nav')s.innerHTML=`<h3>${o.id} · ${o.name}</h3><div class="m">${o.type} · ${o.freq} · ${o.lat.toFixed(3)}, ${o.lon.toFixed(3)}</div><div class="row"><button onclick="addSel()">Add to route</button></div>`;
 else s.innerHTML=`<h3>${o.id}</h3><div class="m">Alt ${Math.round(o.alt/10)*10} ft · ${o.gs?o.gs+' kt · ':''}HDG ${String(Math.round(o.hdg)).padStart(3,'0')}°</div>`;return}
@@ -493,7 +486,6 @@ function faaHtml(a){const f=a.faa;if(!f)return/^[KP]/.test(a.id)?'<div class="m"
 return '<h3 style="margin-top:10px">Official FAA charts (cycle '+f.cycle+')</h3><div class="row">'+f.c.map(c=>'<a href="https://aeronav.faa.gov/d-tpp/'+f.cycle+'/'+c[2]+'" target="_blank" rel="noopener"><button>'+(c[0]=='APD'?'Airport diagram':c[1])+'</button></a>').join('')+'</div>'}
 function getFaa(a){if(location.protocol!='http:'||a.faa||a.fq)return;a.fq=1;fetch('/faa?id='+a.id).then(r=>r.json()).then(j=>{if(j&&j.c){a.faa=j;if($('#chart').style.display=='block'&&sel==a)openChart(a)}}).catch(()=>{})}
 $('#bData').onclick=()=>{panel=panel=='data'?null:'data';render()};
-  $('#bLogbook').onclick=()=>{panel=panel=='logbook'?null:'logbook';render()};
 idb('get').then(t=>{if(t)applyPack(JSON.parse(t))}).catch(()=>{});
 function settingsHtml(){
   const sbUser=localStorage.getItem('stratos.simbrief.id')||'';
