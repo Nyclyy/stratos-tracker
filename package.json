@@ -48,7 +48,8 @@
       "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Stratos"
+      "shortcutName": "Stratos",
+      "runAfterFinish": true
     }
   },
   "dependencies": {
