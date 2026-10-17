@@ -297,45 +297,67 @@ class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
- def do_GET(self):
-    if self.path.startswith('/logbook.json'):
-        _handle_logbook(self)
-        return
-    
-    if self.path.startswith("/stream"):
+
+    def do_GET(self):
+        if self.path.startswith("/logbook.json"):
+            _handle_logbook(self)
+            return
+
+        if self.path.startswith("/logbook.html"):
+            try:
+                body = open(os.path.join(HERE, "logbook.html"), "rb").read()
+            except OSError:
+                self.send_error(404, "logbook.html not found next to this script")
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/stream"):
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
-                      try:
+
+            try:
                 while True:
                     with lock:
                         s = dict(state)
                     s["age"] = time.time() - s.get("t", 0)
-                    s['flightPhase'] = get_flight_phase()
-                    self.wfile.write(("data: " + json.dumps(s) + "\n\n").encode())
+                    s["flightPhase"] = get_flight_phase()
+                    self.wfile.write(
+                        ("data: " + json.dumps(s) + "\n\n").encode()
+                    )
                     self.wfile.flush()
                     time.sleep(0.2)
             except Exception:
                 return
-                    self.wfile.flush()
-                    time.sleep(0.2)
-            except Exception:
-                return
+
         if self.path.startswith("/osm"):
             import urllib.parse
-            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            qs = urllib.parse.parse_qs(
+                urllib.parse.urlparse(self.path).query
+            )
             try:
-                body = osm_airfield(qs["id"][0], float(qs["lat"][0]), float(qs["lon"][0])).encode()
+                body = osm_airfield(
+                    qs["id"][0],
+                    float(qs["lat"][0]),
+                    float(qs["lon"][0])
+                ).encode()
             except Exception:
                 body = b"[]"
+
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
             return
+
         m = re.match(r"/tile/(\d+)/(\d+)/(\d+)", self.path)
         if m:
             try:
@@ -349,8 +371,11 @@ class H(BaseHTTPRequestHandler):
             except Exception:
                 self.send_error(404)
             return
+
         if self.path.startswith("/faa"):
-            ident = re.sub(r"\W", "", self.path.split("id=")[-1].split("&")[0]).upper()
+            ident = re.sub(
+                r"\W", "", self.path.split("id=")[-1].split("&")[0]
+            ).upper()
             body = json.dumps(FAA.get(ident, {})).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -358,6 +383,7 @@ class H(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+
         if self.path.startswith("/navaids.json"):
             body = json.dumps(navaids).encode()
             self.send_response(200)
@@ -366,36 +392,48 @@ class H(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+
         if self.path.startswith("/airports.json") or self.path.startswith("/metar"):
             if self.path.startswith("/metar"):
-                ids = re.sub(r"[^A-Za-z0-9,]", "", self.path.split("ids=")[-1].split("&")[0])[:40]
+                ids = re.sub(
+                    r"[^A-Za-z0-9,]",
+                    "",
+                    self.path.split("ids=")[-1].split("&")[0]
+                )[:40]
                 hit = METARS.get(ids)
+
                 if hit and time.time() - hit[0] < 120:
                     body = hit[1]
                 else:
                     try:
                         req = urllib.request.Request(
                             "https://aviationweather.gov/api/data/metar?format=raw&ids=" + ids,
-                            headers={"User-Agent": "stratos"})
+                            headers={"User-Agent": "stratos"}
+                        )
                         body = urllib.request.urlopen(req, timeout=10).read()
                         if body:
                             METARS[ids] = (time.time(), body)
                     except Exception:
                         body = hit[1] if hit else b""
+
                 ctype = "text/plain"
             else:
-                body, ctype = json.dumps(airports).encode(), "application/json"
+                body = json.dumps(airports).encode()
+                ctype = "application/json"
+
             self.send_response(200)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
             return
+
         try:
             body = open(os.path.join(HERE, "stratos.html"), "rb").read()
         except OSError:
             self.send_error(404, "stratos.html not found next to this script")
             return
+
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
