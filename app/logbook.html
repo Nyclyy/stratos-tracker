@@ -219,7 +219,7 @@ a { color: var(--acc); }
 
 <!-- Topbar -->
 <header id="topbar">
-  <a class="home" href="stratos.html">STRA<span>T</span>OS</a>
+  <a class="home" href="index.html">STRA<span>T</span>OS</a>
   <h1>Logbook</h1>
   <div class="spacer"></div>
   <button class="topbar-btn" onclick="exportCSV()">Export CSV</button>
@@ -300,7 +300,7 @@ a { color: var(--acc); }
 <!-- Bottom nav -->
 <nav id="bottom-nav">
   <a class="bnav-item" href="index.html"><span class="icon">⊕</span>Map</a>
-  <a class="bnav-item" href="index.html?panel=wx"><span class="icon">⛅</span>Weather</a>
+  <a class="bnav-item" href="weather.html"><span class="icon">⛅</span>Weather</a>
   <a class="bnav-item act" href="#overview" onclick="switchTab(document.querySelector('.tab-btn[data-tab=overview]')); return false;"><span class="icon">📋</span>Logbook</a>
   <a class="bnav-item" href="#profile" onclick="switchTab(document.querySelector('.tab-btn[data-tab=profile]')); return false;"><span class="icon">✈</span>Profile</a>
 </nav>
@@ -883,7 +883,7 @@ function renderAirportsTab() {
   }
   el.innerHTML = '<div class="section"><h2>Airports Visited</h2>' +
     sorted.map(([id, data]) => `
-    <div class="flight-row" onclick="window.open('stratos.html','_blank')">
+    <div class="flight-row" onclick="window.open('index.html','_self')">
       <div class="fl-badge">${id}</div>
       <div class="fl-main">
         <div class="fl-route">${id}</div>
@@ -1148,6 +1148,8 @@ function showToast(msg) {
   await loadProfile();
   await loadAchievements();
   await loadAndRender();
+  const initialTab = [...document.querySelectorAll('.tab-btn')].find(btn => btn.dataset.tab === location.hash.slice(1));
+  if (initialTab) switchTab(initialTab);
 })();
 
 // Expose for inline event handlers
