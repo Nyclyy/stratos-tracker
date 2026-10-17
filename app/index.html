@@ -490,6 +490,7 @@ function faaHtml(a){const f=a.faa;if(!f)return/^[KP]/.test(a.id)?'<div class="m"
 return '<h3 style="margin-top:10px">Official FAA charts (cycle '+f.cycle+')</h3><div class="row">'+f.c.map(c=>'<a href="https://aeronav.faa.gov/d-tpp/'+f.cycle+'/'+c[2]+'" target="_blank" rel="noopener"><button>'+(c[0]=='APD'?'Airport diagram':c[1])+'</button></a>').join('')+'</div>'}
 function getFaa(a){if(location.protocol!='http:'||a.faa||a.fq)return;a.fq=1;fetch('/faa?id='+a.id).then(r=>r.json()).then(j=>{if(j&&j.c){a.faa=j;if($('#chart').style.display=='block'&&sel==a)openChart(a)}}).catch(()=>{})}
 $('#bData').onclick=()=>{panel=panel=='data'?null:'data';render()};
+  $('#bLogbook').onclick=()=>{panel=panel=='logbook'?null:'logbook';render()};
 idb('get').then(t=>{if(t)applyPack(JSON.parse(t))}).catch(()=>{});
 function settingsHtml(){
   const sbUser=localStorage.getItem('stratos.simbrief.id')||'';
