@@ -279,7 +279,7 @@ const PL=[[0,-14],[2,-8],[2,-3],[13,3],[13,6],[2,3],[2,9],[5,12],[5,14],[0,13],[
 const RL={KSFO:[11870,8650],KOAK:[10520],KSJC:[11000],KSAC:[8600],KRNO:[11002],KLAX:[12091],KSAN:[9400],KLAS:[14510],KPHX:[11489],KSEA:[11901],KPDX:[11000],KBOI:[10000],KSLC:[12000],KDEN:[16000],KABQ:[13793],KDFW:[13401],KAUS:[12250],KIAH:[12001],KMSP:[11006],KORD:[13000],KATL:[11889],KMIA:[13016],KJFK:[14511],KBOS:[10083],KDCA:[7169],KCLT:[10000],KLGA:[7001,7003],KEWR:[11000,6726],KPHL:[10506,6500],KMCO:[12005,10000],KTPA:[11002,8300],KMDW:[6445,6522],KHOU:[7602,6000],KSNA:[5700],CYYZ:[11120,9697,11050],CYVR:[11500,7300],CYUL:[11000,7000],CYYC:[8000,14000],CYEG:[10200,9900],CYOW:[10000,8000],CYWG:[8700,7700],CYHZ:[8800,7700],CYQB:[9000,5700],CYYJ:[7000,5000],EGLL:[12802],EGKK:[10879],EGCC:[10000],EGPH:[8400],EIDW:[10200,6800],LFPG:[13780,8858],LFPO:[7874,10893],EHAM:[11300,11500],EDDF:[13123,13123],EDDM:[13123],EDDB:[11975],LEMD:[14270,11483],LEBL:[10997,8530],LIRF:[12795],LIMC:[12861],LSZH:[12139,10827,8858],LOWW:[11811,11483],EKCH:[11811,10890],ESSA:[10830,8000],ENGM:[11811],EFHK:[11204,9514],EPWA:[12106,9183],LKPR:[12198,10663],LHBP:[12162],LGAV:[13123],LTFM:[13123],LPPT:[12467],BIKF:[10190,10000]};
 function pairs(a){const o=[];a.rw.forEach(n=>{if(!o.some(p=>p[0]==n||p[1]==n))o.push([n,(n+17)%36+1])});return o}
 function liveOk(){return live.on&&live.d&&live.d.lat!=null&&live.d.age<3&&performance.now()-live.at<3000}
-const cv=$('#map'),cx=cv.getContext('2d');let W,H,dpr,C={};
+const cv=$('#map'),cx=cv.getContext('2d');let W,H,dpr,C={},zoomFocus=null;
 const V={lon:-119.5,lat:38.8,z:6,fol:false},L={apt:1,nav:1,trf:1,grid:0,style:(function(){try{return localStorage.getItem('dl.style')||'sat'}catch(e){return'sat'}})()};
 let plan=false,panel=new URLSearchParams(location.search).get('panel')==='wx'?'wx':null,sel=null,route=[],trav=0,own={lat:0,lon:0,hdg:0,alt:0,vs:0};
 const byId=id=>A.find(a=>a.id==id)||N.find(a=>a.id==id);
@@ -367,7 +367,7 @@ if(liveOk()){const[x,y]=sc(own.lon,own.lat);cx.save();cx.translate(x,y);cx.rotat
 if(CH.on)chartFx();if(sel&&!CH.on){const q=sel.k=='own'?own:sel,[x,y]=sc(q.lon,q.lat);cx.strokeStyle=C.txt;cx.lineWidth=2;cx.beginPath();cx.arc(x,y,16+(tk?3*Math.sin(performance.now()/260):0),0,7);cx.stroke()}}
 let last=performance.now();(function loop(t){step(Math.min((t-last)/1000,.2));last=t;draw();requestAnimationFrame(loop)})(last);
 /* interaction */
-let drag=null,zoomFocus=null;
+let drag=null;
 function mapPoint(x,y){const r=cv.getBoundingClientRect();return[(x-r.left)*W/(r.width||W),(y-r.top)*H/(r.height||H)]}
 function zoomAt(clientX,clientY,newZ){const[x,y]=mapPoint(clientX,clientY),c=wpx(V.lon,V.lat),p=wun(c[0]+x-W/2,c[1]+y-H/2);zoomFocus={x,y,lon:p[0],lat:p[1]};V.tz=Math.max(2.5,Math.min(17.5,newZ));V.in=null;drag=null;setFol(false)}
 cv.onpointerdown=e=>{V.in=null;V.tz=null;zoomFocus=null;cv.setPointerCapture(e.pointerId);const[x,y]=mapPoint(e.clientX,e.clientY);drag={x,y,c:wpx(V.lon,V.lat),m:0}};
