@@ -397,7 +397,10 @@ pairs(a).forEach(pr=>pr.forEach(r=>{const an=(w.d-r*10)*R,hw=Math.round(sp*Math.
 function render(){const s=$('#sheet');tabHi();if(!panel){s.style.display='none';return}s.style.display='block';
 if(panel=='live'){s.innerHTML=liveHtml();return}
 if(panel=='data'){s.innerHTML=dataHtml();return}
-if(panel=='logbook'){s.innerHTML=logbookAppHtml();return}
+if(panel=='logbook'){
+  s.innerHTML='<iframe src="logbook.html?embedded=1" style="width:100%;height:70vh;min-height:500px;border:0;background:#0b1118;border-radius:12px"></iframe>';
+  return;
+}
 if(panel=='wx'){s.innerHTML=wxHtml();return}
 if(panel=='charts'){s.innerHTML=chHtml();return}if(panel=='settings'){s.innerHTML=settingsHtml();return}if(panel=='sel'&&sel){const o=sel;if(o.k=='trf'||o.k=='own'){s.innerHTML=planeHtml(o);updPl();return}if(o.k=='apt'){getMetar(o);s.innerHTML=aptHtml(o);return}
 if(o.k=='apt')getMetar(o);if(o.k=='apt')s.innerHTML=`<h3>${o.id} · ${o.name}</h3><div class="m">Elev ${o.elev} ft · TWR ${o.twr} · ATIS ${o.atis}</div><div class="m">Runways: ${pairs(o).map(p=>p.map(x=>String(x).padStart(2,'0')).join('/')).join(', ')}</div><code>${o.metar}</code><div class="m">${dec(o.metar)}</div><div class="m">${mAge(o)}</div><div class="m">Real-time reports from AviationWeather.gov via the bridge. Wind uses gusts.</div><div class="m">${o.rws?'':'Unverified placeholder data. Import the data pack (Data tab) for real runways, frequencies and layout.<br>'}${o.lat.toFixed(3)}, ${o.lon.toFixed(3)}${liveOk()?' - '+Math.round(dist(own,o))+' nm from you':''}</div>${rwTable(o)}<div class="row"><button onclick="openChart(sel)">Layout</button><button onclick="chSel=sel;panel='charts';render()">Charts</button><button onclick="addSel()">Add to route</button><button onclick="chartMap()">Zoom in</button></div>`;
