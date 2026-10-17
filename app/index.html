@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-180.png">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Stratos"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="theme-color" content="#0b1118">
+<title>Stratos - flight tracker and charts</title>
+<style>
+:root{--bg:#bcd6e4;--land:#efe9d6;--coast:#5c7b8b;--grid:rgba(40,70,90,.16);--ap:#c2410c;--nav:#0f766e;--route:#6d28d9;--own:#e11d48;--txt:#1b2a33;--ui:rgba(255,253,246,.94);--ui2:#e6e0cd;--mut:#5d6b73;--trf:#1d4ed8;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root[data-theme=night]{--bg:#0b1118;--land:#15222d;--coast:#3d5a6e;--grid:rgba(150,190,220,.11);--ap:#fb923c;--nav:#2dd4bf;--route:#a78bfa;--own:#fb7185;--txt:#dce8ef;--ui:rgba(14,26,37,.94);--ui2:#1f3141;--mut:#8ea3b1;--trf:#7dd3fc;color-scheme:dark}
+:root[data-theme=contrast]{--bg:#000;--land:#0d0d0d;--coast:#fff;--grid:rgba(255,255,255,.3);--ap:#ff0;--nav:#0ff;--route:#f0f;--own:#fff;--txt:#fff;--ui:#000;--ui2:#333;--mut:#ddd;--trf:#7f7;color-scheme:dark}
+html,body{height:100%;min-height:100%;margin:0;background:var(--bg);color:var(--txt);font:14px/1.35 "Trebuchet MS","Segoe UI",system-ui,sans-serif;overscroll-behavior:none}
+#app{position:relative;height:100vh;height:100dvh;min-height:320px;overflow:hidden;isolation:isolate}
+canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+.box{background:var(--ui);border:1px solid var(--ui2);border-radius:10px;position:absolute;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+#top{top:8px;left:8px;right:8px;display:flex;gap:6px;background:none;border:0;box-shadow:none;max-width:560px}
+#q{flex:1;min-width:0;padding:10px 12px;border-radius:10px;border:1px solid var(--ui2);background:var(--ui);color:var(--txt);font:inherit;font-size:16px}
+button{font:inherit;color:var(--txt);background:var(--ui);border:1px solid var(--ui2);border-radius:8px;padding:7px 10px;cursor:pointer}
+button.on{background:var(--route);color:#fff;border-color:var(--route)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--route);outline-offset:1px}
+#res{top:54px;left:8px;width:min(340px,calc(100% - 16px));max-height:40%;overflow:auto;display:none}
+#res div{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--ui2)}
+#chips{top:54px;right:8px;display:flex;flex-direction:column;gap:5px;background:none;border:0;box-shadow:none}
+#sheet{left:8px;bottom:84px;width:min(440px,calc(100% - 16px));max-height:46%;overflow:auto;padding:12px;display:none}
+#tel{left:8px;right:8px;bottom:8px;display:grid;grid-template-columns:repeat(6,1fr);max-width:560px;text-align:center;padding:6px 2px}
+#tel b{display:block;font-size:16px;font-variant-numeric:tabular-nums}#tel span{font-size:11px;color:var(--mut)}
+h3{margin:0 0 2px;font-size:17px}.m{color:var(--mut);font-size:12px}
+table{border-collapse:collapse;width:100%;margin:6px 0}td,th{padding:3px 6px;text-align:left;border-bottom:1px solid var(--ui2);font-size:13px}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+code,pre{font:12px ui-monospace,Consolas,monospace;background:var(--ui2);padding:5px 7px;border-radius:6px;display:block;white-space:pre-wrap}
+textarea{width:100%;height:150px;box-sizing:border-box;background:var(--ui2);color:var(--txt);border:0;border-radius:6px;font:12px ui-monospace,monospace}
+html{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}textarea,input{-webkit-user-select:text;user-select:text}button{min-height:36px}
+#chart{position:absolute;inset:0;background:var(--bg);z-index:5;display:none;overflow:auto;padding:10px}#chart svg{width:100%;max-height:60vh;display:block}
+@media(max-width:420px){#tel b{font-size:13px}#tel span{font-size:10px}#top{left:8px;right:62px;top:8px}#sb{padding:0 12px}#q{padding:12px 0;font-size:16px}#fab{right:8px;top:8px;gap:7px}.fab{width:42px;height:42px}#res{left:8px;right:58px;top:62px}#sheet{left:8px;right:8px;bottom:72px;max-height:min(48dvh,420px);padding:12px;border-radius:16px}#tabs{padding-bottom:max(7px,env(safe-area-inset-bottom));}button{padding:8px 10px}}
+:root{--acc:#2563eb}:root[data-theme=night]{--acc:#60a5fa}:root[data-theme=contrast]{--acc:#fde047}
+html,body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,system-ui,sans-serif}
+.box,#sb,.fab,#lay,#st{-webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4)}
+button{border-radius:12px;padding:9px 14px;font-weight:600;border-color:transparent;background:var(--ui2)}
+button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-theme=contrast] button.on{color:#000}
+#top{position:absolute;top:10px;left:12px;right:72px;display:flex;flex-direction:column;gap:8px;max-width:520px;background:none;border:0;box-shadow:none;z-index:2}
+#sb{display:flex;align-items:center;gap:10px;background:var(--ui);border:1px solid var(--ui2);border-radius:999px;padding:0 16px;box-shadow:0 6px 24px rgba(0,0,0,.22)}
+#sb span{font-size:20px;color:var(--mut)}#q{flex:1;border:0;background:none;padding:14px 0;outline:none;border-radius:0}
+#st{align-self:flex-start;border-radius:999px;font-size:12px;padding:6px 12px;background:var(--ui);border:1px solid var(--ui2);box-shadow:0 2px 10px rgba(0,0,0,.18)}
+#fab{position:absolute;right:12px;top:10px;display:flex;flex-direction:column;gap:10px;z-index:2}
+.fab{width:48px;height:48px;padding:0;border-radius:50%;font-size:20px;background:var(--ui);border:1px solid var(--ui2);box-shadow:0 6px 18px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center}
+#bTheme.fab{font-size:11px}
+#lay{position:absolute;right:72px;top:66px;display:none;flex-direction:column;gap:6px;padding:10px;background:var(--ui);border:1px solid var(--ui2);border-radius:16px;box-shadow:0 8px 28px rgba(0,0,0,.28);z-index:3}
+#lay b{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+#res{top:70px;left:12px;right:72px;width:auto;max-width:520px;border-radius:16px;z-index:4}
+#tabs{position:absolute;left:0;right:0;bottom:0;display:flex;gap:2px;padding:6px 8px 8px;border-radius:20px 20px 0 0;z-index:4}
+.tab{flex:1;background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:600;color:var(--mut);padding:6px 0;min-height:48px}
+.tab b{font-size:20px;line-height:1}.tab.act{color:var(--acc)}.tab.on b{color:#22c55e}
+#sheet{left:12px;right:12px;width:auto;max-width:540px;bottom:76px;border-radius:20px;padding:14px 16px 16px;z-index:3}
+#sheet::before{content:"";display:block;width:38px;height:4px;border-radius:2px;background:var(--ui2);margin:-4px auto 10px}
+#tel{display:none;left:12px;right:12px;bottom:76px;max-width:540px;border-radius:18px;padding:8px 4px;z-index:3}
+.live #tel{display:grid}.live #sheet{bottom:142px}
+#lay{width:240px}#ms{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+
+:root[data-theme=night]{--bg:#0b1118;--land:#121a23;--coast:#3a4a5c;--grid:rgba(160,190,220,.1);--ap:#fbbf24;--nav:#34d399;--route:#22d3ee;--own:#fbbf24;--txt:#e6edf4;--ui:rgba(13,18,25,.94);--ui2:#1a2330;--mut:#8696a8;--trf:#93c5fd;--acc:#22d3ee}
+#tel{display:none!important}.live #sheet{bottom:76px}
+#fc{display:none;top:68px;left:12px;right:72px;max-width:520px;padding:12px 14px;border-radius:18px;z-index:2}
+.fh{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut);font-weight:700;letter-spacing:.05em}.fh i{font-style:normal;color:#34d399}
+.dot{width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 8px #34d399}.sp{flex:1}
+.fr{display:flex;align-items:center;gap:12px;margin:10px 0 2px;font-size:20px;font-weight:800;letter-spacing:.02em}
+.pb{flex:1;height:4px;background:var(--ui2);border-radius:2px;position:relative}.pb u{position:absolute;left:0;top:0;bottom:0;background:var(--acc);border-radius:2px}
+.pb s{position:absolute;top:-10px;transform:translateX(-50%);text-decoration:none;font-size:17px;color:var(--acc)}
+.fm{font-size:12px;color:var(--mut)}
+.fg{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:10px;text-align:center}.fg b{display:block;font-size:22px;font-variant-numeric:tabular-nums}.fg span{font-size:10px;color:var(--mut);letter-spacing:.05em}
+.seg{display:flex;gap:4px;background:var(--ui2);padding:3px;border-radius:12px;margin:10px 0}.seg button{flex:1;background:none;padding:8px 0;border-radius:9px;color:var(--mut)}.seg button.on{background:var(--acc);color:#04212b}
+.ah{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.ic{font-size:28px;letter-spacing:.03em}.chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.chips span{background:var(--ui2);border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700}
+@media(max-height:520px) and (orientation:landscape){#top{max-width:360px}#sheet{max-height:calc(100dvh - 90px);bottom:66px}#tabs{padding-top:4px;padding-bottom:4px}.tab{min-height:40px}}
+@media(min-width:768px){
+#tabs{left:0;right:auto;top:0;bottom:0;width:78px;flex-direction:column;justify-content:flex-start;padding:76px 6px 10px;border-radius:0 20px 20px 0;gap:6px}
+#top{left:94px;right:auto;width:440px}#fc{left:94px;right:auto;width:440px}#res{left:94px;right:auto;width:440px}
+#fab{right:auto;left:94px;top:auto;bottom:18px;flex-direction:row}
+#sheet{left:auto;right:12px;top:12px;bottom:12px;width:390px;max-width:none;max-height:none}.live #sheet{bottom:12px}
+#lay{right:auto;left:94px;top:auto;bottom:76px}
+}
+
+.mg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.mg>div{background:var(--ui2);border-radius:14px;padding:10px 12px}.mg b{display:block;font-size:24px;font-variant-numeric:tabular-nums;line-height:1.15}.mg span{font-size:11px;color:var(--mut);letter-spacing:.05em}.mg .big{grid-column:1/-1}.mg .big b{font-size:34px}
+.pill{border-radius:999px;padding:5px 11px;font-size:11px;font-weight:800;letter-spacing:.06em;background:var(--ui2);color:var(--mut);white-space:nowrap}.pill.on{background:rgba(52,211,153,.16);color:#34d399}
+.spark{width:100%;height:56px;display:block;margin-top:2px}.dot.lost{background:#fbbf24;box-shadow:0 0 8px #fbbf24}
+#cv{display:none;position:absolute;top:0;left:0;right:0;z-index:6;padding:10px 12px 8px;background:var(--ui);border-bottom:1px solid var(--ui2);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+.chartmode #cv{display:block}.cvh{display:flex;align-items:center;gap:10px}.cvt{flex:1;min-width:0;display:flex;flex-direction:column}.cvt b{font-size:22px}.cvt span{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ci{display:none;position:absolute;left:0;right:0;bottom:0;top:124px;background:var(--bg);color:var(--txt);z-index:5;overflow:auto;padding:14px 16px 30px}.chartinfo #ci{display:block}
+.chartmode #top,.chartmode #fab,.chartmode #tabs,.chartmode #sheet,.chartmode #fc,.chartmode #lay,.chartmode #res{display:none!important}
+#pdf{display:none;position:absolute;inset:0;z-index:9;background:var(--bg)}.pdh{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--ui);border-bottom:1px solid var(--ui2)}.pdh b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pdh a{font-size:12px;color:var(--mut)}
+.pdb{position:absolute;top:56px;left:0;right:0;bottom:0;overflow:auto;-webkit-overflow-scrolling:touch}#pdf2{width:100%;height:100%;border:0;background:#fff}
+</style></head><body><div id="app">
+<canvas id="map" aria-label="Aviation chart map"></canvas>
+<div id="top"><div id="sb"><span>&#8981;</span><input id="q" placeholder="Search airports and navaids" autocomplete="off" aria-label="Search"></div><button id="st">No live data</button></div>
+<div id="res" class="box"></div>
+<div id="fc" class="box"></div><div id="fab"><button id="bTheme" class="fab" title="Theme">Day</button>
+<button id="bLay" class="fab" title="Layers">&#9776;</button><button id="bPlan" class="fab" title="Add waypoints">&#9998;</button><button id="bFol" class="fab" title="Follow aircraft">&#9992;</button><button id="bZi" class="fab" title="Zoom in">+</button><button id="bZo" class="fab" title="Zoom out">−</button>
+</div><div id="lay"><b>Map layers</b><button data-l="apt" class="on">Airports</button><button data-l="nav" class="on">Navaids</button><button data-l="trf" class="on">Traffic</button><button data-l="trl">All trails</button><button data-l="grid">Grid</button><b>Map style</b><div id="ms"></div></div>
+<div id="tabs" class="box"><button class="tab" id="bMap"><b>&#8982;</b>Map</button><button class="tab" id="bCh"><b>&#9707;</b>Charts</button><button class="tab" id="bRoute"><b>&#8599;</b>Route</button><button class="tab" id="bWx"><b>&#9729;</b>METAR</button><button class="tab" id="bLive"><b>&#9673;</b>Live</button><button class="tab" id="bData"><b>&#9636;</b>Data</button><button class="tab" id="bSet"><b>&#9881;</b>Settings</button></div>
+<div id="cv"><div class="cvh"><button id="cvx" aria-label="Back">&#8592;</button><div class="cvt"><b id="cvi"></b><span id="cvn"></span><span id="cvm"></span></div><button id="cvf">Fit</button></div><div class="seg" id="cvs"></div></div><div id="ci"></div>
+<div id="pdf"><div class="pdh"><button id="pdx" aria-label="Back">&#8592;</button><b id="pdt"></b><a id="pda" target="_blank" rel="noopener">Open outside app</a></div><div class="pdb"><iframe id="pdf2" title="Chart"></iframe></div></div>
+<div id="chart"></div>
+<div id="sheet" class="box"></div>
+<div id="tel" class="box"><div><b id="tGS">–</b><span>GS kt</span></div><div><b id="tAL">–</b><span>ALT ft</span></div><div><b id="tHD">–</b><span>HDG°</span></div><div><b id="tVS">–</b><span>VS fpm</span></div><div><b id="tDS">–</b><span>DEST nm</span></div><div><b id="tEt">–</b><span>ETA</span></div></div>
+</div>
+<script>
+const A=`KSFO|San Francisco Intl|37.619|-122.375|13|10,1|120.5|135.1|29012KT 10SM FEW015 16/11 A3002
+KOAK|Oakland Intl|37.721|-122.221|9|12,30|118.3|128.5|28010KT 10SM CLR 17/10 A3001
+KSJC|San Jose Mineta|37.363|-121.929|62|12,30|124.0|126.8|30008KT 10SM SCT025 19/09 A3001
+KSAC|Sacramento Exec|38.507|-121.495|24|2,20|119.5|125.0|18006KT 10SM CLR 24/12 A2998
+KRNO|Reno-Tahoe Intl|39.499|-119.768|4415|16,34|118.3|127.0|16014G22KT 10SM FEW080 12/M02 A3012
+KLAX|Los Angeles Intl|33.942|-118.408|128|25,7|133.9|133.8|26009KT 6SM BKN012 18/15 A2996
+KSAN|San Diego Intl|32.734|-117.19|17|9,27|118.3|134.0|27008KT 8SM SCT018 19/14 A2997
+KLAS|Harry Reid Intl|36.08|-115.152|2181|8,26|119.9|132.4|21011G18KT 10SM CLR 29/04 A3003
+KPHX|Phoenix Sky Harbor|33.434|-112.012|1135|8,26|118.7|127.6|09006KT 10SM CLR 31/05 A3000
+KSEA|Seattle-Tacoma Intl|47.449|-122.309|433|16,34|119.9|118.0|18010KT 5SM -RA OVC008 11/09 A2985
+KPDX|Portland Intl|45.589|-122.595|31|10,28|118.7|128.35|09005KT 7SM BKN020 12/08 A2990
+KBOI|Boise Air Terminal|43.564|-116.223|2871|10,28|118.1|127.7|31009KT 10SM FEW120 14/01 A3009
+KSLC|Salt Lake City Intl|40.788|-111.978|4227|16,34|118.3|135.0|16012KT 10SM SCT090 15/M03 A3016
+KDEN|Denver Intl|39.862|-104.673|5434|16,34|132.35|125.6|34016G26KT 10SM FEW100 09/M05 A3020
+KABQ|Albuquerque Sunport|35.04|-106.609|5355|8,26|118.3|118.0|08007KT 10SM CLR 21/00 A3018
+KDFW|Dallas/Fort Worth Intl|32.897|-97.038|607|18,36|126.55|117.1|17014KT 10SM SCT040 27/17 A2992
+KAUS|Austin-Bergstrom|30.195|-97.67|542|18,36|121.0|121.25|15010KT 10SM FEW035 28/19 A2990
+KIAH|Houston Intercontinental|29.984|-95.341|97|15,33|126.0|124.05|14008KT 9SM SCT030 29/21 A2991
+KMSP|Minneapolis–St Paul|44.882|-93.222|841|12,30|126.7|135.1|32012KT 10SM CLR 08/M01 A3027
+KORD|Chicago O'Hare|41.978|-87.904|672|10,28|126.9|135.4|27014G24KT 10SM SCT055 10/02 A3015
+KATL|Hartsfield-Jackson|33.637|-84.428|1026|9,27|119.5|119.65|25006KT 10SM FEW050 24/14 A3008
+KMIA|Miami Intl|25.793|-80.29|8|9,27|118.3|118.85|10010KT 10SM FEW025 29/23 A3004
+KJFK|John F Kennedy Intl|40.64|-73.779|13|4,22|119.1|115.4|31011KT 10SM CLR 14/04 A3019
+KBOS|Boston Logan Intl|42.364|-71.005|20|4,22|120.6|135.0|32015G25KT 10SM FEW040 12/02 A3021
+KDCA|Reagan National|38.852|-77.038|15|1,19|119.1|132.65|01008KT 10SM CLR 16/05 A3022
+KCLT|Charlotte Douglas|35.214|-80.943|748|18,36|118.1|134.55|20007KT 10SM SCT060 22/11 A3012
+KLGA|LaGuardia|40.777|-73.874|21|4,13|118.7|127.05|30010KT 10SM FEW045 13/03 A3020
+KEWR|Newark Liberty Intl|40.692|-74.169|18|4,11|118.3|134.82|31012KT 10SM CLR 13/02 A3019
+KPHL|Philadelphia Intl|39.872|-75.241|36|9,17|118.5|133.4|33008KT 10SM CLR 14/03 A3021
+KMCO|Orlando Intl|28.429|-81.309|96|18,17|118.45|134.0|09008KT 10SM SCT040 28/20 A3006
+KTPA|Tampa Intl|27.975|-82.533|26|1,10|119.5|127.6|08007KT 10SM FEW035 29/21 A3005
+KMDW|Chicago Midway|41.786|-87.752|620|4,13|118.1|132.75|27011KT 10SM FEW060 11/02 A3014
+KHOU|Houston Hobby|29.645|-95.279|46|4,12|118.7|124.6|14009KT 9SM SCT028 29/21 A2992
+KSNA|John Wayne Orange Co|33.676|-117.868|56|2|119.9|126.0|26007KT 8SM BKN015 19/14 A2997
+CYYZ|Toronto Pearson Intl|43.677|-79.631|569|5,6,15|—|—|24010KT 15SM SCT040 14/06 A3005
+CYVR|Vancouver Intl|49.194|-123.184|14|8,13|—|—|25008KT 15SM FEW040 12/08 A2992
+CYUL|Montréal-Trudeau|45.47|-73.741|118|6,10|—|—|27009KT 15SM BKN050 11/04 A3008
+CYYC|Calgary Intl|51.114|-114.02|3557|11,17|—|—|32011KT 15SM FEW080 06/M03 A3015
+CYEG|Edmonton Intl|53.31|-113.58|2373|2,12|—|—|34010KT 15SM CLR 04/M04 A3018
+CYOW|Ottawa Macdonald-Cartier|45.323|-75.669|374|7,14|—|—|29008KT 15SM FEW060 10/03 A3010
+CYWG|Winnipeg Richardson|49.91|-97.24|783|13,18|—|—|33012KT 15SM CLR 05/M02 A3020
+CYHZ|Halifax Stanfield|44.88|-63.51|477|5,14|—|—|27012G20KT 12SM BKN035 09/04 A2998
+CYQB|Québec Jean Lesage|46.79|-71.39|244|6,11|—|—|28007KT 15SM SCT050 08/02 A3009
+CYYJ|Victoria Intl|48.647|-123.426|63|9,13|—|—|20006KT 15SM FEW035 11/07 A2994
+EGLL|London Heathrow|51.47|-0.4543|83|9|—|—|24012KT 9999 SCT025 12/07 Q1015
+EGKK|London Gatwick|51.148|-0.19|202|8|—|—|23010KT 9999 FEW030 12/07 Q1015
+EGCC|Manchester|53.354|-2.275|257|5|—|—|25011KT 9999 BKN030 11/06 Q1013
+EGPH|Edinburgh|55.95|-3.372|135|6|—|—|26014KT 9999 SCT035 09/04 Q1011
+EIDW|Dublin|53.421|-6.27|242|10,16|—|—|24013G22KT 9999 SCT028 10/06 Q1012
+LFPG|Paris Charles de Gaulle|49.01|2.55|392|8,9|—|—|22008KT 9999 BKN025 13/09 Q1016
+LFPO|Paris Orly|48.723|2.379|291|2,6|—|—|22009KT 9999 SCT030 13/09 Q1016
+EHAM|Amsterdam Schiphol|52.309|4.764|-11|18,6|—|—|23012KT 9999 SCT020 11/08 Q1014
+EDDF|Frankfurt|50.033|8.571|364|7,18|—|—|24009KT 9999 FEW035 11/06 Q1017
+EDDM|Munich|48.354|11.786|1487|8|—|—|27006KT 9999 CLR 08/03 Q1018
+EDDB|Berlin Brandenburg|52.362|13.501|157|7|—|—|25010KT 9999 SCT030 10/05 Q1016
+LEMD|Madrid Barajas|40.472|-3.561|2000|14,18|—|—|32008KT 9999 FEW060 17/05 Q1019
+LEBL|Barcelona El Prat|41.297|2.078|12|7,2|—|—|17007KT 9999 SCT040 19/12 Q1018
+LIRF|Rome Fiumicino|41.8|12.239|13|16|—|—|28008KT 9999 FEW035 19/13 Q1017
+LIMC|Milan Malpensa|45.63|8.723|768|17|—|—|36005KT 9999 BKN040 14/09 Q1019
+LSZH|Zurich|47.458|8.548|1416|16,14,10|—|—|24007KT 9999 BKN045 09/05 Q1017
+LOWW|Vienna Schwechat|48.11|16.57|600|11,16|—|—|30010KT 9999 SCT040 10/04 Q1018
+EKCH|Copenhagen Kastrup|55.618|12.656|17|4,12|—|—|26013KT 9999 BKN030 09/05 Q1012
+ESSA|Stockholm Arlanda|59.652|17.919|137|1,8|—|—|20008KT 9999 SCT050 06/02 Q1014
+ENGM|Oslo Gardermoen|60.194|11.1|681|1|—|—|18006KT 9999 FEW050 04/00 Q1015
+EFHK|Helsinki-Vantaa|60.317|24.963|179|4,15|—|—|21009KT 9999 BKN040 03/M01 Q1016
+EPWA|Warsaw Chopin|52.166|20.967|361|11,3|—|—|27007KT 9999 SCT045 08/03 Q1019
+LKPR|Prague Václav Havel|50.101|14.26|1247|6,12|—|—|28009KT 9999 FEW040 08/02 Q1018
+LHBP|Budapest Liszt Ferenc|47.43|19.262|495|13|—|—|31008KT 9999 CLR 11/03 Q1020
+LGAV|Athens Eleftherios Venizelos|37.936|23.945|308|3|—|—|36008KT 9999 FEW040 20/11 Q1016
+LTFM|Istanbul|41.275|28.752|325|16|—|—|04012KT 9999 SCT035 15/08 Q1015
+LPPT|Lisbon Humberto Delgado|38.774|-9.134|374|2|—|—|34010KT 9999 CLR 18/09 Q1020
+BIKF|Keflavík Intl|63.985|-22.605|171|1,10|—|—|09015G25KT 9999 BKN020 05/01 Q1002
+RJTT|Tokyo Haneda|35.553|139.781|21|4,5,16|—|—|No METAR loaded
+RJAA|Tokyo Narita|35.765|140.386|141|16|—|—|No METAR loaded
+RJBB|Osaka Kansai|34.427|135.244|26|6|—|—|No METAR loaded
+RJCC|Sapporo New Chitose|42.775|141.692|82|1|—|—|No METAR loaded
+RJFF|Fukuoka|33.586|130.451|32|16|—|—|No METAR loaded
+ROAH|Okinawa Naha|26.196|127.646|12|18|—|—|No METAR loaded
+RKSI|Seoul Incheon|37.469|126.451|23|15,16|—|—|No METAR loaded
+RKSS|Seoul Gimpo|37.558|126.791|58|14|—|—|No METAR loaded
+RCTP|Taipei Taoyuan|25.078|121.233|108|5|—|—|No METAR loaded
+ZBAA|Beijing Capital|40.08|116.585|116|1,18|—|—|No METAR loaded
+ZSPD|Shanghai Pudong|31.144|121.805|13|16,17|—|—|No METAR loaded
+ZGGG|Guangzhou Baiyun|23.392|113.299|50|1,2|—|—|No METAR loaded
+VHHH|Hong Kong Intl|22.308|113.918|28|7|—|—|No METAR loaded
+WSSS|Singapore Changi|1.364|103.991|22|2|—|—|No METAR loaded
+WMKK|Kuala Lumpur Intl|2.746|101.71|69|14,15|—|—|No METAR loaded
+VTBS|Bangkok Suvarnabhumi|13.69|100.75|5|1|—|—|No METAR loaded
+VTBD|Bangkok Don Mueang|13.913|100.607|9|3|—|—|No METAR loaded
+WIII|Jakarta Soekarno-Hatta|-6.126|106.656|34|6,7|—|—|No METAR loaded
+WADD|Bali Ngurah Rai|-8.748|115.167|14|9|—|—|No METAR loaded
+RPLL|Manila Ninoy Aquino|14.509|121.02|75|6,13|—|—|No METAR loaded
+VVTS|Ho Chi Minh Tan Son Nhat|10.819|106.652|33|7|—|—|No METAR loaded
+VVNB|Hanoi Noi Bai|21.221|105.807|39|11|—|—|No METAR loaded
+VIDP|Delhi Indira Gandhi|28.566|77.103|777|9,10,11|—|—|No METAR loaded
+VABB|Mumbai Chhatrapati Shivaji|19.089|72.868|39|9,14|—|—|No METAR loaded
+VOBL|Bengaluru Kempegowda|13.199|77.706|3002|9|—|—|No METAR loaded
+VOMM|Chennai|12.99|80.169|52|7,12|—|—|No METAR loaded
+VECC|Kolkata Netaji Subhas|22.655|88.447|16|1|—|—|No METAR loaded
+VCBI|Colombo Bandaranaike|7.18|79.884|29|4|—|—|No METAR loaded
+VGHS|Dhaka Hazrat Shahjalal|23.843|90.398|27|14|—|—|No METAR loaded
+VNKT|Kathmandu Tribhuvan|27.696|85.359|4390|2|—|—|No METAR loaded
+OPKC|Karachi Jinnah|24.907|67.161|100|7|—|—|No METAR loaded
+OPLA|Lahore Allama Iqbal|31.521|74.404|712|18|—|—|No METAR loaded
+OMDB|Dubai Intl|25.253|55.366|62|12|—|—|No METAR loaded
+OMAA|Abu Dhabi Zayed|24.433|54.651|88|13|—|—|No METAR loaded
+OTHH|Doha Hamad|25.273|51.608|13|16|—|—|No METAR loaded
+OERK|Riyadh King Khalid|24.958|46.699|2049|15|—|—|No METAR loaded
+OEJN|Jeddah King Abdulaziz|21.68|39.157|48|16|—|—|No METAR loaded
+LLBG|Tel Aviv Ben Gurion|32.011|34.887|135|3,12|—|—|No METAR loaded
+SBGR|São Paulo Guarulhos|-23.436|-46.473|2459|9|—|—|No METAR loaded
+SBSP|São Paulo Congonhas|-23.626|-46.656|2631|17|—|—|No METAR loaded
+SBKP|Campinas Viracopos|-23.007|-47.135|2170|15|—|—|No METAR loaded
+SBGL|Rio de Janeiro Galeão|-22.81|-43.25|28|10,15|—|—|No METAR loaded
+SBRJ|Rio Santos Dumont|-22.91|-43.163|10|2|—|—|No METAR loaded
+SBBR|Brasília|-15.871|-47.918|3497|11|—|—|No METAR loaded
+SBCF|Belo Horizonte Confins|-19.624|-43.972|2715|16|—|—|No METAR loaded
+SBSV|Salvador|-12.911|-38.331|64|10|—|—|No METAR loaded
+SBRF|Recife Guararapes|-8.126|-34.923|33|18|—|—|No METAR loaded
+SBFZ|Fortaleza|-3.776|-38.533|82|13|—|—|No METAR loaded
+SBPA|Porto Alegre Salgado Filho|-29.994|-51.171|11|11|—|—|No METAR loaded
+SBCT|Curitiba Afonso Pena|-25.528|-49.176|2988|15|—|—|No METAR loaded
+SAEZ|Buenos Aires Ezeiza|-34.822|-58.536|67|11,17|—|—|No METAR loaded
+SABE|Buenos Aires Aeroparque|-34.559|-58.416|18|13|—|—|No METAR loaded
+SCEL|Santiago Arturo Merino Benítez|-33.393|-70.786|1555|17|—|—|No METAR loaded
+SUMU|Montevideo Carrasco|-34.838|-56.031|105|6|—|—|No METAR loaded
+SGAS|Asunción Silvio Pettirossi|-25.24|-57.519|291|2|—|—|No METAR loaded
+SLLP|La Paz El Alto|-16.513|-68.192|13325|10|—|—|No METAR loaded
+SPJC|Lima Jorge Chávez|-12.022|-77.114|113|16|—|—|No METAR loaded
+SPZO|Cusco Velasco Astete|-13.536|-71.939|10860|10|—|—|No METAR loaded
+SEQM|Quito Mariscal Sucre|-0.129|-78.358|7882|18|—|—|No METAR loaded
+SKBO|Bogotá El Dorado|4.702|-74.147|8361|13|—|—|No METAR loaded
+SKRG|Medellín José María Córdova|6.165|-75.423|7021|1|—|—|No METAR loaded
+SVMI|Caracas Maiquetía|10.603|-66.991|235|10|—|—|No METAR loaded
+YSSY|Sydney Kingsford Smith|-33.946|151.177|21|7,16|—|—|No METAR loaded
+YMML|Melbourne Tullamarine|-37.673|144.843|434|9,16|—|—|No METAR loaded
+YBBN|Brisbane|-27.384|153.117|13|1|—|—|No METAR loaded
+YPPH|Perth|-31.94|115.967|67|3,6|—|—|No METAR loaded
+YPAD|Adelaide|-34.945|138.531|20|5,12|—|—|No METAR loaded
+YBCG|Gold Coast|-28.164|153.505|21|14|—|—|No METAR loaded
+YSCB|Canberra|-35.307|149.195|1886|17|—|—|No METAR loaded
+YPDN|Darwin|-12.415|130.877|103|11|—|—|No METAR loaded
+YBCS|Cairns|-16.886|145.755|10|12|—|—|No METAR loaded
+NZAA|Auckland|-37.008|174.792|23|5|—|—|No METAR loaded
+NZWN|Wellington|-41.327|174.805|40|16|—|—|No METAR loaded
+NZCH|Christchurch|-43.489|172.532|123|2|—|—|No METAR loaded
+NZQN|Queenstown|-45.021|168.739|1171|5|—|—|No METAR loaded
+NFFN|Nadi Fiji|-17.755|177.443|59|2|—|—|No METAR loaded
+NTAA|Tahiti Faa'a|-17.554|-149.607|5|4|—|—|No METAR loaded
+NWWW|Noumea La Tontouta|-22.015|166.213|52|11|—|—|No METAR loaded
+AYPY|Port Moresby Jacksons|-9.443|147.22|146|14|—|—|No METAR loaded
+AGGH|Honiara Henderson|-9.428|160.054|28|6|—|—|No METAR loaded`.split('\n').map(l=>{const p=l.split('|');return{k:'apt',id:p[0],name:p[1],lat:+p[2],lon:+p[3],elev:+p[4],rw:p[5].split(',').map(Number),twr:'—',atis:'—',metar:'No METAR loaded'}});
+const N=`SFO|San Francisco|VOR-DME|37.619|-122.373|115.8
+OAK|Oakland|VOR-DME|37.725|-122.224|116.8
+SAC|Sacramento|VORTAC|38.443|-121.55|115.2
+RBL|Red Bluff|VORTAC|40.1|-122.24|115.3
+FMG|Mustang|VORTAC|39.55|-119.65|117.8
+LAX|Los Angeles|VORTAC|33.934|-118.431|113.6
+PDX|Portland|VORTAC|45.6|-122.6|111.8
+SEA|Seattle|VORTAC|47.435|-122.309|116.8
+BOI|Boise|VORTAC|43.55|-116.2|116.4
+DEN|Denver|VORTAC|39.8|-104.66|117.0
+SLC|Salt Lake|VORTAC|40.85|-111.98|116.8
+PHX|Phoenix|VORTAC|33.43|-112.0|116.0
+ABQ|Albuquerque|VORTAC|35.04|-106.82|113.2
+DFW|Dallas-Ft Worth|VORTAC|32.87|-97.02|117.0
+ORD|O'Hare|VORTAC|41.99|-87.98|113.9
+BOS|Boston|VORTAC|42.36|-70.99|112.7`.split('\n').map(l=>{const p=l.split('|');return{k:'nav',id:p[0],name:p[1],type:p[2],lat:+p[3],lon:+p[4],freq:p[5]}});
+const LAND=[[-124.7,48.4],[-124,46.3],[-124.4,43],[-124.2,40.4],[-122.5,37.8],[-120.6,34.5],[-117.1,32.5],[-114.7,32.7],[-111,31.3],[-108.2,31.3],[-106.5,31.8],[-104.5,29.6],[-102.4,29.8],[-99.5,27.5],[-97.2,25.9],[-97.4,27.8],[-94.7,29.4],[-91.5,29.5],[-89.2,29.1],[-89.4,30.2],[-85.3,29.7],[-84,30],[-82.8,28],[-81.8,26],[-80.4,25.2],[-80,26.8],[-81.3,30.7],[-79.2,33.2],[-76,35],[-75.5,37.5],[-74,39.7],[-74,40.6],[-71.5,41.2],[-70,41.7],[-70.7,43],[-67,44.8],[-69,47.4],[-71.5,45],[-75,45],[-79,43.3],[-83,42],[-82.5,45.3],[-84.5,46.5],[-88,48],[-95,49],[-123,49]];
+const $=s=>document.querySelector(s),R=Math.PI/180,SZ=256,WARP=30,CRUISE=145;
+N.length=0;const TRL=new Map(),CH={on:false,pg:'paper',a:null,prev:null},TS={ok:0,err:0},TC=new Map(),MS={sat:{n:'Satellite',m:18,a:'Imagery (c) Esri, Maxar, Earthstar Geographics'},hyb:{n:'Hybrid',m:18,a:'Imagery (c) Esri, Maxar, Earthstar Geographics'},st:{n:'Detailed',m:19,a:'(c) OpenStreetMap contributors'},lt:{n:'Light',m:19,a:'(c) OpenStreetMap contributors, (c) CARTO'},dk:{n:'Dark',m:19,a:'(c) OpenStreetMap contributors, (c) CARTO'},tr:{n:'Terrain',m:17,a:'(c) OpenStreetMap contributors, SRTM | style (c) OpenTopoMap (CC-BY-SA)'},vec:{n:'Basic',m:18,a:''}};const live={on:false,d:null,es:null,at:0,seen:0};
+const EX=[[[-123,49],[-125,50],[-130,54.5],[-133,58],[-137,59],[-141,60],[-141,69.6],[-135,69],[-128,70],[-115,68.5],[-105,68],[-95,71],[-90,69],[-85,70],[-82,66],[-87,64],[-94,60],[-93,57],[-85,55.5],[-82,53],[-79,51.5],[-79,55],[-77,60],[-70,59],[-65,60],[-61,56],[-56,52],[-60,50],[-65,49.2],[-66,48],[-61,46],[-64,45],[-66,44.5],[-67,45],[-70,47],[-71.5,45],[-75,45],[-79,43.3],[-83,42],[-82.5,45.3],[-84.5,46.5],[-88,48],[-95,49]],[[-59,47.6],[-56,51.6],[-53,47],[-55,46.9]],
+[[-9.5,43],[-9,37],[-6,36.2],[-2,36.7],[0,38.5],[3,42.5],[7,43.7],[9,44.4],[10,44],[12.5,41.5],[16,38],[18.5,40],[16,41.9],[12.5,44.5],[13.7,45.6],[15,44],[19,41.5],[21,39],[23,36.5],[24,38],[23.5,40.5],[26,40.8],[29,41],[28,43.5],[30,45.3],[33,46],[37,47],[40,47.5],[40,56],[40,60.5],[30,60.5],[28,60.5],[23.5,59.2],[21,57],[20,54.5],[18,54.8],[14,54],[10.5,54.3],[8.5,57],[8.2,55],[8.7,54],[7,53.5],[5,53],[4,51.5],[2,51],[1.5,50.2],[-1.5,49.7],[-1.5,48.7],[-4.5,48.5],[-2,47],[-1.2,46],[-1.8,43.5]],
+[[8,58],[5,59],[5,62],[12,66],[18,70],[28,71],[31,70],[30,67],[30,61],[28,60.5],[23,60],[21.5,61],[21.5,63],[25,65.5],[22,65.8],[18,62.5],[17.5,60.5],[19,59.5],[16.5,56.5],[14,55.5],[12.5,56],[11,58],[10.5,59.5]],
+[[-5.7,50],[1.4,51.2],[1.7,52.7],[0,53.5],[-1.5,55],[-2,57.5],[-3.5,58.6],[-5,58.5],[-6,57],[-5.5,55.5],[-3,54.8],[-3.2,53.4],[-4.5,53.3],[-5,52],[-3,51.5],[-4.5,51],[-5.7,50]],[[-10,51.8],[-6,52.2],[-6,54],[-5.5,54.6],[-8,55.3],[-10,54.2]],[[-24,65.5],[-22,64],[-18,63.4],[-14,64.5],[-14.5,66],[-18,66.2],[-22,66.4]]];
+const PL=[[0,-14],[2,-8],[2,-3],[13,3],[13,6],[2,3],[2,9],[5,12],[5,14],[0,13],[-5,14],[-5,12],[-2,9],[-2,3],[-13,6],[-13,3],[-2,-3],[-2,-8]];
+const RL={KSFO:[11870,8650],KOAK:[10520],KSJC:[11000],KSAC:[8600],KRNO:[11002],KLAX:[12091],KSAN:[9400],KLAS:[14510],KPHX:[11489],KSEA:[11901],KPDX:[11000],KBOI:[10000],KSLC:[12000],KDEN:[16000],KABQ:[13793],KDFW:[13401],KAUS:[12250],KIAH:[12001],KMSP:[11006],KORD:[13000],KATL:[11889],KMIA:[13016],KJFK:[14511],KBOS:[10083],KDCA:[7169],KCLT:[10000],KLGA:[7001,7003],KEWR:[11000,6726],KPHL:[10506,6500],KMCO:[12005,10000],KTPA:[11002,8300],KMDW:[6445,6522],KHOU:[7602,6000],KSNA:[5700],CYYZ:[11120,9697,11050],CYVR:[11500,7300],CYUL:[11000,7000],CYYC:[8000,14000],CYEG:[10200,9900],CYOW:[10000,8000],CYWG:[8700,7700],CYHZ:[8800,7700],CYQB:[9000,5700],CYYJ:[7000,5000],EGLL:[12802],EGKK:[10879],EGCC:[10000],EGPH:[8400],EIDW:[10200,6800],LFPG:[13780,8858],LFPO:[7874,10893],EHAM:[11300,11500],EDDF:[13123,13123],EDDM:[13123],EDDB:[11975],LEMD:[14270,11483],LEBL:[10997,8530],LIRF:[12795],LIMC:[12861],LSZH:[12139,10827,8858],LOWW:[11811,11483],EKCH:[11811,10890],ESSA:[10830,8000],ENGM:[11811],EFHK:[11204,9514],EPWA:[12106,9183],LKPR:[12198,10663],LHBP:[12162],LGAV:[13123],LTFM:[13123],LPPT:[12467],BIKF:[10190,10000]};
+function pairs(a){const o=[];a.rw.forEach(n=>{if(!o.some(p=>p[0]==n||p[1]==n))o.push([n,(n+17)%36+1])});return o}
+function liveOk(){return live.on&&live.d&&live.d.lat!=null&&live.d.age<3&&performance.now()-live.at<3000}
+const cv=$('#map'),cx=cv.getContext('2d');let W,H,dpr,C={};
+const V={lon:-119.5,lat:38.8,z:6,fol:false},L={apt:1,nav:1,trf:1,grid:0,style:(function(){try{return localStorage.getItem('dl.style')||'sat'}catch(e){return'sat'}})()};
+let plan=false,panel=null,sel=null,route=[],trav=0,own={lat:0,lon:0,hdg:0,alt:0,vs:0};
+const byId=id=>A.find(a=>a.id==id)||N.find(a=>a.id==id);
+const wp=o=>({id:o.id,name:o.name,lat:o.lat,lon:o.lon,k:o.k||'fix',elev:o.elev||0});
+const wpx=(lon,lat)=>{const k=SZ*2**V.z,s=Math.sin(lat*R);return[(lon+180)/360*k,(.5-Math.log((1+s)/(1-s))/(4*Math.PI))*k]};
+const wun=(X,Y)=>{const k=SZ*2**V.z;return[X/k*360-180,Math.atan(Math.sinh(Math.PI-2*Math.PI*Y/k))/R]};
+const sc=(lon,lat)=>{const c=wpx(V.lon,V.lat),p=wpx(lon,lat);return[p[0]-c[0]+W/2,p[1]-c[1]+H/2]};
+const dist=(a,b)=>{const dl=(b.lat-a.lat)*R,dn=(b.lon-a.lon)*R,h=Math.sin(dl/2)**2+Math.cos(a.lat*R)*Math.cos(b.lat*R)*Math.sin(dn/2)**2;return 6880.13*Math.asin(Math.sqrt(h))};
+const brg=(a,b)=>{const y=Math.sin((b.lon-a.lon)*R)*Math.cos(b.lat*R),x=Math.cos(a.lat*R)*Math.sin(b.lat*R)-Math.sin(a.lat*R)*Math.cos(b.lat*R)*Math.cos((b.lon-a.lon)*R);return(Math.atan2(y,x)/R+360)%360};
+const fwd=(a,h,d)=>{const r=d/3440.065,l1=a.lat*R,o1=a.lon*R,l2=Math.asin(Math.sin(l1)*Math.cos(r)+Math.cos(l1)*Math.sin(r)*Math.cos(h*R)),o2=o1+Math.atan2(Math.sin(h*R)*Math.sin(r)*Math.cos(l1),Math.cos(r)-Math.sin(l1)*Math.sin(l2));return{lat:l2/R,lon:o2/R}};
+const legs=()=>route.slice(1).map((p,i)=>dist(route[i],p)),total=()=>legs().reduce((a,b)=>a+b,0);
+const hm=h=>{if(!isFinite(h))return'–';const m=Math.round(h*60);return Math.floor(m/60)+':'+String(m%60).padStart(2,'0')};
+function theme(t){try{localStorage.setItem('dl.theme',t)}catch(_){}document.documentElement.dataset.theme=t;$('#bTheme').textContent={day:'Day',night:'Night',contrast:'High'}[t];const cs=getComputedStyle(document.documentElement);['bg','land','coast','grid','ap','nav','route','own','txt','trf'].forEach(n=>C[n]=cs.getPropertyValue('--'+n).trim())}
+theme((function(){try{return localStorage.getItem('dl.theme')||'night'}catch(e){return'night'}})());
+$('#bTheme').onclick=()=>{const o=['day','night','contrast'];theme(o[(o.indexOf(document.documentElement.dataset.theme)+1)%3])};
+function size(){dpr=devicePixelRatio||1;W=cv.clientWidth;H=cv.clientHeight;cv.width=W*dpr;cv.height=H*dpr}addEventListener('resize',size);size();
+/* traffic (simulated) */
+const T=[],WT={n:0,src:'',busy:0,fail:0,last:'',okAt:0};
+/* route */
+function save(){try{localStorage.setItem('dl.route',JSON.stringify(route))}catch(e){}}
+function load(){try{const r=JSON.parse(localStorage.getItem('dl.route'));if(r&&r.length){route=r;return true}}catch(e){}return false}
+function defRoute(){route=[]}
+load();
+function addWp(o){route.push(wp(o));save();panel='route';trav=Math.min(trav,total());render()}
+/* own-ship sim */
+function pos(d){const l=legs();let i=0;while(i<l.length-1&&d>l[i]){d-=l[i];i++}if(!route[i+1])return{lat:V.lat,lon:V.lon,hdg:0};const a=route[i],b=route[i+1],h=brg(a,b);return{...fwd(a,h,Math.min(d,l[i])),hdg:h}}
+function alt(d){const t=total();return Math.max(route[0]?.elev||0,Math.min(6500,route[0].elev+d*180,(route.at(-1).elev||0)+(t-d)*260))}
+function step(dt){if(V.tz!=null&&Math.abs(V.tz-V.z)>.001){V.z+=(V.tz-V.z)*Math.min(1,dt*10);if(Math.abs(V.tz-V.z)<.002)V.z=V.tz}else if(V.tz!=null){V.z=V.tz;}if(V.in){const c=wpx(V.lon,V.lat),p=wun(c[0]-V.in[0]*dt,c[1]-V.in[1]*dt),f=Math.exp(-4*dt);V.lon=p[0];V.lat=p[1];V.in=[V.in[0]*f,V.in[1]*f];if(Math.hypot(V.in[0],V.in[1])<8)V.in=null}const ok=!!liveOk();$('#app').classList.toggle('live',ok);const tx=ok?'● Live from '+(live.d.src||'simulator'):wtTxt();if($('#st').textContent!=tx)$('#st').textContent=tx;if(ok)liveStep(dt);else wtStep(dt);fcRender(ok);$('#st').style.display=$('#fc').style.display=='block'?'none':'';return;trav+=CRUISE/3600*dt*WARP;if(trav>=t)trav=0;const p=pos(trav);own.lat=p.lat;own.lon=p.lon;own.hdg=p.hdg;own.alt=alt(trav);own.vs=(alt(trav+.1)-own.alt)*CRUISE/6;
+T.forEach(a=>{const p=fwd(a,a.hdg,a.gs/3600*dt*WARP);a.lat=p.lat;a.lon=p.lon});
+const el=route.length>1?t-trav:0;$('#tGS').textContent=CRUISE;$('#tAL').textContent=Math.round(own.alt/10)*10;$('#tHD').textContent=String(Math.round(own.hdg)%360).padStart(3,'0');$('#tVS').textContent=Math.round(own.vs/50)*50;$('#tDS').textContent=el.toFixed(1);$('#tEt').textContent=hm(el/CRUISE);
+if(V.fol){V.lon=own.lon;V.lat=own.lat}}
+/* drawing */
+function draw(){cx.setTransform(dpr,0,0,dpr,0,0);cx.fillStyle=C.bg;cx.fillRect(0,0,W,H);
+cx.beginPath();[LAND,...EX].forEach(po=>{po.forEach((p,i)=>{const[x,y]=sc(p[0],p[1]);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.closePath()});if(CH.on&&CH.pg!='sat'){cx.fillStyle='#fbfaf6';cx.fillRect(0,0,W,H)}else if(!SAT()){cx.fillStyle=C.land;cx.fill();cx.strokeStyle=C.coast;cx.lineWidth=1.5;cx.stroke()}else drawTiles();
+const tl=wpx(V.lon,V.lat);
+if(L.grid&&V.z<12&&!CH.on){const s=V.z<4?10:V.z<5.5?5:V.z<7?2:V.z<8.5?1:V.z<10?.5:.1,a=wun(tl[0]-W/2,tl[1]-H/2),b=wun(tl[0]+W/2,tl[1]+H/2);cx.strokeStyle=C.grid;cx.lineWidth=1;cx.fillStyle=C.coast;cx.font='10px sans-serif';cx.beginPath();
+for(let o=Math.ceil(a[0]/s)*s;o<b[0];o+=s){const x=sc(o,0)[0];cx.moveTo(x,0);cx.lineTo(x,H);cx.fillText(o.toFixed(s<1?1:0)+'°',x+2,H-100)}
+for(let t=Math.ceil(b[1]/s)*s;t<a[1];t+=s){const y=sc(0,t)[1];cx.moveTo(0,y);cx.lineTo(W,y);cx.fillText(t.toFixed(s<1?1:0)+'°',4,y-2)}cx.stroke()}
+const ppn=lat=>SZ*2**V.z/360/(60*Math.cos(lat*R));
+if(L.nav&&!CH.on)N.forEach(n=>{const[x,y]=sc(n.lon,n.lat);if(V.z<6)return;if(x<-20||x>W+20||y<-20||y>H+20)return;cx.strokeStyle=C.nav;cx.lineWidth=1.6;cx.beginPath();cx.moveTo(x,y-6);cx.lineTo(x+5.5,y+4);cx.lineTo(x-5.5,y+4);cx.closePath();cx.stroke();if(V.z>5.5){cx.fillStyle=C.nav;cx.font='11px sans-serif';cx.fillText(n.id,x+8,y+4)}});
+if(L.apt)A.forEach(a=>{if(CH.on&&a!==CH.a)return;const[x,y]=sc(a.lon,a.lat);if(a.x&&V.z<6)return;const mg=V.z>10?4000:60;if(x<-mg||x>W+mg||y<-mg||y>H+mg)return;
+if(V.z>8.5)drawReal(a,x,y);else a.det=false;if(0)pairs(a).forEach(pr=>{const n=pr[0],h=n*10,p=ppn(a.lat)*1.4,dx=Math.sin(h*R)*p,dy=-Math.cos(h*R)*p;cx.strokeStyle=C.ap;cx.lineWidth=Math.max(3,p/9);cx.lineCap='butt';cx.beginPath();cx.moveTo(x-dx,y-dy);cx.lineTo(x+dx,y+dy);cx.stroke()});
+cx.beginPath();cx.arc(x,y,a.det?0:V.z>8.5?3:5,0,7);cx.fillStyle=C.land;cx.fill();cx.strokeStyle=C.ap;cx.lineWidth=2.2;cx.stroke();
+if(V.z>(a.x?7:4.8)){cx.font='bold 12px sans-serif';if(SAT()){cx.lineWidth=3;cx.strokeStyle=DKM()?'rgba(0,0,0,.7)':'rgba(255,255,255,.85)';cx.strokeText(a.id,x+9,y-6)}cx.fillStyle=SAT()?(DKM()?'#fff':'#111'):C.txt;cx.fillText(a.id,x+9,y-6)}});
+if(route.length&&!CH.on){
+  cx.strokeStyle=C.route;cx.lineWidth=3;cx.setLineDash([9,5]);cx.beginPath();
+  route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});
+  cx.stroke();cx.setLineDash([]);
+  
+  if(liveOk()&&route.length>1){
+    const pr=routeProg(),pts=[route[0]];let acc=0;
+    for(let i=0;i<route.length-1;i++){acc+=dist(route[i],route[i+1]);if(acc<pr)pts.push(route[i+1])}
+    pts.push(pos(pr));
+    cx.strokeStyle=C.route;cx.lineWidth=5;cx.beginPath();
+    pts.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});
+    cx.stroke();
+  }
+  
+  route.forEach((p,i)=>{
+    const[x,y]=sc(p.lon,p.lat);
+    if(x<-50||x>W+50||y<-50||y>H+50)return;
+    // Waypoint icon: triangle for fix/nav, circle for airport
+    cx.fillStyle=p.k=='apt'?'#38bdf8':'#e11d48';
+    cx.strokeStyle='#ffffff';
+    cx.lineWidth=1.5;
+    cx.beginPath();
+    if(p.k=='apt'){
+      cx.arc(x,y,6,0,7);
+    }else{
+      cx.moveTo(x,y-6);cx.lineTo(x+6,y+5);cx.lineTo(x-6,y+5);cx.closePath();
+    }
+    cx.fill();cx.stroke();
+    
+    // Waypoint label & sequence number
+    cx.fillStyle='#ffffff';
+    cx.font='bold 11px sans-serif';
+    cx.shadowColor='#000000';
+    cx.shadowBlur=4;
+    cx.fillText(p.id||`WP${i+1}`,x+9,y+4);
+    cx.shadowBlur=0;
+  });
+}
+trails();if(L.trf&&!CH.on)T.forEach(a=>{const[x,y]=sc(a.lon,a.lat);cx.save();cx.translate(x,y);cx.rotate(a.hdg*R);cx.strokeStyle=C.trf;cx.lineWidth=2;cx.beginPath();PL.forEach((p,i)=>i?cx.lineTo(p[0]*.7,p[1]*.7):cx.moveTo(p[0]*.7,p[1]*.7));cx.closePath();cx.fillStyle=C.trf;cx.fill();cx.restore();if(V.z>6){cx.fillStyle=C.trf;cx.font='10px sans-serif';cx.fillText(a.id+' '+Math.round(a.alt/100),x+9,y+3)}});
+if(liveOk()){const[x,y]=sc(own.lon,own.lat);cx.save();cx.translate(x,y);cx.rotate(own.hdg*R);cx.beginPath();cx.arc(0,0,15,0,7);cx.strokeStyle=C.own;cx.globalAlpha=.4;cx.lineWidth=1.5;cx.stroke();cx.globalAlpha=1;cx.beginPath();PL.forEach((p,i)=>i?cx.lineTo(p[0]*1.15,p[1]*1.15):cx.moveTo(p[0]*1.15,p[1]*1.15));cx.closePath();cx.fillStyle=C.own;cx.fill();cx.strokeStyle=C.land;cx.lineWidth=1.5;cx.stroke();cx.restore()}
+if(CH.on)chartFx();if(sel&&!CH.on){const q=sel.k=='own'?own:sel,[x,y]=sc(q.lon,q.lat);cx.strokeStyle=C.txt;cx.lineWidth=2;cx.beginPath();cx.arc(x,y,16+(tk?3*Math.sin(performance.now()/260):0),0,7);cx.stroke()}}
+let last=performance.now();(function loop(t){step(Math.min((t-last)/1000,.2));last=t;draw();requestAnimationFrame(loop)})(last);
+/* interaction */
+let drag=null;
+cv.onpointerdown=e=>{V.in=null;cv.setPointerCapture(e.pointerId);drag={x:e.clientX,y:e.clientY,c:wpx(V.lon,V.lat),m:0}};
+cv.onpointermove=e=>{if(!drag||pd)return;{const nw=performance.now();if(drag.t){const k=Math.max(1,nw-drag.t);drag.vx=(e.clientX-drag.px)/k*1000;drag.vy=(e.clientY-drag.py)/k*1000}drag.t=nw;drag.px=e.clientX;drag.py=e.clientY}const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.m=Math.max(drag.m,Math.hypot(dx,dy));if(drag.m>5){setFol(false);tk=false;const p=wun(drag.c[0]-dx,drag.c[1]-dy);V.lon=p[0];V.lat=p[1]}};
+cv.onpointerup=e=>{if(drag&&drag.m>5&&drag.vx!=null&&performance.now()-drag.t<90)V.in=[drag.vx,drag.vy];if(drag&&drag.m<=5&&!pd)tap(e.clientX,e.clientY);drag=null};
+let pd=0;cv.addEventListener('touchmove',e=>{if(e.touches.length==2){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if(pd){const base=V.tz==null?V.z:V.tz;V.tz=Math.max(2.5,Math.min(17.5,base+Math.log2(d/pd)))}pd=d;drag=null}},{passive:true});cv.addEventListener('touchend',e=>{if(e.touches.length<2)setTimeout(()=>pd=0,80)});
+cv.onwheel=e=>{e.preventDefault();const base=V.tz==null?V.z:V.tz;V.tz=Math.max(2.5,Math.min(17.5,base-e.deltaY*.0025));setFol(false)};
+$('#bZi').onclick=()=>{V.tz=Math.min(17.5,(V.tz==null?V.z:V.tz)+.7);setFol(false)};$('#bZo').onclick=()=>{V.tz=Math.max(2.5,(V.tz==null?V.z:V.tz)-.7);setFol(false)};
+function setFol(v){V.fol=v;$('#bFol').classList.toggle('on',v)}
+$('#bFol').onclick=()=>{setFol(!V.fol);if(V.fol)V.z=Math.max(V.z,8)};
+$('#bPlan').onclick=()=>{plan=!plan;$('#bPlan').classList.toggle('on',plan);if(plan){panel='route';render()}};
+$('#bRoute').onclick=()=>{panel=panel=='route'?null:'route';render()};
+document.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{L[b.dataset.l]^=1;b.classList.toggle('on')});
+function tap(x,y){if(CH.on)return;let best=null,bd=28;const items=[...(L.trf?T:[]),...(L.apt?A.filter(a=>!a.x||V.z>=6):[]),...(L.nav?N:[]),...(liveOk()?[{k:'own',id:'Own-ship',...own}]:[])];
+items.forEach(o=>{const[a,b]=sc(o.lon,o.lat),d0=Math.hypot(a-x,b-y),d=o.det?Math.max(d0-(o.rpx||0),20):d0;if(d<bd){bd=d;best=o}});
+if(best){sel=best;if(plan&&(best.k=='apt'||best.k=='nav'))addWp(best);else{if(best.k=='trf'){tk=true;setFol(false)}panel='sel';render()}}
+else if(plan){const p=wun(...wpx(V.lon,V.lat).map((c,i)=>c+(i?y-H/2:x-W/2)));addWp({id:'WPT'+(route.length+1),name:'User waypoint',lat:p[1],lon:p[0],k:'fix'})}
+else{sel=null;panel=null;render()}}
+/* search */
+$('#q').oninput=e=>{const q=e.target.value.trim().toLowerCase(),r=$('#res');if(!q){r.style.display='none';return}
+const m=[...A,...N].filter(o=>o.id.toLowerCase().includes(q)||o.name.toLowerCase().includes(q)).sort((a,b)=>b.id.toLowerCase().startsWith(q)-a.id.toLowerCase().startsWith(q)).slice(0,8);
+r.innerHTML=m.map(o=>`<div data-id="${o.id}" data-k="${o.k}"><b>${o.id}</b> ${o.name} <span class="m">${o.k=='apt'?'airport':o.type}</span></div>`).join('')||'<div class="m">No match in bundled data</div>';r.style.display='block'};
+$('#res').onclick=e=>{const d=e.target.closest('[data-id]');if(!d)return;const o=[...A,...N].find(x=>x.id==d.dataset.id&&x.k==d.dataset.k);setFol(false);V.lon=o.lon;V.lat=o.lat;V.tz=null;V.z=o.k=='apt'?11.5:9;sel=o;panel='sel';$('#res').style.display='none';$('#q').value='';render();if(o.k=='apt')openCharts(o)};
+/* panels */
+function wind(m){const r=m.match(/(\d{3}|VRB)(\d{2,3})(G(\d{2,3}))?KT/);return r?{d:r[1]=='VRB'?null:+r[1],s:+r[2],g:r[4]?+r[4]:0}:null}
+function rwTable(a){const w=wind(a.metar);if(!w)return'<div class="m">No wind data without a live METAR.</div>';if(w.d==null)return'<div class="m">Variable wind – no component.</div>';const sp=Math.max(w.s,w.g);let h='<table><tr><th>Runway</th><th>Head/tail</th><th>Cross</th></tr>';
+pairs(a).forEach(pr=>pr.forEach(r=>{const an=(w.d-r*10)*R,hw=Math.round(sp*Math.cos(an)),xw=Math.round(sp*Math.sin(an));h+=`<tr><td>${String(r).padStart(2,'0')}</td><td>${Math.abs(hw)} kt ${hw>=0?'head':'tail'}</td><td>${Math.abs(xw)} kt ${xw>0?'from R':xw<0?'from L':''}</td></tr>`}));return h+'</table>'}
+function render(){const s=$('#sheet');tabHi();if(!panel){s.style.display='none';return}s.style.display='block';
+if(panel=='live'){s.innerHTML=liveHtml();return}if(panel=='data'){s.innerHTML=dataHtml();return}if(panel=='wx'){s.innerHTML=wxHtml();return}if(panel=='charts'){s.innerHTML=chHtml();return}if(panel=='settings'){s.innerHTML=settingsHtml();return}if(panel=='sel'&&sel){const o=sel;if(o.k=='trf'||o.k=='own'){s.innerHTML=planeHtml(o);updPl();return}if(o.k=='apt'){getMetar(o);s.innerHTML=aptHtml(o);return}
+if(o.k=='apt')getMetar(o);if(o.k=='apt')s.innerHTML=`<h3>${o.id} · ${o.name}</h3><div class="m">Elev ${o.elev} ft · TWR ${o.twr} · ATIS ${o.atis}</div><div class="m">Runways: ${pairs(o).map(p=>p.map(x=>String(x).padStart(2,'0')).join('/')).join(', ')}</div><code>${o.metar}</code><div class="m">${dec(o.metar)}</div><div class="m">${mAge(o)}</div><div class="m">Real-time reports from AviationWeather.gov via the bridge. Wind uses gusts.</div><div class="m">${o.rws?'':'Unverified placeholder data. Import the data pack (Data tab) for real runways, frequencies and layout.<br>'}${o.lat.toFixed(3)}, ${o.lon.toFixed(3)}${liveOk()?' - '+Math.round(dist(own,o))+' nm from you':''}</div>${rwTable(o)}<div class="row"><button onclick="openChart(sel)">Layout</button><button onclick="chSel=sel;panel='charts';render()">Charts</button><button onclick="addSel()">Add to route</button><button onclick="chartMap()">Zoom in</button></div>`;
+else if(o.k=='nav')s.innerHTML=`<h3>${o.id} · ${o.name}</h3><div class="m">${o.type} · ${o.freq} · ${o.lat.toFixed(3)}, ${o.lon.toFixed(3)}</div><div class="row"><button onclick="addSel()">Add to route</button></div>`;
+else s.innerHTML=`<h3>${o.id}</h3><div class="m">Alt ${Math.round(o.alt/10)*10} ft · ${o.gs?o.gs+' kt · ':''}HDG ${String(Math.round(o.hdg)).padStart(3,'0')}°</div>`;return}
+const t=total();s.innerHTML=`<h3>Flight plan</h3><div class="m">${route.length?route.map(p=>p.id).join(' → '):'Empty'} · ${t.toFixed(0)} nm · ${hm(t/CRUISE)} @ ${CRUISE} kt</div>
+<table>${route.map((p,i)=>`<tr><td>${i+1}</td><td>${p.id}</td><td class="m">${p.name}</td><td>${i?Math.round(dist(route[i-1],p))+' nm':''}</td><td><button onclick="rm(${i})" aria-label="Remove">✕</button></td></tr>`).join('')}</table>
+<div class="row"><button onclick="importSimBrief()">Import SimBrief</button><button onclick="defRoute();save();render()">Reset</button><button onclick="route=[];save();trav=0;render()">Clear</button><button onclick="exp('pln')">MSFS .PLN</button><button onclick="exp('fms')">X-Plane .FMS</button></div><div id="ex"></div>`}
+const pad=n=>String(n).padStart(2,'0');
+function openChart(a){sel=a;getMetar(a);getFaa(a);const pr=pairs(a),ln=RL[a.id]||[],mx=Math.max(...pr.map((p,i)=>ln[i]||8000)),k=230/mx,w=wind(a.metar);
+let s=`<svg viewBox="0 0 600 600" role="img" aria-label="${a.id} airport diagram"><rect width="600" height="600" rx="12" fill="${C.land}" stroke="${C.coast}"/>`;
+s+=rwSvg(a);(a.rws?[]:pr).forEach((p,i)=>{const l=(ln[i]||8000)*k,h=p[0]*10*R,dx=Math.sin(h)*l/2,dy=-Math.cos(h)*l/2,wd=Math.max(8,l/26);
+s+=`<line x1="${300-dx}" y1="${300-dy}" x2="${300+dx}" y2="${300+dy}" stroke="${C.txt}" stroke-width="${wd}"/><line x1="${300-dx*.92}" y1="${300-dy*.92}" x2="${300+dx*.92}" y2="${300+dy*.92}" stroke="${C.land}" stroke-width="1.5" stroke-dasharray="7 6"/>`;
+[[p[0],-1],[p[1],1]].forEach(e=>{s+=`<text x="${300+e[1]*Math.sin(h)*(l/2+24)}" y="${300-e[1]*Math.cos(h)*(l/2+24)+7}" text-anchor="middle" font-size="22" font-weight="700" fill="${C.ap}">${pad(e[0])}</text>`})});
+s+=`<g transform="translate(548 52)" fill="${C.txt}"><path d="M0-26 9 10 0 4-9 10z"/><text y="30" text-anchor="middle" font-size="14">N</text></g>`;
+if(w&&w.d!=null)s+=`<g transform="translate(60 56)" fill="${C.route}"><g transform="rotate(${w.d+180})"><path d="M0-22 8 4 0 0-8 4z"/><rect x="-1.5" y="0" width="3" height="20"/></g><text y="48" text-anchor="middle" font-size="13" fill="${C.txt}">${String(w.d).padStart(3,'0')}°/${w.s}${w.g?'G'+w.g:''} kt</text></g>`;
+s+=`<line x1="30" y1="568" x2="${30+1000*(a.rws&&a._k?a._k:k)}" y2="568" stroke="${C.txt}" stroke-width="3"/><text x="30" y="556" font-size="13" fill="${C.txt}">1000 ft</text></svg>`;
+const el=$('#chart');el.innerHTML=`<div class="row" style="justify-content:space-between;margin:0 0 6px"><div><h3>${a.id} · ${a.name}</h3><div class="m">Elev ${a.elev} ft · TWR ${a.twr} · ATIS ${a.atis}</div></div><button onclick="closeChart()">Close</button></div>${s}<code>${a.metar}</code><div class="m">${mAge(a)}</div>${rwTable(a)}<div class="m">${pr.map((p,i)=>pad(p[0])+'/'+pad(p[1])+' · '+(ln[i]||'?')+' ft').join('  |  ')}</div>${faaHtml(a)}<div class="row"><button onclick="chartMap()">Show on map</button><button onclick="addSel();closeChart()">Add to route</button></div><div class="m" style="margin-top:8px">Runway diagram. Positions are real only when connected through the bridge; otherwise runways are centered schematically. Not for navigation.</div>`;el.style.display='block';el.scrollTop=0}
+var tk=false;
+function planeHtml(o){return `<h3>${o.id}</h3><div class="m">${o.k=='own'?'Your aircraft ('+((live.d&&live.d.src)||'simulator')+')':'Live ADS-B traffic'+(o.cc?' - '+o.cc:'')}</div><div id="pv"></div><div class="row">${o.k=='trf'?`<button onclick="tk=!tk;if(tk)setFol(false);render()" class="${tk?'on':''}">${tk?'Tracking (tap to stop)':'Track this aircraft'}</button>`:''}<button onclick="panel=null;sel=null;tk=false;render()">Close</button></div>`}
+function updPl(){const e=$('#pv');if(!e||!sel)return;const o=sel.k=='own'?{...own,gs:live.d?live.d.gs:0}:sel,r=(a,b,u)=>`<tr><td>${a}</td><td><b>${b}</b> ${u}</td></tr>`;e.innerHTML='<table>'+r('Altitude',Math.round(o.alt/10)*10,'ft')+r('Ground speed',Math.round(o.gs||0),'kt')+r('Heading',String(Math.round(o.hdg+360)%360).padStart(3,'0'),'deg')+(o.vs!=null?r('Vertical speed',Math.round(o.vs/10)*10,'fpm'):'')+(sel.k=='trf'&&liveOk()?r('Distance from you',Math.round(dist(own,o)),'nm'):'')+'</table>'}
+function hs(s){let h=7;for(const c of s)h=(h*31+c.charCodeAt(0))>>>0;return h}
+/* Original procedural airport layouts: runways from data, taxiways/aprons/terminals generated */
+function layout(a){const pr=pairs(a),ln=RL[a.id]||[],H0=hs(a.id),g={rw:[],tw:[],ap:null},L0=ln[0]||8000,q=pr[0][0]*10*R,u0=[Math.sin(q),Math.cos(q)];
+pr.forEach((p,i)=>{const L=ln[i]||8000,hd=p[0]*10*R,u=[Math.sin(hd),Math.cos(hd)],v=[u[1],-u[0]],W=L>=9000?150:L>=6000?100:75,t=i?(i%2?1:-1)*.16*i*L0:0,c=[u0[0]*t,u0[1]*t],s=((H0>>i)&1)?1:-1,d=W/2+330+(W>100?90:0),nm='ABCD'[i]||'E',P=(e,n)=>[c[0]+u[0]*e+v[0]*n,c[1]+u[1]*e+v[1]*n];
+g.rw.push({a:P(-L/2,0),b:P(L/2,0),W,L,hd,p,u,v});g.tw.push({a:P(-L*.48,s*d),b:P(L*.48,s*d),n:nm,m:P(0,s*d)});
+const cn=[[-.45,-.45],[0,0],[.45,.45]];if(L>=6000)cn.push([-.2,-.29],[.2,.29]);
+cn.forEach((k,j)=>{const a1=P(k[0]*L,s*W/2),b1=P(k[1]*L,s*d);g.tw.push({a:a1,b:b1,n:nm+(j+1),m:[(a1[0]+b1[0])/2,(a1[1]+b1[1])/2],h:1})});
+if(!i){const al=Math.min(4500,Math.max(1400,L*.34)),ac=P(.05*L,s*(d+420)),bc=[ac[0]+v[0]*s*240,ac[1]+v[1]*s*240],np=L>=9000?4:L>=6000?3:L>=4000?2:1;g.ap={c:ac,u,v,l:al,w:640,b:{c:bc,l:al*.8,w:170},pi:[]};
+for(let j=0;j<np;j++){const o=(np==1?0:(j/(np-1)-.5))*al*.6;g.ap.pi.push({c:[bc[0]-v[0]*s*255+u[0]*o,bc[1]-v[1]*s*255+u[1]*o],l:340,w:85})}
+[-1,1].forEach(z=>g.tw.push({a:P(.05*L+z*al*.45,s*d),b:P(.05*L+z*al*.45,s*(d+420)),st:1}))}});return g}
+function drawApt(a,x,y){const pf=SZ*2**V.z/360/(60*Math.cos(a.lat*R))/6076.12,pr=pairs(a),ln=RL[a.id]||[],mx=Math.max(...pr.map((p,i)=>ln[i]||8000))*pf,T=mx<26?0:mx<80?1:mx<200?2:3;a.det=T>0;a.rpx=mx/2;
+if(!T){pr.forEach((p,i)=>{const h=p[0]*10*R,l=Math.max(7,(ln[i]||8000)*pf)/2;cx.strokeStyle=C.ap;cx.lineWidth=3;cx.lineCap='butt';cx.beginPath();cx.moveTo(x-Math.sin(h)*l,y+Math.cos(h)*l);cx.lineTo(x+Math.sin(h)*l,y-Math.cos(h)*l);cx.stroke()});return}
+const g=a.g||(a.g=layout(a)),mn=1.4/pf,lw=f=>Math.max(f,mn),S=(e,n)=>[x+e*pf,y-n*pf],Y='#facc15';
+cx.save();cx.translate(x,y);cx.scale(pf,-pf);cx.lineCap='butt';cx.setLineDash([]);
+const seg=(p,q,w,col,al)=>{cx.globalAlpha=al||1;cx.strokeStyle=col;cx.lineWidth=lw(w);cx.beginPath();cx.moveTo(p[0],p[1]);cx.lineTo(q[0],q[1]);cx.stroke();cx.globalAlpha=1},
+box=(c,e,f,l,w,col,al)=>{cx.globalAlpha=al;cx.fillStyle=col;cx.beginPath();[[1,1],[1,-1],[-1,-1],[-1,1]].forEach((k,i)=>{const X=c[0]+e[0]*k[0]*l/2+f[0]*k[1]*w/2,Z=c[1]+e[1]*k[0]*l/2+f[1]*k[1]*w/2;i?cx.lineTo(X,Z):cx.moveTo(X,Z)});cx.fill();cx.globalAlpha=1},
+mv=(p,u,k)=>[p[0]+u[0]*k,p[1]+u[1]*k];
+if(T>1&&g.ap){const p=g.ap;box(p.c,p.u,p.v,p.l,p.w,C.coast,.28)}
+g.tw.forEach(t=>{if(T>1||(t.m&&!t.h))seg(t.a,t.b,75,C.coast,.7)});
+if(T>1){const p=g.ap;if(p){box(p.b.c,p.u,p.v,p.b.l,p.b.w,C.ap,.75);p.pi.forEach(q=>box(q.c,p.v,p.u,q.l,q.w,C.ap,.75))}g.tw.forEach(t=>seg(t.a,t.b,3,Y,.9))}
+g.rw.forEach(r=>{seg(r.a,r.b,r.W+50,C.coast,.5);seg(r.a,r.b,r.W,C.txt);
+if(T>1){cx.setLineDash([140,110]);seg(mv(r.a,r.u,260),mv(r.b,r.u,-260),6,C.land);cx.setLineDash([])}
+if(T>2)for(let j=-3.5;j<=3.5;j++){const o=j*r.W/8;[[r.a,1],[r.b,-1]].forEach(([e,sg])=>seg(mv(mv(e,r.v,o),r.u,sg*40),mv(mv(e,r.v,o),r.u,sg*170),r.W/14,C.land))}});
+if(T>2)g.tw.forEach(t=>{if(!t.h)return;const dx=t.b[0]-t.a[0],dy=t.b[1]-t.a[1],l=Math.hypot(dx,dy),dr=[dx/l,dy/l],H=mv(t.a,dr,150),pp=[-dr[1],dr[0]];seg(mv(H,pp,-45),mv(H,pp,45),6,Y)});
+cx.restore();
+if(T>1){cx.textAlign='center';cx.textBaseline='middle';g.rw.forEach(r=>{[[r.a,1,r.p[0],0],[r.b,-1,r.p[1],Math.PI]].forEach(([e,sg,n,rot])=>{const[sx,sy]=S(e[0]+r.u[0]*sg*210,e[1]+r.u[1]*sg*210);cx.save();cx.translate(sx,sy);cx.rotate(r.hd+rot);cx.fillStyle=C.land;cx.font='bold '+Math.max(10,70*pf)+'px "Arial Narrow",Arial,sans-serif';cx.fillText(pad(n),0,0);cx.restore()})});
+if(T>2)g.tw.forEach(t=>{if(!t.n)return;const[sx,sy]=S(t.m[0],t.m[1]),w=8+t.n.length*7;cx.fillStyle=Y;cx.fillRect(sx-w/2,sy-8,w,16);cx.fillStyle='#111';cx.font='bold 11px sans-serif';cx.fillText(t.n,sx,sy+1)});cx.textAlign='left';cx.textBaseline='alphabetic'}}
+/* Real geometry: runway ends from OurAirports, taxiways/aprons/terminals from OpenStreetMap via the bridge */
+const loc=(a,la,lo)=>[(lo-a.lon)*Math.cos(a.lat*R)*364567,(la-a.lat)*364567];
+function mk(A,B,le,he,W){const dx=B[0]-A[0],dy=B[1]-A[1],L=Math.hypot(dx,dy)||1;return{a:A,b:B,L,u:[dx/L,dy/L],hd:Math.atan2(dx,dy),le,he,W:W||(L>9000?150:L>6000?100:75)}}
+function rwList(a){if(a._rl)return a._rl;const rl=[];
+if(a.rws&&a.rws.length)a.rws.forEach(r=>rl.push(mk(loc(a,r[2],r[3]),loc(a,r[4],r[5]),r[0],r[1],r[7])));
+else(a.osm||[]).forEach(o=>{if(o.t!='runway'||o.p.length<2)return;const ids=(o.r||'').split('/'),n=parseInt(ids[0]);let r=mk(o.p[0],o.p[o.p.length-1],ids[0]||'',ids[1]||'',0);if(n&&Math.abs((r.hd/R-n*10+540)%360-180)>90)r=mk(o.p[o.p.length-1],o.p[0],ids[0]||'',ids[1]||'',0);rl.push(r)});
+if(rl.length)a._rl=rl;return rl}
+function procOsm(a,l){a.osm=l.map(o=>({t:o[0],r:o[1],p:o[2].map(q=>loc(a,q[0],q[1]))}));a._rl=null;a.ost='ok';if(CH.on&&CH.a===a)chFit()}
+function rwSvg(a){const rr=rwList(a);if(!a.rws||!rr.length)return'';let m=1;rr.forEach(r=>[r.a,r.b].forEach(p=>{m=Math.max(m,Math.abs(p[0]),Math.abs(p[1]))}));const k=250/m;a._k=k;let s='';
+rr.forEach(r=>{const X=p=>300+p[0]*k,Z=p=>300-p[1]*k,ux=r.u[0],uz=-r.u[1];s+=`<line x1="${X(r.a)}" y1="${Z(r.a)}" x2="${X(r.b)}" y2="${Z(r.b)}" stroke="${C.txt}" stroke-width="${Math.max(5,r.W*k)}"/><text x="${X(r.a)-ux*22}" y="${Z(r.a)-uz*22+6}" text-anchor="middle" font-size="18" font-weight="700" fill="${C.ap}">${r.le}</text><text x="${X(r.b)+ux*22}" y="${Z(r.b)+uz*22+6}" text-anchor="middle" font-size="18" font-weight="700" fill="${C.ap}">${r.he}</text>`});return s}
+function drawReal(a,x,y){const pf=SZ*2**V.z/360/(60*Math.cos(a.lat*R))/6076.12,pr=pairs(a),ln=RL[a.id]||[],mx=Math.max(...pr.map((p,i)=>ln[i]||8000))*pf,T=mx<26?0:mx<80?1:mx<200?2:3;
+if(T>1&&(!a.os||(a.os>1&&Date.now()>a.os))){a.os=1;qOsm(a)}
+const rl=rwList(a);a.det=T>0&&rl.length>0;a.rpx=mx/2;
+if(!a.det){if(a.rws)pr.forEach((p,i)=>{const h=p[0]*10*R,l=Math.max(7,(ln[i]||8000)*pf)/2;cx.strokeStyle=C.ap;cx.lineWidth=3;cx.lineCap='butt';cx.beginPath();cx.moveTo(x-Math.sin(h)*l,y+Math.cos(h)*l);cx.lineTo(x+Math.sin(h)*l,y-Math.cos(h)*l);cx.stroke()});if(T>1){cx.fillStyle=C.txt;cx.font='11px sans-serif';cx.fillText('No verified layout loaded yet. It loads from OpenStreetMap when online (bridge or your own hosted copy), or import the data pack (Data tab).',x+10,y+16)}return}
+{const tn=(a.osm||[]).filter(o=>o.t=='taxiway').length,st=a.ost=='queued'?'Taxiway download queued...':a.ost=='loading'?'Loading taxiways...':a.ost=='fail'?'Taxiways unavailable: '+(a.err||'unknown')+' (retrying)':(a.ost=='ok'&&!tn)?'No taxiways mapped for this airport in OpenStreetMap.':'';if(st&&T>0){cx.font='12px sans-serif';cx.lineWidth=3;cx.strokeStyle='rgba(0,0,0,.6)';cx.strokeText(st,x+12,y+28);cx.fillStyle='#fff';cx.fillText(st,x+12,y+28)}}
+cx.save();cx.translate(x,y);cx.scale(pf,-pf);cx.lineJoin='round';
+const mn=1.4/pf,lw=f=>Math.max(f,mn),Y='#facc15',os=a.osm||[],
+poly=(p,c,al)=>{cx.globalAlpha=al;cx.fillStyle=c;cx.beginPath();p.forEach((q,i)=>i?cx.lineTo(q[0],q[1]):cx.moveTo(q[0],q[1]));cx.closePath();cx.fill();cx.globalAlpha=1},
+line=(p,w,c,al,cap)=>{cx.lineCap=cap||'round';cx.globalAlpha=al||1;cx.strokeStyle=c;cx.lineWidth=lw(w);cx.beginPath();p.forEach((q,i)=>i?cx.lineTo(q[0],q[1]):cx.moveTo(q[0],q[1]));cx.stroke();cx.globalAlpha=1};
+if(T>1){os.forEach(o=>{if(o.t=='apron')poly(o.p,C.coast,.28)});os.forEach(o=>{if(o.t=='terminal')poly(o.p,C.ap,.75)})}
+os.forEach(o=>{if(o.t=='taxiway'||(T>1&&o.t=='taxilane'))line(o.p,o.t=='taxiway'?75:40,TWC(),TWA())});
+os.forEach(o=>{if(o.t=='taxiway'||(T>1&&o.t=='taxilane'))line(o.p,3,Y,.95)});
+rl.forEach(r=>{line([r.a,r.b],r.W+50,C.coast,.5,'butt');line([r.a,r.b],r.W,PVC(),PVA(),'butt');
+if(T>1){cx.setLineDash([140,110]);line([[r.a[0]+r.u[0]*260,r.a[1]+r.u[1]*260],[r.b[0]-r.u[0]*260,r.b[1]-r.u[1]*260]],6,WHT(),1,'butt');cx.setLineDash([])}
+if(T>2)for(let j=-3.5;j<=3.5;j++){const o=j*r.W/8,v=[r.u[1],-r.u[0]];[[r.a,1],[r.b,-1]].forEach(([e,s])=>{const P=k=>[e[0]+v[0]*o+r.u[0]*s*k,e[1]+v[1]*o+r.u[1]*s*k];line([P(40),P(170)],r.W/14,WHT(),1,'butt')})}});
+cx.restore();
+if(T>1){const S=(e,n)=>[x+e*pf,y-n*pf];cx.textAlign='center';cx.textBaseline='middle';
+rl.forEach(r=>{[[r.a,1,r.le,0],[r.b,-1,r.he,Math.PI]].forEach(([e,s,t,rot])=>{if(!t)return;const[sx,sy]=S(e[0]+r.u[0]*s*210,e[1]+r.u[1]*s*210);cx.save();cx.translate(sx,sy);cx.rotate(r.hd+rot);cx.fillStyle=WHT();cx.font='bold '+Math.max(10,70*pf)+'px "Arial Narrow",Arial,sans-serif';cx.fillText(t,0,0);cx.restore()})});
+if(T>1)os.forEach(o=>{if(o.t!='taxiway'||!o.r||o.p.length<2)return;const q=o.p[o.p.length>>1],[sx,sy]=S(q[0],q[1]),w=8+o.r.length*7;if(sx<0||sx>W||sy<0||sy>H)return;cx.fillStyle=Y;cx.fillRect(sx-w/2,sy-8,w,16);cx.fillStyle='#111';cx.font='bold 11px sans-serif';cx.fillText(o.r,sx,sy+1)});
+if(pf>.07){const lab=pf>.14;os.forEach(o=>{if(o.t!='gate')return;const[sx,sy]=S(o.p[0][0],o.p[0][1]);if(sx<-20||sx>W+20||sy<-20||sy>H+20)return;cx.beginPath();cx.arc(sx,sy,Math.max(3,Math.min(9,22*pf)),0,7);cx.fillStyle=Y;cx.fill();cx.lineWidth=2;cx.strokeStyle='#111';cx.stroke();if(lab&&o.r){cx.font='bold 11px sans-serif';cx.textAlign='left';cx.lineWidth=3;cx.strokeStyle='rgba(0,0,0,.75)';cx.strokeText(o.r,sx+8,sy);cx.fillStyle='#fff';cx.fillText(o.r,sx+8,sy)}})}
+cx.textAlign='left';cx.textBaseline='alphabetic'}}
+/* Offline data pack (built by the bridge with --pack), stored in this browser */
+const pk={info:''};
+const idb=(m,v,k)=>new Promise((ok,no)=>{try{const q=indexedDB.open('dl',1);q.onupgradeneeded=()=>q.result.createObjectStore('k');q.onerror=()=>no();q.onsuccess=()=>{const s=q.result.transaction('k',m=='get'?'readonly':'readwrite').objectStore('k'),r=m=='get'?s.get(k||'pack'):s.put(v,k||'pack');r.onsuccess=()=>ok(r.result);r.onerror=()=>no()}}catch(e){no(e)}});
+function mergeAir(l){const m=new Map(A.map(z=>[z.id,z]));l.forEach(a=>{const e=m.get(a[0]),f=a[8]||{};if(e){e.rws=a[7];e._rl=null;e.lat=a[2];e.lon=a[3];e.elev=a[4];e.rw=a[5];RL[a[0]]=a[6];e.twr=f.TWR||'—';e.atis=f.ATIS||'—';e.fqs=f;return}A.push({rws:a[7],k:'apt',x:1,id:a[0],name:a[1],lat:a[2],lon:a[3],elev:a[4],rw:a[5],twr:f.TWR||'—',atis:f.ATIS||'—',fqs:f,metar:'No METAR loaded'});RL[a[0]]=a[6]})}
+function applyPack(p){mergeAir(p.airports||[]);if((p.navaids||[]).length){N.length=0;p.navaids.forEach(n=>N.push({k:'nav',id:n[0],name:n[1],type:n[2],lat:n[3],lon:n[4],freq:n[5]}))}
+const m=new Map(A.map(z=>[z.id,z]));let c=0;for(const id in p.osm||{}){const a=m.get(id);if(a){a.os=1;procOsm(a,p.osm[id]);c++}}for(const id in p.faa||{}){const a=m.get(id);if(a)a.faa=p.faa[id]}
+pk.info='Pack built '+p.built+' (FAA cycle '+p.cycle+'): '+(p.airports||[]).length+' airports, '+c+' with real taxiway data.'}
+async function importPack(f){if(!f)return;pk.info='Reading '+Math.round(f.size/1e5)/10+' MB...';render();try{const t=await f.text();applyPack(JSON.parse(t));try{await idb('put',t)}catch(_){pk.info+=' Could not save it for next time.'}}catch(e){pk.info='That file could not be read.'}render()}
+function dataHtml(){return '<h3>Offline data pack</h3><div class="m">'+(pk.info||'No pack imported yet.')+'</div><ol class="m" style="padding-left:18px"><li>On a computer with internet run <b>python3 stratos_bridge.py --pack</b>. It builds stratos_pack.json with real runways, taxiways, aprons, terminals, navaids, frequencies and the current FAA chart list.</li><li>Send that file to your iPhone (AirDrop or Files).</li><li>Choose it here. It is saved on this device and works with no bridge.</li></ol><input type="file" accept=".json,application/json" onchange="importPack(this.files[0])"><div class="m" style="margin-top:8px">Add more airports: <b>--pack KSFO EGLL CYYZ</b></div>'}
+function faaHtml(a){const f=a.faa;if(!f)return/^[KP]/.test(a.id)?'<div class="m" style="margin-top:8px">Official FAA airport diagram and ILS charts: <a href="https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dtpp/" target="_blank" rel="noopener">FAA d-TPP</a>. Import the data pack to link them directly.</div>':'';
+return '<h3 style="margin-top:10px">Official FAA charts (cycle '+f.cycle+')</h3><div class="row">'+f.c.map(c=>'<a href="https://aeronav.faa.gov/d-tpp/'+f.cycle+'/'+c[2]+'" target="_blank" rel="noopener"><button>'+(c[0]=='APD'?'Airport diagram':c[1])+'</button></a>').join('')+'</div>'}
+function getFaa(a){if(location.protocol!='http:'||a.faa||a.fq)return;a.fq=1;fetch('/faa?id='+a.id).then(r=>r.json()).then(j=>{if(j&&j.c){a.faa=j;if($('#chart').style.display=='block'&&sel==a)openChart(a)}}).catch(()=>{})}
+$('#bData').onclick=()=>{panel=panel=='data'?null:'data';render()};
+idb('get').then(t=>{if(t)applyPack(JSON.parse(t))}).catch(()=>{});
+function settingsHtml(){
+  const sbUser=localStorage.getItem('stratos.simbrief.id')||'';
+  const autoFollow=localStorage.getItem('stratos.autofollow')!=='0';
+  const defaultTheme=document.documentElement.dataset.theme||'night';
+  const showLabels=localStorage.getItem('stratos.showlabels')!=='0';
+  
+  return `<h3>Settings</h3>
+<div style="display:flex;flex-direction:column;gap:16px;margin-top:10px">
+  <div>
+    <b style="display:block;margin-bottom:4px">SimBrief Credentials</b>
+    <div class="m" style="margin-bottom:6px">Save your SimBrief Pilot ID or Username so importing flight plans is instantaneous without re-typing.</div>
+    <div style="display:flex;gap:8px">
+      <input id="set_sb" type="text" placeholder="Pilot ID or Username (e.g. 123456 or JohnDoe)" value="${sbUser}" style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--ui2);background:var(--ui2);color:var(--txt)">
+      <button onclick="saveSimBriefSetting()">Save</button>
+    </div>
+  </div>
+  
+  <div style="border-top:1px solid var(--ui2);padding-top:12px">
+    <b style="display:block;margin-bottom:4px">Simulator & Map Options</b>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+        <input type="checkbox" id="set_af" ${autoFollow?'checked':''} onchange="localStorage.setItem('stratos.autofollow',this.checked?'1':'0');setFol(this.checked)">
+        <span>Auto-follow aircraft when connected to flight simulator</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+        <input type="checkbox" id="set_lbl" ${showLabels?'checked':''} onchange="localStorage.setItem('stratos.showlabels',this.checked?'1':'0');render()">
+        <span>Show airway & waypoint labels on flight route</span>
+      </label>
+    </div>
+  </div>
+
+  <div style="border-top:1px solid var(--ui2);padding-top:12px">
+    <b style="display:block;margin-bottom:4px">Quick Actions</b>
+    <div class="row" style="margin-top:6px">
+      <button onclick="importSimBrief(true)">Fetch Latest SimBrief Plan</button>
+      <button onclick="localStorage.removeItem('dl.route');route=[];save();render();alert('Route cleared!')">Clear Stored Route</button>
+      <button onclick="localStorage.clear();location.reload()">Reset App Data</button>
+    </div>
+  </div>
+
+  <div style="border-top:1px solid var(--ui2);padding-top:12px" class="m">
+    <b>Stratos Flight Platform</b><br>
+    Version: 1.2.0 (Desktop Edition)<br>
+    Weather Provider: NOAA Aviation Weather Center (Live REST)<br>
+    Airfield Data: OurAirports Public Domain Database<br>
+    ADS-B Traffic: Multi-Source Community Feeds
+  </div>
+</div>`;
+}
+
+window.saveSimBriefSetting=()=>{
+  const val=($('#set_sb')?$('#set_sb').value:'').trim();
+  localStorage.setItem('stratos.simbrief.id',val);
+  alert(val?`Saved SimBrief account: ${val}`:'SimBrief account cleared.');
+};
+
+$('#bSet').onclick=()=>{panel=panel=='settings'?null:'settings';render()};
+function tabHi(){[['bMap',null],['bCh','charts'],['bRoute','route'],['bWx','wx'],['bLive','live'],['bData','data'],['bSet','settings']].forEach(([i,p])=>$('#'+i).classList.toggle('act',p?panel==p:!panel||panel=='sel'))}
+$('#bLay').onclick=()=>{const l=$('#lay');l.style.display=l.style.display=='flex'?'none':'flex'};
+$('#bMap').onclick=()=>{panel=null;sel=null;tk=false;render()};
+$('#st').onclick=()=>{panel='live';render()};
+function TILED(){if(CH.on)return CH.pg=='sat'&&!(TS.ok==0&&TS.err>6);return L.style!='vec'&&!(TS.ok==0&&TS.err>6)}
+function SAT(){return TILED()}
+function DKM(){return TILED()&&(L.style=='sat'||L.style=='hyb'||L.style=='dk')}
+function PVC(){const s=L.style;return !TILED()?C.txt:(s=='sat'||s=='hyb')?'#d8d8d8':s=='dk'?'#a9b4bd':'#4a4f55'}
+function PVA(){const s=L.style;return !TILED()?1:(s=='sat'||s=='hyb')?.45:.92}
+function TWC(){const s=L.style;return !TILED()?C.coast:(s=='sat'||s=='hyb')?'#ffe27a':s=='dk'?'#5d6872':'#8a8f96'}
+function TWA(){const s=L.style;return !TILED()?.75:(s=='sat'||s=='hyb')?.5:.9}
+function WHT(){return TILED()?'#fff':C.land}
+function tileUrl(l,z,x,y){const h=location.protocol=='http:',s='abc'[(x+y)%3];
+if(l=='sat'||l=='hyb')return h?'/tile/'+z+'/'+x+'/'+y+'.jpg':'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/'+z+'/'+y+'/'+x;
+if(l=='lab')return 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/'+z+'/'+y+'/'+x;
+if(l=='st')return 'https://'+s+'.tile.openstreetmap.org/'+z+'/'+x+'/'+y+'.png';
+if(l=='lt')return 'https://'+s+'.basemaps.cartocdn.com/light_all/'+z+'/'+x+'/'+y+'.png';
+if(l=='dk')return 'https://'+s+'.basemaps.cartocdn.com/dark_all/'+z+'/'+x+'/'+y+'.png';
+return 'https://'+s+'.tile.opentopomap.org/'+z+'/'+x+'/'+y+'.png'}
+function tImg(l,z,x,y){const k=l+'/'+z+'/'+x+'/'+y;let t=TC.get(k);if(!t){t={i:new Image(),ok:0,t:0};t.i.onload=()=>{t.ok=1;t.t=performance.now();TS.ok++};t.i.onerror=()=>{TS.err++};t.i.src=tileUrl(l,z,x,y);TC.set(k,t);if(TC.size>600)TC.delete(TC.keys().next().value)}return t}
+function tl(l){const mz=l=='lab'?18:(MS[l]||MS.sat).m,Z=Math.min(mz,Math.max(0,Math.ceil(V.z-.25))),s=256*2**(V.z-Z),c=wpx(V.lon,V.lat),n=2**Z,now=performance.now(),x0=Math.max(0,Math.floor((c[0]-W/2)/s)),x1=Math.min(n-1,Math.floor((c[0]+W/2)/s)),y0=Math.max(0,Math.floor((c[1]-H/2)/s)),y1=Math.min(n-1,Math.floor((c[1]+H/2)/s));
+for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const dx=x*s-c[0]+W/2,dy=y*s-c[1]+H/2,t=tImg(l,Z,x,y);
+if(Z>0){const p=t.ok&&now-t.t>260?null:tImg(l,Z-1,x>>1,y>>1);if(p&&p.ok)cx.drawImage(p.i,(x&1)*128,(y&1)*128,128,128,dx,dy,s+.5,s+.5)}
+if(t.ok){cx.globalAlpha=Math.min(1,(now-t.t)/220);cx.drawImage(t.i,dx,dy,s+.5,s+.5);cx.globalAlpha=1}}}
+function drawTiles(){const l=L.style;tl(l=='hyb'?'sat':l);if(l=='hyb')tl('lab');const tx=(MS[l]||MS.sat).a||'';cx.font='10px sans-serif';cx.lineWidth=3;cx.strokeStyle='rgba(0,0,0,.65)';cx.strokeText(tx,8,H-84);cx.fillStyle='#fff';cx.fillText(tx,8,H-84)}
+function msUi(){const e=$('#ms');if(!e)return;e.innerHTML=Object.keys(MS).map(k=>'<button data-ms="'+k+'" class="'+(L.style==k?'on':'')+'">'+MS[k].n+'</button>').join('')}
+$('#ms').onclick=e=>{const k=e.target.dataset&&e.target.dataset.ms;if(!k)return;L.style=k;try{localStorage.setItem('dl.style',k)}catch(_){}TS.err=0;msUi()};
+msUi();
+
+function tileImg(z,x,y){const k=z+'/'+x+'/'+y;let t=TC.get(k);if(!t){t={i:new Image(),ok:0,t:0};t.i.onload=()=>{t.ok=1;t.t=performance.now();TS.ok++};t.i.onerror=()=>{TS.err++};t.i.src=location.protocol=='http:'?'/tile/'+k+'.jpg':'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/'+z+'/'+y+'/'+x;TC.set(k,t);if(TC.size>500)TC.delete(TC.keys().next().value)}return t}
+function drawSat(){const Z=Math.min(18,Math.max(0,Math.ceil(V.z-.25))),s=256*2**(V.z-Z),c=wpx(V.lon,V.lat),n=2**Z,now=performance.now(),x0=Math.max(0,Math.floor((c[0]-W/2)/s)),x1=Math.min(n-1,Math.floor((c[0]+W/2)/s)),y0=Math.max(0,Math.floor((c[1]-H/2)/s)),y1=Math.min(n-1,Math.floor((c[1]+H/2)/s));
+for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const dx=x*s-c[0]+W/2,dy=y*s-c[1]+H/2,t=tileImg(Z,x,y);
+if(Z>0){const p=t.ok&&now-t.t>260?null:tileImg(Z-1,x>>1,y>>1);if(p&&p.ok)cx.drawImage(p.i,(x&1)*128,(y&1)*128,128,128,dx,dy,s+.5,s+.5)}
+if(t.ok){cx.globalAlpha=Math.min(1,(now-t.t)/220);cx.drawImage(t.i,dx,dy,s+.5,s+.5);cx.globalAlpha=1}}
+const tx='Imagery © Esri, Maxar, Earthstar Geographics';cx.font='10px sans-serif';cx.strokeStyle='rgba(0,0,0,.65)';cx.lineWidth=3;cx.strokeText(tx,8,H-84);cx.fillStyle='#fff';cx.fillText(tx,8,H-84)}
+var fcS='',aTab='info';
+function routeProg(){let best=1e9,acc=0,at=0;for(let i=0;i<route.length-1;i++){const a=route[i],b=route[i+1],L2=dist(a,b),k=Math.cos(a.lat*R),bx=(b.lon-a.lon)*k*60,by=(b.lat-a.lat)*60,px=(own.lon-a.lon)*k*60,py=(own.lat-a.lat)*60,d2=bx*bx+by*by||1e-9,t=Math.max(0,Math.min(1,(px*bx+py*by)/d2)),dd=Math.hypot(px-bx*t,py-by*t);if(dd<best){best=dd;at=acc+t*L2}acc+=L2}return at}
+function fcRender(ok){const e=$('#fc');if(!ok){if(fcS){fcS='';e.style.display='none'}return}
+const g=i=>$('#'+i).textContent,rt=route.length>1,tot=rt?total():0,pr=rt?routeProg():0,pct=tot?Math.min(100,pr/tot*100):0,
+s='<div class="fh"><span class="dot"></span>'+(live.d.src||'SIM')+' <i>LIVE</i><span class="sp"></span>'+(rt?'ETA '+g('tEt'):'')+'</div>'+(rt?'<div class="fr"><span>'+route[0].id+'</span><div class="pb"><u style="width:'+pct.toFixed(1)+'%"></u><s style="left:'+pct.toFixed(1)+'%">&#9992;</s></div><span>'+route[route.length-1].id+'</span></div><div class="fm">'+Math.round(Math.max(0,tot-pr))+' nm remaining</div>':'')+
+'<div class="fg"><div><b>'+g('tAL')+'</b><span>ALT FT</span></div><div><b>'+g('tGS')+'</b><span>GS KT</span></div><div><b>'+g('tHD')+'</b><span>HDG</span></div><div><b>'+g('tVS')+'</b><span>VS FPM</span></div></div>';
+if(s!==fcS){fcS=s;e.innerHTML=s;e.style.display='block'}}
+function aptHtml(o){const tb=[['info','Info'],['wx','Weather'],['ch','Charts']];
+let h='<div class="ah"><div><b class="ic">'+o.id+'</b><div class="m">'+o.name+'</div></div><div class="chips"><span>'+o.elev+' ft</span>'+(liveOk()?'<span>'+Math.round(dist(own,o))+' nm</span>':'')+'</div></div><div class="seg">'+tb.map(t=>'<button class="'+(aTab==t[0]?'on':'')+'" data-t="'+t[0]+'" onclick="aTab=this.dataset.t;render()">'+t[1]+'</button>').join('')+'</div>';
+if(aTab=='wx')return h+'<code>'+o.metar+'</code><div class="m">'+dec(o.metar)+'</div><div class="m">'+mAge(o)+'</div>'+rwTable(o);
+if(aTab=='ch')return h+chBody(o);
+h+='<table><tr><td>Tower</td><td>'+o.twr+'</td></tr><tr><td>ATIS</td><td>'+o.atis+'</td></tr><tr><td>Position</td><td>'+o.lat.toFixed(4)+', '+o.lon.toFixed(4)+'</td></tr></table>';
+if(o.rws&&o.rws.length)h+='<table><tr><th>Runway</th><th>Length</th><th>Width</th></tr>'+o.rws.map(r=>'<tr><td>'+r[0]+' / '+r[1]+'</td><td>'+r[6]+' ft</td><td>'+(r[7]||'-')+' ft</td></tr>').join('')+'</table>';
+else h+='<div class="m">Runway positions load from the airport database (needs internet or the data pack).</div>';
+return h+'<div class="row"><button onclick="addSel()">Add to route</button><button onclick="chartMap()">Zoom in</button><button class="on" onclick="openCharts(sel)">Charts</button></div>'}
+function closeChart(){$('#chart').style.display='none'}
+function chartMap(){closeChart();setFol(false);V.lon=sel.lon;V.lat=sel.lat;V.tz=null;V.z=12.5;panel='sel';render()}
+/* X-Plane live link */
+function liveStep(dt){T.forEach(a=>{if(Date.now()-(a.seen||0)<45000){const p=fwd(a,a.hdg,a.gs/3600*dt);a.lat=p.lat;a.lon=p.lon}});if(tk&&sel&&sel.k=='trf'){V.lon=sel.lon;V.lat=sel.lat}if(panel=='sel'&&sel&&(sel.k=='trf'||sel.k=='own')&&(live.f=(live.f||0)+1)%10==0)updPl();const d=live.d;own.lat=d.lat;own.lon=d.lon;trlAdd('own',d.lat,d.lon,d.alt,8000);own.hdg=d.hdg||0;own.alt=d.alt;own.vs=d.vs||0;const gs=d.gs||0,el=route.length?dist(own,route.at(-1)):NaN;
+$('#tGS').textContent=Math.round(gs);$('#tAL').textContent=Math.round(own.alt);$('#tHD').textContent=String(Math.round(own.hdg+360)%360).padStart(3,'0');$('#tVS').textContent=Math.round(own.vs/10)*10;$('#tDS').textContent=isFinite(el)?el.toFixed(1):'–';$('#tEt').textContent=isFinite(el)&&gs>30?hm(el/gs):'–';if(V.fol){V.lon=own.lon;V.lat=own.lat}}
+function getMetar(a){if(location.protocol!='http:'||(a.mf&&Date.now()-a.mf<600000))return;a.mf=Date.now();fetch('/metar?ids='+a.id).then(r=>r.text()).then(t=>{t=t.trim().split('\n')[0];if(t){a.metar=t;a.mt=Date.now();if(panel=='sel'&&sel==a)render();if($('#chart').style.display=='block'&&sel==a)openChart(a)}}).catch(()=>{})}
+let wxList=[];try{wxList=JSON.parse(localStorage.getItem('dl.wx')||'[]')}catch(_){}
+function wxAdd(a){if(!wxList.includes(a.id)){wxList.unshift(a.id);wxList=wxList.slice(0,8);try{localStorage.setItem('dl.wx',JSON.stringify(wxList))}catch(_){}}}
+function mRef(a){if(CH.on&&CH.a===a)chHead();if((panel=='sel'&&sel==a)||panel=='wx')render();if($('#chart').style.display=='block'&&sel==a)openChart(a)}
+function getMetar(a,force){if(!force&&a.mf&&Date.now()-a.mf<300000)return;a.mf=Date.now();wxAdd(a);return mget(a);
+if(location.protocol!='http:'){a.me='METAR needs the bridge. The weather service blocks direct browser requests, and this preview has no internet access.';mRef(a);return}
+fetch('/metar?ids='+a.id).then(r=>r.text()).then(t=>{t=(t||'').trim().split('\n')[0];if(t){a.metar=t;a.mt=Date.now();a.me=''}else a.me='No METAR reported for this airport.';mRef(a)}).catch(()=>{a.me='METAR fetch failed. Is the bridge running with internet?';mRef(a)})}
+function wxHtml(){const m=new Map(A.map(z=>[z.id,z])),rows=wxList.map(i=>m.get(i)).filter(Boolean);rows.forEach(a=>getMetar(a));
+return '<h3>Weather (METAR)</h3><div class="m">Airports you open are added here and refreshed every 5 minutes. Works without X-Plane or live tracking.</div>'+(rows.length?rows.map(a=>'<div style="margin-top:10px"><b>'+a.id+'</b> <span class="m">'+a.name+'</span><code>'+(a.mt?a.metar:(a.me||'Loading...'))+'</code><div class="m">'+mAge(a)+'</div></div>').join(''):'<div class="m" style="margin-top:8px">No airports yet. Search for one or tap an airport on the map.</div>')+'<div class="row"><button onclick="wxList.forEach(i=>{const a=A.find(z=>z.id==i);if(a)getMetar(a,true)})">Refresh now</button></div>'}
+$('#bWx').onclick=()=>{panel=panel=='wx'?null:'wx';render()};
+async function loadOsm(a){try{let l=null;try{const c=await idb('get',0,'osm:'+a.id);if(c)l=JSON.parse(c)}catch(_){}
+if(!l){if(location.protocol=='http:'){l=await(await fetch('/osm?id='+a.id+'&lat='+a.lat+'&lon='+a.lon)).json()}else{const q='[out:json][timeout:30];(way["aeroway"~"^(runway|taxiway|taxilane|apron|terminal)$"](around:5000,'+a.lat+','+a.lon+'););out geom;',d=await(await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q)})).json();l=d.elements.filter(e=>e.type=='way'&&e.geometry).map(e=>[e.tags.aeroway,e.tags.ref||'',e.geometry.map(p=>[p.lat,p.lon])])}
+if(l&&l.length)idb('put',JSON.stringify(l),'osm:'+a.id).catch(()=>{})}
+if(l&&l.length)procOsm(a,l)}catch(_){a.os=Date.now()+120000}}
+async function mget(a){const br=location.protocol=='http:',S=br?['/metar?ids=']:['https://metar.vatsim.net/','https://aviationweather.gov/api/data/metar?format=raw&ids='];let t='',ok=0;
+for(const u of S){try{const r=await fetch(u+a.id);if(!r.ok)continue;ok=1;t=(await r.text()).trim().split('\n')[0];if(t)break}catch(_){}}
+if(t){a.metar=t;a.mt=Date.now();a.me=''}else a.me=ok?'No METAR reported for this airport.':(br?'METAR fetch failed. Is the bridge online?':'Could not reach a METAR source (blocked or offline). This preview has no internet access; use your own hosted copy or the bridge.');mRef(a)}
+function dec(m){if(!m||/^No METAR/.test(m))return'';const o=[],w=wind(m);if(w)o.push('Wind '+(w.d==null?'VRB':String(w.d).padStart(3,'0')+'°')+' at '+w.s+(w.g?' gust '+w.g:'')+' kt');const v=/ (\d+SM|\d{4}|CAVOK) /.exec(m);if(v)o.push('Vis '+v[1]);const c=m.match(/(FEW|SCT|BKN|OVC)\d{3}/g);if(c)o.push(c.join(' '));const t=/ (M?\d{2})\/(M?\d{2}) /.exec(m);if(t)o.push('Temp '+t[1].replace('M','-')+'C, dew '+t[2].replace('M','-')+'C');const q=/ ([AQ])(\d{4})/.exec(m);if(q)o.push(q[1]=='A'?'Altimeter '+q[2].slice(0,2)+'.'+q[2].slice(2)+' inHg':'QNH '+q[2]+' hPa');return o.join(' | ')}
+function faaCycle(){const d=Math.floor((Date.now()-Date.UTC(2026,0,22))/864e5/28);return '26'+String(1+d).padStart(2,'0')}
+let chSel=null;
+function chHtml(){const a=chSel||(sel&&sel.k=='apt'?sel:null);return '<h3>Airport charts</h3><input id="chq" placeholder="Search airport (KJFK, CYUL, EGLL, Denver)" oninput="chFind(this.value)" style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid var(--ui2);background:var(--ui2);color:var(--txt);font-size:16px"><div id="chr"></div>'+(a?chBody(a):'<div class="m" style="margin-top:8px">Search for an airport to open its charts.</div>')}
+function chFind(q){q=q.trim().toLowerCase();const e=$('#chr');if(!q){e.innerHTML='';return}const m=A.filter(o=>o.id.toLowerCase().includes(q)||o.name.toLowerCase().includes(q)).sort((a,b)=>b.id.toLowerCase().startsWith(q)-a.id.toLowerCase().startsWith(q)).slice(0,6);e.innerHTML=m.map(o=>'<div style="padding:8px 4px;cursor:pointer;border-bottom:1px solid var(--ui2)" data-i="'+o.id+'" onclick="chPick(this.dataset.i)"><b>'+o.id+'</b> '+o.name+'</div>').join('')||'<div class="m">No match</div>'}
+function chPick(i){chSel=A.find(z=>z.id==i);render()}
+function chOpen(i){sel=A.find(z=>z.id==i);openChart(sel)}
+function chBody(a){const f=a.faa,us=/^K/.test(a.id)||/^P[AHGJ]/.test(a.id),cy=faaCycle(),L2=(u,t)=>'<a href="'+u+'" target="_blank" rel="noopener"><button>'+t+'</button></a>';
+let h='<div style="margin-top:10px"><b>'+a.id+'</b> <span class="m">'+a.name+'</span></div><div class="row"><button data-i="'+a.id+'" onclick="chOpen(this.dataset.i)">Airport layout + wind</button></div>';
+if(us){h+='<div class="m" style="margin-top:10px">Official FAA charts, cycle '+cy+'</div><div class="row">'+(f?f.c.map(c=>L2('https://aeronav.faa.gov/d-tpp/'+f.cycle+'/'+c[2],c[0]=='APD'?'Airport diagram':c[1])).join(''):'')+L2('https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dtpp/search/results/?cycle='+cy+'&ident='+a.id.replace(/^K/,''),'All FAA charts (SIDs, STARs, approaches)')+'</div>'}
+else h+='<div class="m" style="margin-top:10px">Official charts for this country are published by its own aviation authority (for example NAV CANADA or the national AIP), not a single free source. These sites list what is available:</div>';
+const ai=AIP[a.id.slice(0,2)]||AIP[a.id[0]];return h+'<div class="m" style="margin-top:10px">Jeppesen charts are licensed per subscriber and cannot be embedded here. If you subscribe, open them in Navigraph or Jeppesen:</div><div class="row">'+L2('https://charts.navigraph.com/','Jeppesen via Navigraph')+L2('https://www.jeppesen.com/','Jeppesen')+'</div><div class="row">'+(ai?L2(ai[1],ai[0]):'')+L2('https://skyvector.com/airport/'+a.id,'SkyVector')+(us?L2('https://www.airnav.com/airport/'+a.id,'AirNav'):'')+L2('https://ourairports.com/airports/'+a.id+'/','OurAirports')+'</div>'}
+$('#bCh').onclick=()=>{panel=panel=='charts'?null:'charts';render()};
+function csv(t,cb){let r=[],f='',q=0;const n=t.length;for(let i=0;i<n;i++){const c=t.charCodeAt(i);if(q){if(c==34){if(t.charCodeAt(i+1)==34){f+='"';i++}else q=0}else f+=t[i]}else if(c==34)q=1;else if(c==44){r.push(f);f=''}else if(c==10){r.push(f);f='';cb(r);r=[]}else if(c!=13)f+=t[i]}if(f||r.length){r.push(f);cb(r)}}
+function csvh(t,cb){let h=null;csv(t,r=>{if(!h){h={};r.forEach((x,i)=>h[x]=i);return}cb(r,h)})}
+async function loadOA(){if(location.protocol=='http:')return;try{const c=await idb('get',0,'oa');if(c){applyPack(JSON.parse(c));return}}catch(_){}
+try{const B='https://davidmegginson.github.io/ourairports-data/',g=async n=>{const r=await fetch(B+n);if(!r.ok)throw 0;return r.text()},rw={},rws={},fq={},ap=[],nv=[];
+csvh(await g('runways.csv'),(r,h)=>{if(r[h.closed]=='1')return;const m=/^\d+/.exec(r[h.le_ident]||'');if(!m)return;const n=+m[0],lo=n<=18?n:n-18;if(lo<1||lo>18)return;const id=r[h.airport_ident],d=rw[id]||(rw[id]={});d[lo]=Math.max(d[lo]||0,+r[h.length_ft]||0);const a=parseFloat(r[h.le_latitude_deg]),b=parseFloat(r[h.le_longitude_deg]),c=parseFloat(r[h.he_latitude_deg]),e=parseFloat(r[h.he_longitude_deg]);if([a,b,c,e].every(isFinite))(rws[id]||(rws[id]=[])).push([r[h.le_ident],r[h.he_ident],a,b,c,e,+r[h.length_ft]||0,+r[h.width_ft]||0])});
+csvh(await g('airport-frequencies.csv'),(r,h)=>{const d=fq[r[h.airport_ident]]||(fq[r[h.airport_ident]]={});if(!d[r[h.type]])d[r[h.type]]=r[h.frequency_mhz]});
+csvh(await g('airports.csv'),(r,h)=>{const id=r[h.ident];if(!/^(large|medium)_airport$/.test(r[h.type])||!rw[id])return;ap.push([id,r[h.name],+r[h.latitude_deg],+r[h.longitude_deg],+r[h.elevation_ft]||0,Object.keys(rw[id]).map(Number),Object.values(rw[id]),rws[id]||[],fq[id]||{}])});
+csvh(await g('navaids.csv'),(r,h)=>{const t=r[h.type];if(!/^(VOR|NDB)/.test(t)||!r[h.frequency_khz])return;const f=+r[h.frequency_khz];nv.push([r[h.ident],r[h.name],t,+r[h.latitude_deg],+r[h.longitude_deg],/^VOR/.test(t)?(f/1000).toFixed(2)+' MHz':Math.round(f)+' kHz'])});
+const p={airports:ap,navaids:nv,built:new Date().toISOString().slice(0,10),cycle:faaCycle()};applyPack(p);idb('put',JSON.stringify(p),'oa').catch(()=>{})}catch(_){}}
+async function loadOsm2(a){a.ost='loading';try{let l=null;try{const c=await idb('get',0,'osm:'+a.id);if(c)l=JSON.parse(c)}catch(_){}
+if(!l||!l.length){l=null;if(location.protocol=='http:'){l=await(await fetch('/osm?id='+a.id+'&lat='+a.lat+'&lon='+a.lon)).json()}else{const dl=.045,dn=dl/Math.cos(a.lat*R),q='[out:json][timeout:40];(way["aeroway"~"^(runway|taxiway|taxilane|apron|terminal)$"]('+(a.lat-dl)+','+(a.lon-dn)+','+(a.lat+dl)+','+(a.lon+dn)+'););out geom;',U=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass.private.coffee/api/interpreter'];
+for(const u of U){try{const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(q)});if(!r.ok)continue;const d=await r.json();if(d.elements&&d.elements.length){l=d.elements.filter(e=>e.type=='way'&&e.geometry).map(e=>[e.tags.aeroway,e.tags.ref||'',e.geometry.map(p=>[p.lat,p.lon])]);break}}catch(_){}}}
+if(l&&l.length)idb('put',JSON.stringify(l),'osm:'+a.id).catch(()=>{})}
+if(l&&l.length){procOsm(a,l)}else{a.ost='fail';a.os=Date.now()+90000}}catch(_){a.ost='fail';a.os=Date.now()+90000}}
+const OQ=[];let OB=false;
+function qOsm(a){a.ost='queued';OQ.push(a);pumpOsm()}
+async function pumpOsm(){if(OB)return;OB=true;try{while(OQ.length){const c=wpx(V.lon,V.lat);let bi=0,bd=1e18;OQ.forEach((a,i)=>{const p=wpx(a.lon,a.lat),d=Math.hypot(p[0]-c[0],p[1]-c[1]);if(d<bd){bd=d;bi=i}});const a=OQ.splice(bi,1)[0];if(bd>Math.max(W,H)*1.2){a.os=Date.now()+5000;a.ost='';continue}await loadOsm3(a);await new Promise(z=>setTimeout(z,1200))}}finally{OB=false}}
+async function loadOsm3(a){a.ost='loading';a.err='';let l=null;try{const c=await idb('get',0,'osm2:'+a.id);if(c)l=JSON.parse(c)}catch(_){}
+if(!l||!l.length){l=await tileWays(a);if(l&&l.length){}else if(location.protocol=='http:'){try{l=await(await fetch('/osm?id='+a.id+'&lat='+a.lat+'&lon='+a.lon)).json()}catch(e){a.err='bridge offline'}}else{
+const dl=.032,dn=dl/Math.cos(a.lat*R),q='[out:json][timeout:30];(way["aeroway"~"^(runway|taxiway|taxilane|apron|terminal)$"]('+(a.lat-dl).toFixed(5)+','+(a.lon-dn).toFixed(5)+','+(a.lat+dl).toFixed(5)+','+(a.lon+dn).toFixed(5)+'););out geom;',
+U=['https://overpass-api.de/api/interpreter','https://overpass.private.coffee/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass.openstreetmap.fr/api/interpreter','https://overpass.osm.jp/api/interpreter'];
+for(const u of U){const hn=new URL(u).hostname;try{const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),30000),r=await fetch(u+'?data='+encodeURIComponent(q),{signal:ac.signal});clearTimeout(tm);if(!r.ok){a.err=hn+' HTTP '+r.status;if(r.status==429)await new Promise(z=>setTimeout(z,2500));continue}const d=await r.json();if(d.elements&&d.elements.length){l=d.elements.filter(e=>e.type=='way'&&e.geometry).map(e=>[e.tags.aeroway,e.tags.ref||'',e.geometry.map(p=>[p.lat,p.lon])]);break}a.err=hn+' returned no data'}catch(e){a.err=hn+' '+((e&&e.name)||'network error')}}}
+if(l&&l.length)idb('put',JSON.stringify(l),'osm2:'+a.id).catch(()=>{})}
+if(l&&l.length){procOsm(a,l);a.err=''}else{a.ost='fail';a.os=Date.now()+45000}}
+/* Taxiways from OpenFreeMap vector tiles (OpenStreetMap data), decoded in the browser */
+let OFMT=null;
+function mvtAero(ab,z,tx,ty){
+const d=new Uint8Array(ab);let p=0;const out=[];
+const rv=()=>{let r=0,s=1,b;do{b=d[p++];r+=(b&127)*s;s*=128}while(b&128);return r};
+const skip=w=>{if(w==0)rv();else if(w==1)p+=8;else if(w==2){const l=rv();p+=l}else if(w==5)p+=4};
+const str=(s,e)=>new TextDecoder().decode(d.subarray(s,e));
+const val=(s,e)=>{p=s;let v=null;while(p<e){const k=rv(),f=Math.floor(k/8),w=k&7;if(f==1&&w==2){const l=rv();v=str(p,p+l);p+=l}else if(w==0)v=rv();else skip(w)}return v};
+const lonlat=(px,py,ext)=>{const n=Math.PI-2*Math.PI*(ty+py/ext)/2**z;return[180/Math.PI*Math.atan(Math.sinh(n)),(tx+px/ext)/2**z*360-180]};
+const layer=e=>{let name='',ext=4096;const keys=[],vals=[],feats=[];
+while(p<e){const k=rv(),f=Math.floor(k/8),w=k&7;
+if(w==2){const l=rv(),s=p,en=p+l;if(f==1)name=str(s,en);else if(f==2)feats.push([s,en]);else if(f==3)keys.push(str(s,en));else if(f==4)vals.push(val(s,en));p=en}
+else if(f==5&&w==0)ext=rv();else skip(w)}
+if(name!='aeroway')return;
+feats.forEach(([s,en])=>{p=s;const tags=[],g=[];let type=0;
+while(p<en){const k=rv(),f=Math.floor(k/8),w=k&7;
+if(f==2&&w==2){const l=rv(),e2=p+l;while(p<e2)tags.push(rv())}
+else if(f==4&&w==2){const l=rv(),e2=p+l;while(p<e2)g.push(rv())}
+else if(f==3&&w==0)type=rv();else skip(w)}
+const at={};for(let i=0;i<tags.length;i+=2)at[keys[tags[i]]]=vals[tags[i+1]];
+const cl=at.class;if(cl!='runway'&&cl!='taxiway'&&cl!='apron'&&cl!='gate')return;if(cl=='runway'&&type!=2)return;
+let x=0,y=0,i=0,cur=null;const rings=[];
+while(i<g.length){const c=g[i++],id=c&7,n=c>>>3;
+if(id==7){if(cur&&cur.length)cur.push(cur[0])}
+else for(let q=0;q<n;q++){const dx=g[i++],dy=g[i++];x+=(dx>>>1)^-(dx&1);y+=(dy>>>1)^-(dy&1);if(id==1){cur=[lonlat(x,y,ext)];rings.push(cur)}else cur.push(lonlat(x,y,ext))}}
+rings.forEach(r=>{if(r.length>1||cl=='gate')out.push([cl,at.ref==null?'':String(at.ref),r])})})};
+while(p<d.length){const k=rv(),f=Math.floor(k/8),w=k&7;if(f==3&&w==2){const l=rv(),e=p+l;layer(e);p=e}else skip(w)}
+return out}
+async function tileWays(a){try{if(!OFMT){const r=await fetch('https://tiles.openfreemap.org/planet');if(!r.ok)throw new Error('TileJSON HTTP '+r.status);OFMT=(await r.json()).tiles[0]}
+const z=14,n=2**z,tx=l=>Math.floor((l+180)/360*n),ty=l=>{const s=Math.sin(l*R);return Math.floor((.5-Math.log((1+s)/(1-s))/(4*Math.PI))*n)},dl=.032,dn=dl/Math.cos(a.lat*R),x0=tx(a.lon-dn),x1=tx(a.lon+dn),y0=ty(a.lat+dl),y1=ty(a.lat-dl),jobs=[];
+for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++)jobs.push([x,y]);
+let out=[],bad=0;
+for(let i=0;i<jobs.length;i+=6)await Promise.all(jobs.slice(i,i+6).map(async([x,y])=>{try{const r=await fetch(OFMT.replace('{z}',z).replace('{x}',x).replace('{y}',y));if(!r.ok)return;let b=await r.arrayBuffer();const u=new Uint8Array(b);if(u[0]==31&&u[1]==139)b=await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();out=out.concat(mvtAero(b,z,x,y))}catch(e){bad++}}));
+if(!out.length){a.err=bad?'map tiles unreachable':'no airfield data in tiles';return null}return out}catch(e){a.err='map tiles: '+((e&&e.message)||e);return null}}
+function connect(base){disc();live.on=true;fetch(base+'/airports.json').then(r=>r.json()).then(l=>{l.forEach(a=>{const e=A.find(z=>z.id==a[0]);if(e){e.rws=a[7];e._rl=null;e.lat=a[2];e.lon=a[3];e.elev=a[4];e.rw=a[5];RL[a[0]]=a[6];e.twr=(a[8]||{}).TWR||'—';e.atis=(a[8]||{}).ATIS||'—';e.fqs=a[8]||{};return}A.push({rws:a[7],k:'apt',x:1,id:a[0],name:a[1],lat:a[2],lon:a[3],elev:a[4],rw:a[5],twr:(a[8]||{}).TWR||'—',atis:(a[8]||{}).ATIS||'—',fqs:a[8]||{},metar:'No METAR loaded'});RL[a[0]]=a[6]})}).catch(()=>{});fetch(base+'/navaids.json').then(r=>r.json()).then(l=>{N.length=0;l.forEach(n=>N.push({k:'nav',id:n[0],name:n[1],type:n[2],lat:n[3],lon:n[4],freq:n[5]}))}).catch(()=>{});try{live.es=new EventSource(base+'/stream');live.es.onmessage=e=>{try{live.d=JSON.parse(e.data);live.at=performance.now();if(live.d.trt!==live.trt){live.trt=live.d.trt;T.length=0;(live.d.tr||[]).forEach(a=>{T.push({k:'trf',seen:Date.now(),...a});trlAdd(a.hx||a.id,a.lat,a.lon,a.alt,400)});if(sel&&sel.k=='trf'){const n=T.find(a=>a.id==sel.id);if(n)sel=n}}if(live.d.lat!=null&&!live.seen){live.seen=1;V.lon=live.d.lon;V.lat=live.d.lat;V.tz=null;V.z=Math.max(V.z,9);setFol(true);if(panel=='live')render()}}catch(_){}}}catch(_){live.on=false}$('#bLive').classList.add('on')}
+function disc(){if(live.es)live.es.close();live.on=false;live.d=null;live.seen=0;$('#bLive').classList.remove('on');if(panel=='live')render()}
+function liveHtml(){const web=location.protocol=='http:',ok=liveOk();return `<h3>Live tracking</h3><div class="m"><b>Traffic:</b> ${wtTxt()}${WT.src?' via '+WT.src:''}. Live aircraft load automatically in Stratos; no Python process is needed for public traffic.</div><div class="m" style="margin-top:8px"><b>Simulator link (optional)</b></div><div class="m">${ok?'● Receiving live data from the simulator':live.on?'Connected to bridge, waiting for simulator data…':'Not connected'}</div>`+(web?'':'<div class="m" style="margin-top:6px">This hosted copy cannot reach your PC. Use the bridge address in step 4 instead.</div>')+'<div class="m">To see your own aircraft from X-Plane or MSFS 2020/2024, run the Stratos bridge on your PC.</div><ol class="m" style="padding-left:18px"><li>On your PC run <b>python3 stratos_bridge.py</b> (keep stratos.html beside it). For MSFS 2020/2024, run it on the same Windows PC as the sim after a one-time <b>pip install SimConnect</b>, then start a flight. No other MSFS setup.</li><li>X-Plane only: Settings → Data Output: tick “Network via UDP” for rows 3, 17 and 20</li><li>X-Plane only: tick “Send network data output”, enter the IP the bridge prints, port 49003</li><li>On iPhone Safari open <b>http://PC-IP:8765</b>, then Share → Add to Home Screen</li></ol>'+(web?'<div class="row"><button onclick="connect(location.origin)">Reconnect</button><button onclick="disc()">Disconnect</button></div>':'')}
+$('#bLive').onclick=()=>{panel=panel=='live'?null:'live';render()};
+window.addSel=()=>{if(sel)addWp(sel)};window.rm=i=>{route.splice(i,1);save();trav=0;render()};window.defRoute=defRoute;
+const dms=(v,p,n)=>{const a=Math.abs(v),d=Math.floor(a),m=Math.floor((a-d)*60),s=((a-d)*60-m)*60;return(v<0?n:p)+d+'° '+m+"' "+s.toFixed(2)+'"'};
+window.exp=f=>{const o=route;if(o.length<2){$('#ex').innerHTML='<div class="m">Add at least two waypoints.</div>';return}let x;
+if(f=='pln')x=`<?xml version="1.0" encoding="UTF-8"?>\n<SimBase.Document Type="AceXML" version="1,0">\n<FlightPlan.FlightPlan>\n<Title>${o[0].id} to ${o.at(-1).id}</Title>\n<FPType>VFR</FPType>\n<RouteType>Direct</RouteType>\n<DepartureID>${o[0].id}</DepartureID>\n<DestinationID>${o.at(-1).id}</DestinationID>\n`+o.map(p=>`<ATCWaypoint id="${p.id}"><ATCWaypointType>${p.k=='apt'?'Airport':p.k=='nav'?'VOR':'User'}</ATCWaypointType><WorldPosition>${dms(p.lat,'N','S')},${dms(p.lon,'E','W')},+${String(p.elev.toFixed(2)).padStart(9,'0')}</WorldPosition></ATCWaypoint>`).join('\n')+`\n</FlightPlan.FlightPlan>\n</SimBase.Document>`;
+else x=`I\n1100 Version\nCYCLE 2610\nADEP ${o[0].id}\nADES ${o.at(-1).id}\nNUMENR ${o.length}\n`+o.map(p=>`${p.k=='apt'?1:p.k=='nav'?3:28} ${p.id} ${p.k=='apt'?'ADEP':'DRCT'} ${p.elev.toFixed(6)} ${p.lat.toFixed(6)} ${p.lon.toFixed(6)}`).join('\n');
+$('#ex').innerHTML='<div class="m">Copy into a .'+f+' file:</div><textarea readonly></textarea>';const t=$('#ex textarea');t.value=x;t.focus();t.select()};
+window.importSimBrief=async(fromSettings)=>{
+  let id=localStorage.getItem('stratos.simbrief.id')||'';
+  if(!id||fromSettings===false){
+    id=prompt('Enter your SimBrief Username or Pilot ID:',id);
+  }
+  if(!id||!id.trim())return;
+  const cleanId=id.trim();
+  localStorage.setItem('stratos.simbrief.id',cleanId);
+  const q=/^\d+$/.test(cleanId)?`userid=${encodeURIComponent(cleanId)}`:`username=${encodeURIComponent(cleanId)}`;
+  const simUrl=`https://www.simbrief.com/api/xml.fetcher.php?${q}&json=v2&navlog=1`;
+  
+  // Try direct fetch first (works in Electron desktop app & environments with CORS), then fallback to CORS proxies
+  const tryUrls=[
+    simUrl,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(simUrl)}`,
+    `https://corsproxy.io/?url=${encodeURIComponent(simUrl)}`
+  ];
+  
+  let d=null;
+  for(const u of tryUrls){
+    try{
+      const r=await fetch(u);
+      if(r.ok){
+        d=await r.json();
+        if(d&&((d.navlog&&d.navlog.fix)||d.origin||d.general))break;
+      }
+    }catch(_){}
+  }
+  
+  if(!d){
+    alert('Could not retrieve SimBrief flight plan. Please ensure you have generated an active flight plan on SimBrief and check your username/ID.');
+    return;
+  }
+  
+  try{
+    // Extract fixes from any possible SimBrief structure (navlog, fixes, or waypoints)
+    const rawFixes=(d.navlog&&d.navlog.fix)||(d.navlog)||(d.fixes&&d.fixes.fix)||(d.waypoints&&d.waypoints.fix)||(d.fix)||[];
+    const fixes=Array.isArray(rawFixes)?[...rawFixes]:(rawFixes?[rawFixes]:[]);
+    
+    const pts=[];
+    
+    // Add origin airport if not already the first waypoint
+    const origLat=parseFloat(d.origin?.pos_lat||d.origin?.lat);
+    const origLon=parseFloat(d.origin?.pos_long||d.origin?.lon);
+    if(d.origin?.icao_code&&!isNaN(origLat)&&!isNaN(origLon)){
+      pts.push({
+        id:d.origin.icao_code,
+        name:d.origin.name||d.origin.icao_code,
+        lat:origLat,
+        lon:origLon,
+        elev:parseFloat(d.origin.elevation||0),
+        k:'apt'
+      });
+    }
+    
+    // Add all enroute fixes & waypoints
+    fixes.forEach((w,i)=>{
+      const lat=parseFloat(w.pos_lat??w.lat);
+      const lon=parseFloat(w.pos_long??w.lon??w.pos_lon);
+      const ident=(w.ident||w.name||`WP${i+1}`).trim();
+      if(!isNaN(lat)&&!isNaN(lon)&&ident){
+        const fixType=(w.type||'').toLowerCase();
+        pts.push({
+          id:ident,
+          name:w.name||ident,
+          lat:lat,
+          lon:lon,
+          elev:parseFloat(w.altitude_feet||0),
+          k:fixType=='apt'?'apt':(fixType=='vor'||fixType=='ndb'?'nav':'fix')
+        });
+      }
+    });
+    
+    // Add destination airport if not already the last waypoint
+    const destLat=parseFloat(d.destination?.pos_lat||d.destination?.lat);
+    const destLon=parseFloat(d.destination?.pos_long||d.destination?.lon);
+    if(d.destination?.icao_code&&!isNaN(destLat)&&!isNaN(destLon)){
+      pts.push({
+        id:d.destination.icao_code,
+        name:d.destination.name||d.destination.icao_code,
+        lat:destLat,
+        lon:destLon,
+        elev:parseFloat(d.destination.elevation||0),
+        k:'apt'
+      });
+    }
+    
+    // Remove duplicate consecutive waypoints (e.g. if origin or destination was also listed in navlog)
+    const filtered=pts.filter((p,idx)=>idx==0||p.id!=pts[idx-1].id);
+    
+    if(!filtered.length){
+      alert('SimBrief flight plan was found, but contained no waypoints. Ensure you clicked "Generate OFP" on SimBrief.');
+      return;
+    }
+    
+    route=filtered;
+    save();trav=0;panel='route';render();
+    if(route.length){
+      const lats=route.map(p=>p.lat),lons=route.map(p=>p.lon);
+      const minLat=Math.min(...lats),maxLat=Math.max(...lats);
+      const minLon=Math.min(...lons),maxLon=Math.max(...lons);
+      V.lon=(minLon+maxLon)/2;
+      V.lat=(minLat+maxLat)/2;
+      const dLat=Math.max(0.1,maxLat-minLat);
+      const dLon=Math.max(0.1,maxLon-minLon);
+      const span=Math.max(dLat,dLon);
+      V.z=Math.max(3,Math.min(10,Math.log2(360/span)-1.5));
+      V.tz=null;setFol(false);
+    }
+    const orig=d.origin?d.origin.icao_code:'';
+    const dest=d.destination?d.destination.icao_code:'';
+    alert(`SimBrief flight plan loaded: ${orig} → ${dest} (${route.length} waypoints)`);
+  }catch(err){
+    alert('SimBrief parsing error: '+(err.message||err));
+  }
+};
+render();
+function mAge(a){return a.mt?'Live METAR, checked '+new Date(a.mt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' (updates every 5 min)':(a.me||'Loading METAR...')}
+setInterval(()=>{A.forEach(a=>{if(a.mf&&Date.now()-a.mf>=300000)getMetar(a)})},60000);
+
+/* Stratos: built-in live ADS-B traffic, no bridge needed. Real data only: nothing is simulated. */
+const WSRC=[
+{n:'adsb.fi',u:(la,lo,r)=>'https://opendata.adsb.fi/api/v2/lat/'+la+'/lon/'+lo+'/dist/'+r,p:wtAdsb},
+{n:'adsb.one',u:(la,lo,r)=>'https://api.adsb.one/v2/point/'+la+'/'+lo+'/'+r,p:wtAdsb},
+{n:'adsb.lol',u:(la,lo,r)=>'https://api.adsb.lol/v2/point/'+la+'/'+lo+'/'+r,p:wtAdsb},
+{n:'airplanes.live',u:(la,lo,r)=>'https://api.airplanes.live/v2/point/'+la+'/'+lo+'/'+r,p:wtAdsb},
+{n:'OpenSky',u:(la,lo,r)=>{const dl=r/60,dn=dl/Math.max(.2,Math.cos(la*R));return'https://opensky-network.org/api/states/all?lamin='+(la-dl).toFixed(2)+'&lomin='+(lo-dn).toFixed(2)+'&lamax='+(la+dl).toFixed(2)+'&lomax='+(lo+dn).toFixed(2)},p:wtSky}];
+function wtAdsb(j){return j&&Array.isArray(j.ac)?j.ac.filter(a=>a.lat!=null&&a.lon!=null&&a.alt_baro!='ground').slice(0,400).map(a=>({hx:a.hex,id:((a.flight||'').trim()||a.r||a.hex||'?').toUpperCase(),lat:a.lat,lon:a.lon,hdg:a.track??a.true_heading??0,gs:a.gs||0,alt:typeof a.alt_baro=='number'?a.alt_baro:0,vs:a.baro_rate||0,cc:[a.t,a.r].filter(Boolean).join(' · ')})):null}
+function wtSky(j){return j&&Array.isArray(j.states)?j.states.filter(s=>s[5]!=null&&s[6]!=null&&!s[8]).slice(0,400).map(s=>({hx:s[0],id:((s[1]||'').trim()||s[0]).toUpperCase(),lon:s[5],lat:s[6],alt:Math.round((s[7]||0)*3.281),gs:Math.round((s[9]||0)*1.944),hdg:s[10]||0,vs:Math.round((s[11]||0)*196.85),cc:s[2]||''})):(j&&j.states===null?[]:null)}
+function wtTxt(){return WT.n?'● Live traffic · '+WT.n+' aircraft':live.on?'Connecting…':WT.busy?'Loading traffic…':WT.fail>=2?'Live traffic unavailable (check your connection)':'No traffic in view'}
+function wtMerge(l){const m=new Map(T.map(a=>[a.hx,a])),n=[];l.forEach(o=>{o.seen=Date.now();trlAdd(o.hx,o.lat,o.lon,o.alt,400);const a=m.get(o.hx);if(a){Object.assign(a,o);n.push(a)}else n.push({k:'trf',...o})});if(sel&&sel.k=='trf'&&!n.includes(sel))n.push(sel);T.length=0;n.forEach(a=>T.push(a));WT.n=T.length;trlGC()}
+async function wtPoll(){if(WT.busy||document.hidden||liveOk())return;WT.busy=1;const la=+V.lat.toFixed(3),lo=+V.lon.toFixed(3),r=Math.min(250,Math.max(25,Math.ceil(Math.hypot(W,H)/2*40075016*Math.cos(la*R)/(SZ*2**V.z)/1852)));let l=null;
+for(const sr of WSRC){try{const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),8000),x=await fetch(sr.u(la,lo,r),{signal:ac.signal});clearTimeout(tm);if(!x.ok)continue;l=sr.p(await x.json());if(l){WT.src=sr.n;break}}catch(_){}}
+WT.busy=0;if(liveOk())return;if(l){WT.fail=0;WT.okAt=Date.now();wtMerge(l)}else{if(++WT.fail>=2&&Date.now()-(WT.okAt||0)>120000){T.length=0;WT.n=0}}const t=wtTxt();if(panel=='live'&&t!=WT.last)render();WT.last=t}
+function wtStep(dt){if(!T.length)return;T.forEach(a=>{if(a.gs>30&&Date.now()-(a.seen||0)<45000){const p=fwd(a,a.hdg,a.gs/3600*dt);a.lat=p.lat;a.lon=p.lon}});if(tk&&sel&&sel.k=='trf'){V.lon=sel.lon;V.lat=sel.lat}if(panel=='sel'&&sel&&sel.k=='trf'&&(WT.f=(WT.f||0)+1)%30==0)updPl()}
+Object.assign(RL,{RJTT:[8202,8202,11024],RJAA:[13123],RJBB:[13125],RJCC:[9843],RJFF:[9383],ROAH:[9843],RKSI:[12303,13123],RKSS:[10500],RCTP:[12467],ZBAA:[12467,12467],ZSPD:[11811,13123],ZGGG:[12467,12467],VHHH:[12467],WSSS:[13123],WMKK:[13123,13123],VTBS:[13123],VTBD:[12139],WIII:[9843,12008],WADD:[9843],RPLL:[11004,7200],VVTS:[10171],VVNB:[12467],VIDP:[9229,12500,14534],VABB:[11336,7454],VOBL:[13123],VOMM:[10000,7500],VECC:[11900],VCBI:[11001],VGHS:[10500],VNKT:[10007],OPKC:[10000],OPLA:[11500],OMDB:[14764],OMAA:[13123],OTHH:[16000],OERK:[13796],OEJN:[13123],LLBG:[9000,10800],SBGR:[12139],SBSP:[6365],SBKP:[10630],SBGL:[13123,10827],SBRJ:[4347],SBBR:[10827],SBCF:[9843],SBSV:[10827],SBRF:[10171],SBFZ:[8858],SBPA:[7546],SBCT:[7218],SAEZ:[10827,10187],SABE:[6847],SCEL:[12303],SUMU:[10499],SGAS:[10138],SLLP:[13123],SPJC:[11506],SPZO:[11155],SEQM:[13451],SKBO:[12467],SKRG:[11483],SVMI:[11319],YSSY:[8301,12999],YMML:[7500,11998],YBBN:[11483],YPPH:[11299,6893],YPAD:[10171,5420],YBCG:[7694],YSCB:[8800],YPDN:[10919],YBCS:[10499],NZAA:[11926],NZWN:[6351],NZCH:[10787],NZQN:[6204],NFFN:[10732],NTAA:[11204],NWWW:[10663],AYPY:[9022],AGGH:[7218]});
+EX.push([[26,40.8],[29,41],[36,41.5],[41,41],[41.5,43],[37.5,45],[39,47],[40,47.5],[40,60.5],[60,68],[70,73],[80,73.5],[100,77],[113,74],[130,71.5],[140,72.5],[160,70],[170,69.8],[180,68.5],[180,65],[170,60],[163,60],[160,54],[156,51],[155,57],[143,59],[137,54],[141,52],[140,48],[135,43],[131,43],[129,41],[127,39.5],[129,35.5],[126.5,34.5],[126.3,37],[125,39.5],[121.5,40.3],[121.5,38.9],[118,38.2],[119.2,37],[122.5,37.2],[120,35],[121.8,31.2],[122,29.5],[119.5,25.5],[116,22.8],[110.5,21],[108.5,21.7],[106.5,20],[105.8,19],[108.5,15.5],[109.3,12],[107,10.3],[105,8.6],[104.8,10.2],[103,11],[100.8,13.4],[99.5,10.5],[100.3,8],[102.2,6.2],[103.5,4.3],[103.5,1.4],[101.4,2.8],[100.4,5.3],[98.3,8.2],[98.5,10.5],[97.7,16.5],[94.3,16],[94.2,19.5],[92,22],[90.5,22],[88,21.6],[86.8,20],[84.5,18.5],[82,16.5],[80.2,15.2],[80.3,13],[79.8,10.3],[77.5,8.1],[76.2,9.9],[74.8,12.7],[73,17.5],[72.8,20.5],[72.5,21.8],[70,20.8],[69,22.3],[70.5,23],[67,24.8],[66.5,25.4],[61.5,25.2],[57.3,25.7],[56.5,27],[54,26.7],[51,27.8],[49.5,30],[48,29.8],[48.8,28],[49.5,27],[50.2,26.2],[51.6,24.4],[55,24.2],[56.4,26.3],[56.6,24.5],[58.8,23.5],[59.8,22.4],[57.7,19],[55,17],[52,16],[45,13],[43.2,12.7],[42.8,15],[41.2,19],[39.1,21.5],[37,25.5],[35,28],[34.9,29.5],[34.2,31.3],[35,33],[35.9,34.5],[36,36.5],[34,36.2],[30,36.3],[28,36.8],[26.5,38.5],[26,40.5]],
+[[130.9,34],[135,33.5],[136.9,34.6],[139.8,35],[140.9,35.7],[141.9,38.5],[141.5,41.4],[140,40.5],[139.9,38],[137,37],[136,36],[132,35.6],[131,34.3]],[[140,41.6],[141.5,42.5],[145.4,43.3],[143.5,44.5],[141.7,45.4],[141.5,43.5],[140.2,43]],[[130,31.3],[131.5,31.4],[131.9,33.3],[130.9,33.9],[129.7,33.2]],[[120.1,23],[121,25.2],[122,25],[121.5,22.5]],[[79.8,6.5],[80.2,9.7],[81.8,7.2],[80.6,6]],[[108.7,18.5],[110.5,20],[111,19.5],[109.5,18.2]],
+[[120.5,14],[120.4,18.5],[122.2,18.5],[121.5,15.5],[124,13],[122,13.5]],[[122,7],[124,9],[126.5,8],[126,6],[124,6.5]],
+[[95.3,5.5],[98,4],[103.5,-0.5],[106,-3],[105.8,-5.8],[102,-4],[98.5,0.5],[95.3,3]],[[105.2,-6.8],[108,-6.2],[112.8,-6.9],[114.5,-7.8],[110,-8.2],[106,-7.5]],[[109,1.5],[111,2],[114,4.5],[117,7],[119,5.2],[117.5,1],[116.5,-3.8],[114,-4],[111,-3],[109.5,-1]],
+[[131,-0.8],[135,-3.2],[141,-2.6],[145.7,-5],[147.5,-6.2],[150.5,-10.5],[146,-8],[143.5,-9],[141,-9],[138,-8.4],[137.7,-5.3],[133,-4],[132,-2.5]],
+[[113.2,-22],[114.2,-26.4],[115,-30],[115.5,-33.5],[118,-35],[123,-34],[126,-32.3],[131,-31.5],[134,-32.8],[135,-34.8],[137.8,-32.7],[138.5,-35.5],[140,-38],[143.5,-38.8],[146.3,-39],[150,-37.5],[151.2,-34],[153,-30],[153.5,-27],[152.8,-25],[150.5,-22.5],[148,-20],[146,-17.5],[145.4,-15],[143.5,-13.8],[142.5,-10.7],[141.5,-13],[141.5,-17],[139,-17.3],[136,-15.5],[135.5,-12.2],[132.5,-11.5],[130,-12.3],[129.7,-14.8],[127,-14],[125,-15.3],[122.2,-17.5],[121,-19.5],[117.5,-20.7],[114,-21.8]],
+[[144.7,-40.7],[148.3,-40.9],[148,-43],[146,-43.6],[145.2,-42]],[[172.7,-34.4],[174.5,-36.3],[176,-37.5],[178.5,-37.7],[177,-39.5],[175,-41.6],[174.7,-39.5],[173.8,-39.3],[174.7,-37.2]],[[172.7,-40.5],[174.3,-41.3],[173,-43.7],[171,-44.5],[168,-46.6],[166.5,-45.8],[168,-44],[170.5,-43],[172,-41.2]],
+[[-77.3,8.7],[-75.5,10.5],[-72,12],[-71.5,10.8],[-68,10.6],[-64,10.6],[-61,10.5],[-60,8.5],[-57,6],[-54,5.8],[-52,4.8],[-50,1.8],[-50,0],[-48,-1],[-44.5,-2.5],[-41,-2.9],[-38,-4],[-35,-5.5],[-34.8,-8],[-37,-11.5],[-38.9,-14],[-39,-17.7],[-41,-22],[-43.2,-23],[-46.5,-24],[-48.5,-26],[-48.6,-28.5],[-52,-32],[-53.5,-34],[-56,-34.8],[-57.3,-36.5],[-57.5,-38.2],[-62,-39],[-62.3,-41],[-65,-41],[-64.5,-42.6],[-65.5,-45],[-67.5,-46.5],[-66,-48],[-68.5,-50.5],[-69,-52.5],[-65.5,-55],[-71,-54.5],[-74.5,-52],[-75.5,-47.5],[-73.5,-42.5],[-73.8,-37],[-71.6,-33],[-71.5,-30],[-70.2,-26],[-70.3,-18.5],[-75.5,-14.5],[-77.5,-11],[-79.5,-7.5],[-81.3,-5.5],[-80.2,-3.5],[-80,-1],[-80.2,1],[-78.9,1.5],[-77.5,4],[-77.4,6.5]]);
+const RGN={'N. America':[-98,39,4.3],Europe:[12,49,4.6],Asia:[105,28,3.7],'S. America':[-60,-17,3.6],Oceania:[145,-27,4]};
+$('#lay').insertAdjacentHTML('beforeend','<b>Go to region</b><div id="rg" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>');
+Object.keys(RGN).forEach(k=>{const b=document.createElement('button');b.textContent=k;b.onclick=()=>{const r=RGN[k];setFol(false);V.in=null;V.lon=r[0];V.lat=r[1];V.tz=null;V.z=r[2];$('#lay').style.display='none'};$('#rg').appendChild(b)});
+const AIP={Y:['Australia AIP','https://www.airservicesaustralia.com/aip/aip.asp'],NZ:['New Zealand AIP','https://www.aip.net.nz'],SB:['Brazil AIS','https://aisweb.decea.mil.br'],SD:['Brazil AIS','https://aisweb.decea.mil.br'],SI:['Brazil AIS','https://aisweb.decea.mil.br'],SJ:['Brazil AIS','https://aisweb.decea.mil.br'],SN:['Brazil AIS','https://aisweb.decea.mil.br'],SS:['Brazil AIS','https://aisweb.decea.mil.br'],SW:['Brazil AIS','https://aisweb.decea.mil.br'],VI:['India AIP','https://aim-india.aai.gov.in'],RJ:['Japan AIP','https://www.aisjapan.mlit.go.jp'],RO:['Japan AIP','https://www.aisjapan.mlit.go.jp']};
+wtPoll();setInterval(wtPoll,6000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)wtPoll()});
+loadOA();
+if(location.protocol=='http:')connect(location.origin);
+
+/* ===== Stratos additions: trails, tracking panel, built-in charts, in-app PDF viewer ===== */
+function trlAdd(k,lat,lon,alt,mx){let a=TRL.get(k);if(!a){a=[];TRL.set(k,a)}const l=a[a.length-1];if(!l||Math.abs(l[0]-lat)+Math.abs(l[1]-lon)>1e-4){a.push([lat,lon,alt||0,Date.now()]);if(a.length>mx)a.shift()}}
+function trlGC(){const now=Date.now();TRL.forEach((a,k)=>{if(k!='own'&&now-a[a.length-1][3]>1200000)TRL.delete(k)})}
+function trailCol(){if(DKM())return '#ffffff';if(TILED())return '#1e293b';return document.documentElement.dataset.theme=='day'?'#1e293b':'#ffffff'}
+function drawTrail(a,cur,col,wmax){const n=a.length,st=Math.max(1,Math.ceil(n/700)),pts=[];for(let i=0;i<n;i+=st)pts.push(sc(a[i][1],a[i][0]));if(cur)pts.push(sc(cur.lon,cur.lat));const m=pts.length;if(m<2)return;const g=Math.min(28,m-1);
+cx.lineCap='round';cx.lineJoin='round';cx.strokeStyle=col;
+for(let s=0;s<g;s++){const i0=Math.floor(s*(m-1)/g),i1=Math.min(m-1,Math.floor((s+1)*(m-1)/g)+1),f=(s+1)/g;cx.beginPath();for(let i=i0;i<=i1;i++){const q=pts[i];i==i0?cx.moveTo(q[0],q[1]):cx.lineTo(q[0],q[1])}
+cx.globalAlpha=.1+.2*f;cx.lineWidth=wmax*1.9*f+2;cx.stroke();cx.globalAlpha=.15+.8*f*f;cx.lineWidth=Math.max(1,wmax*f);cx.stroke()}
+cx.globalAlpha=1;cx.lineCap='butt'}
+function trails(){if(CH.on)return;const col=trailCol();
+if(L.trl){cx.strokeStyle=col;cx.lineWidth=1.2;cx.globalAlpha=.35;TRL.forEach((a,k)=>{if(k=='own'||a.length<3)return;cx.beginPath();a.slice(-60).forEach((p,i)=>{const q=sc(p[1],p[0]);i?cx.lineTo(q[0],q[1]):cx.moveTo(q[0],q[1])});cx.stroke()});cx.globalAlpha=1}
+if(sel&&sel.k=='trf'){const a=TRL.get(sel.hx||sel.id);if(a)drawTrail(a,sel,col,5)}
+if(liveOk()){const a=TRL.get('own');if(a)drawTrail(a,own,C.own,5)}}
+function trCenter(){if(!sel)return;setFol(false);const q=sel.k=='own'?own:sel;V.lon=q.lon;V.lat=q.lat;V.in=null}
+function trClear(){if(!sel)return;TRL.delete(sel.k=='own'?'own':(sel.hx||sel.id));updPl()}
+function spark(tr){if(tr.length<3)return '<div class="m">The altitude profile appears as the trail builds.</div>';const W2=300,H2=56,al=tr.map(p=>p[2]||0),mn=Math.min(...al),mx=Math.max(...al),r=Math.max(mx-mn,500),pts=al.map((v,i)=>(i/(al.length-1)*W2).toFixed(1)+','+(H2-4-(v-mn)/r*(H2-8)).toFixed(1)).join(' ');
+return '<svg class="spark" viewBox="0 0 '+W2+' '+H2+'" preserveAspectRatio="none"><polyline points="'+pts+'" fill="none" stroke="var(--acc)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg><div class="m" style="display:flex;justify-content:space-between"><span>'+Math.round(mn).toLocaleString()+' ft</span><span>altitude profile</span><span>'+Math.round(mx).toLocaleString()+' ft</span></div>'}
+function planeHtml(o){const io=o.k=='own';return '<div class="ah"><div><b class="ic">'+(io?'Your aircraft':o.id)+'</b><div class="m">'+(io?'Live from '+((live.d&&live.d.src)||'simulator'):(o.cc||'Live ADS-B traffic'))+'</div></div><span class="pill'+((io||tk)?' on':'')+'">'+(io?'&#9679; LIVE':tk?'&#9679; TRACKING':'SELECTED')+'</span></div><div id="pv"></div><div class="row">'+(io?'':'<button class="'+(tk?'on':'')+'" onclick="tk=!tk;if(tk)setFol(false);render()">'+(tk?'Stop tracking':'Track')+'</button>')+'<button onclick="trCenter()">Center</button><button onclick="trClear()">Clear trail</button><button onclick="panel=null;sel=null;tk=false;render()">Close</button></div>'}
+function updPl(){const e=$('#pv');if(!e||!sel)return;const io=sel.k=='own',o=io?{...own,gs:live.d?live.d.gs:0}:sel,alt=Math.round((o.alt||0)/10)*10,fl=alt>=18000?'FL'+String(Math.round(alt/100)).padStart(3,'0'):alt.toLocaleString()+' ft',vs=Math.round((o.vs||0)/10)*10,ar=vs>200?'&#9650;':vs<-200?'&#9660;':'&#9644;',hd=String(Math.round((o.hdg+360)%360)%360).padStart(3,'0'),tr=TRL.get(io?'own':(sel.hx||sel.id))||[],lost=!io&&Date.now()-(sel.seen||0)>45000;
+let nm=0;for(let i=1;i<tr.length;i++)nm+=dist({lat:tr[i-1][0],lon:tr[i-1][1]},{lat:tr[i][0],lon:tr[i][1]});const mins=tr.length>1?Math.round((tr[tr.length-1][3]-tr[0][3])/60000):0;
+e.innerHTML=(lost?'<div class="m" style="color:#fbbf24">Signal lost '+Math.round((Date.now()-sel.seen)/1000)+'s ago. Showing the last known position.</div>':'')+'<div class="mg"><div class="big"><span>ALTITUDE</span><b>'+fl+' <small style="font-size:15px">'+ar+' '+Math.abs(vs)+' fpm</small></b></div><div><span>GROUND SPEED</span><b>'+Math.round(o.gs||0)+' kt</b></div><div><span>HEADING</span><b>'+hd+'&deg;</b></div>'+(!io&&liveOk()?'<div><span>FROM YOU</span><b>'+Math.round(dist(own,o))+' nm</b></div>':'')+'<div><span>TRAIL</span><b>'+nm.toFixed(0)+' nm</b><span>'+mins+' min recorded</span></div></div>'+spark(tr)}
+function fcRender(ok){const e=$('#fc'),tr=tk&&sel&&sel.k=='trf';if(!ok&&!tr){if(fcS){fcS='';e.style.display='none'}return}
+let s;
+if(tr){const o=sel,alt=Math.round((o.alt||0)/10)*10,fl=alt>=18000?'FL'+String(Math.round(alt/100)).padStart(3,'0'):alt.toLocaleString(),vs=Math.round((o.vs||0)/10)*10,lost=Date.now()-(o.seen||0)>45000;
+s='<div class="fh"><span class="dot'+(lost?' lost':'')+'"></span>'+(lost?'SIGNAL LOST':'TRACKING')+'<span class="sp"></span><span>'+(o.cc||'ADS-B')+'</span></div><div class="fr"><span>'+o.id+'</span></div><div class="fg"><div><b>'+fl+'</b><span>ALT'+(alt>=18000?'':' FT')+'</span></div><div><b>'+Math.round(o.gs||0)+'</b><span>GS KT</span></div><div><b>'+String(Math.round((o.hdg+360)%360)%360).padStart(3,'0')+'</b><span>HDG</span></div><div><b>'+(vs>0?'+':'')+vs+'</b><span>VS FPM</span></div></div>'}
+else{const g=i=>$('#'+i).textContent,rt=route.length>1,tot=rt?total():0,pr=rt?routeProg():0,pct=tot?Math.min(100,pr/tot*100):0;
+s='<div class="fh"><span class="dot"></span>'+(live.d.src||'SIM')+' <i>LIVE</i><span class="sp"></span>'+(rt?'ETA '+g('tEt'):'')+'</div>'+(rt?'<div class="fr"><span>'+route[0].id+'</span><div class="pb"><u style="width:'+pct.toFixed(1)+'%"></u><s style="left:'+pct.toFixed(1)+'%">&#9992;</s></div><span>'+route[route.length-1].id+'</span></div><div class="fm">'+Math.round(Math.max(0,tot-pr))+' nm remaining</div>':'')+
+'<div class="fg"><div><b>'+g('tAL')+'</b><span>ALT FT</span></div><div><b>'+g('tGS')+'</b><span>GS KT</span></div><div><b>'+g('tHD')+'</b><span>HDG</span></div><div><b>'+g('tVS')+'</b><span>VS FPM</span></div></div>'}
+if(s!==fcS){fcS=s;e.innerHTML=s;e.style.display='block'}}
+/* in-app PDF viewer (official FAA charts stay inside the app) */
+function PB(u,t){return '<button data-u="'+u+'" data-t="'+String(t).replace(/"/g,'')+'" onclick="openPdf(this.dataset.u,this.dataset.t)">'+t+'</button>'}
+function openPdf(u,t){$('#pdt').textContent=t||'Chart';$('#pda').href=u;$('#pdf2').src=u;$('#pdf').style.display='block'}
+function closePdf(){$('#pdf2').src='about:blank';$('#pdf').style.display='none'}
+$('#pdx').onclick=closePdf;
+function faaHtml(a){const f=a.faa;if(!f)return/^[KP]/.test(a.id)?'<div class="m">Official FAA procedure charts (ILS, SIDs, STARs) appear here after you import the data pack or connect the bridge.</div>':'';return '<h3 style="margin-top:10px">Official FAA charts (cycle '+f.cycle+')</h3><div class="row">'+f.c.map(c=>PB('https://aeronav.faa.gov/d-tpp/'+f.cycle+'/'+c[2],c[0]=='APD'?'Airport diagram':c[1])).join('')+'</div>'}
+function chBody(a){const f=a.faa,us=/^K/.test(a.id)||/^P[AHGJ]/.test(a.id),cy=faaCycle(),L2=(u,t)=>'<a href="'+u+'" target="_blank" rel="noopener"><button>'+t+'</button></a>';
+let h='<div style="margin-top:10px"><b>'+a.id+'</b> <span class="m">'+a.name+'</span></div><div class="row"><button class="on" data-i="'+a.id+'" onclick="openCharts(A.find(z=>z.id==this.dataset.i))">Open built-in charts</button></div><div class="m">Airport diagram, satellite chart, runways, frequencies and weather. Built into the app for every airport.</div>';
+if(us&&f)h+='<div class="m" style="margin-top:10px">Official FAA charts, cycle '+f.cycle+', opened inside the app</div><div class="row">'+f.c.map(c=>PB('https://aeronav.faa.gov/d-tpp/'+f.cycle+'/'+c[2],c[0]=='APD'?'Airport diagram':c[1])).join('')+'</div>';
+else if(us)h+='<div class="m" style="margin-top:10px">Official FAA procedure charts (ILS, SIDs, STARs) appear here after you import the data pack or connect the bridge.</div>';
+const ai=AIP[a.id.slice(0,2)]||AIP[a.id[0]];
+return h+'<div class="m" style="margin-top:12px">Other sources (these open outside the app)</div><div class="row">'+(us?L2('https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dtpp/search/results/?cycle='+cy+'&ident='+a.id.replace(/^K/,''),'All FAA charts'):'')+(ai?L2(ai[1],ai[0]):'')+L2('https://skyvector.com/airport/'+a.id,'SkyVector')+(us?L2('https://www.airnav.com/airport/'+a.id,'AirNav'):'')+L2('https://ourairports.com/airports/'+a.id+'/','OurAirports')+'</div><div class="m" style="margin-top:10px">Jeppesen charts are licensed per subscriber and cannot be embedded here. If you subscribe, open them in Navigraph or Jeppesen:</div><div class="row">'+L2('https://charts.navigraph.com/','Jeppesen via Navigraph')+L2('https://www.jeppesen.com/','Jeppesen')+'</div>'}
+/* built-in airport charts */
+function chartFx(){const a=CH.a,pf=SZ*2**V.z/360/(60*Math.cos(a.lat*R))/6076.12,nice=[50,100,200,500,1000,2000,5000,10000],L2=nice.find(n=>n*pf>=70)||10000,px=L2*pf,col=CH.pg=='sat'?'#fff':'#111',x=16,y=H-24;
+cx.strokeStyle=col;cx.lineWidth=3;cx.beginPath();cx.moveTo(x,y);cx.lineTo(x+px,y);cx.moveTo(x,y-6);cx.lineTo(x,y+6);cx.moveTo(x+px,y-6);cx.lineTo(x+px,y+6);cx.stroke();
+cx.fillStyle=col;cx.font='bold 12px sans-serif';cx.fillText(L2+' ft',x,y-10);
+cx.save();cx.translate(W-34,158);cx.beginPath();cx.moveTo(0,-22);cx.lineTo(9,10);cx.lineTo(0,4);cx.lineTo(-9,10);cx.closePath();cx.fill();cx.textAlign='center';cx.fillText('N',0,26);cx.restore();cx.textAlign='left'}
+function chPalette(){theme(document.documentElement.dataset.theme);if(CH.pg!='sat')Object.assign(C,{bg:'#fbfaf6',land:'#fbfaf6',coast:'#7b8794',txt:'#111827',ap:'#92400e'})}
+function cvSeg(){$('#cvs').innerHTML=[['paper','Diagram'],['sat','Satellite'],['info','Info']].map(t=>'<button class="'+(CH.pg==t[0]?'on':'')+'" data-p="'+t[0]+'">'+t[1]+'</button>').join('')}
+function chHead(){const a=CH.a;if(!a)return;$('#cvi').textContent=a.id;$('#cvn').textContent=a.name+' | elev '+a.elev+' ft';$('#cvm').textContent=a.mt?a.metar:(a.me||'Loading METAR...');if(CH.pg=='info')$('#ci').innerHTML=ciHtml(a)}
+function chFit(){const a=CH.a;if(!a)return;let m=2000;rwList(a).forEach(r=>[r.a,r.b].forEach(p=>{m=Math.max(m,Math.abs(p[0]),Math.abs(p[1]))}));(a.osm||[]).forEach(o=>{if(o.t=='gate')return;o.p.forEach(q=>{m=Math.max(m,Math.abs(q[0]),Math.abs(q[1]))})});
+V.lon=a.lon;V.lat=a.lat;V.in=null;V.tz=null;V.z=Math.log2(Math.min(W,H-190)*.46/m*360*60*Math.cos(a.lat*R)*6076.12/SZ)}
+function chPage(p){CH.pg=p;L.style=p=='sat'?'sat':CH.prev.style;chPalette();$('#app').classList.toggle('chartinfo',p=='info');cvSeg();chHead()}
+function openCharts(a){if(!a)return;if(!CH.on)CH.prev={style:L.style,lon:V.lon,lat:V.lat,z:V.z};CH.on=true;CH.a=a;setFol(false);tk=false;panel=null;sel=null;
+$('#chart').style.display='none';$('#res').style.display='none';$('#app').classList.add('chartmode');getMetar(a);getFaa(a);chPage('paper');chFit();render()}
+function closeCharts(){if(!CH.on)return;CH.on=false;L.style=CH.prev.style;V.lon=CH.prev.lon;V.lat=CH.prev.lat;V.tz=null;V.z=CH.prev.z;$('#app').classList.remove('chartmode','chartinfo');theme(document.documentElement.dataset.theme);render()}
+function ciHtml(a){const f=a.fqs||{},ord=['ATIS','CLD','GND','TWR','APP','DEP','CTAF','UNICOM','A/D'],ks=ord.filter(k=>f[k]).concat(Object.keys(f).filter(k=>!ord.includes(k)));
+let h='<h3>'+a.id+' &middot; '+a.name+'</h3><div class="m">Elevation '+a.elev+' ft &middot; '+a.lat.toFixed(4)+', '+a.lon.toFixed(4)+'</div><h3 style="margin-top:14px">Frequencies</h3>'+(ks.length?'<table>'+ks.map(k=>'<tr><td>'+k+'</td><td><b>'+f[k]+'</b> MHz</td></tr>').join('')+'</table>':'<div class="m">No frequencies loaded. They come from the airport database (internet or the data pack).</div>');
+const rl=rwList(a);h+='<h3 style="margin-top:14px">Runways</h3>'+(rl.length?'<table><tr><th>RWY</th><th>True hdg</th><th>Length</th><th>Width</th></tr>'+rl.map(r=>{const h1=Math.round((r.hd/R+360)%360)%360,h2=(h1+180)%360;return'<tr><td>'+r.le+' / '+r.he+'</td><td>'+String(h1).padStart(3,'0')+' / '+String(h2).padStart(3,'0')+'</td><td>'+Math.round(r.L)+' ft</td><td>'+r.W+' ft</td></tr>'}).join('')+'</table>':'<div class="m">Runway data not loaded yet.</div>');
+h+='<h3 style="margin-top:14px">Weather</h3><code>'+a.metar+'</code><div class="m">'+dec(a.metar)+'</div><div class="m">'+mAge(a)+'</div>'+rwTable(a);
+return h+'<div style="margin-top:14px">'+faaHtml(a)+'</div>'}
+$('#cvx').onclick=closeCharts;$('#cvf').onclick=chFit;$('#cvs').onclick=e=>{const p=e.target.dataset&&e.target.dataset.p;if(p)chPage(p)};
+try{if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(_){}
+</script></body></html>
