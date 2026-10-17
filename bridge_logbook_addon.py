@@ -28,7 +28,9 @@ MIN_FLIGHT_SEC   = 60      # seconds airborne to count as real flight
 
 # ── Logbook file ─────────────────────────────────────────────────────
 HERE         = os.path.dirname(os.path.abspath(__file__))
-LOGBOOK_FILE = os.path.join(HERE, 'stratos_logbook.json')
+DATA_DIR     = os.environ.get('STRATOS_DATA_DIR', HERE)
+os.makedirs(DATA_DIR, exist_ok=True)
+LOGBOOK_FILE = os.path.join(DATA_DIR, 'stratos_logbook.json')
 lb_lock      = threading.Lock()
 
 def lb_load():

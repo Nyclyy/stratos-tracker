@@ -15,6 +15,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 UDP_PORT, HTTP_PORT = 49003, 8765
 HERE = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.environ.get("STRATOS_DATA_DIR", HERE)
+os.makedirs(DATA_DIR, exist_ok=True)
 state, lock = {}, threading.Lock()
 METARS = {}  # ids -> (fetched_at, body); cached 5 minutes so refreshes stay polite
 
@@ -47,9 +49,9 @@ def udp_loop():
 
 
 OA = "https://davidmegginson.github.io/ourairports-data/"
-CACHE = os.path.join(HERE, "airports_cache3.json")
+CACHE = os.path.join(DATA_DIR, "airports_cache3.json")
 navaids = []
-OSMDIR = os.path.join(HERE, "osm_cache")
+OSMDIR = os.path.join(DATA_DIR, "osm_cache")
 airports = []
 
 
@@ -203,14 +205,14 @@ def build_pack(ids):
         if i in FAA:
             pack["faa"][i] = FAA[i]
         time.sleep(2)
-    json.dump(pack, open(os.path.join(HERE, "stratos_pack.json"), "w"), separators=(",", ":"))
+    json.dump(pack, open(os.path.join(DATA_DIR, "stratos_pack.json"), "w"), separators=(",", ":"))
     print("Wrote stratos_pack.json. Send it to your iPhone and import it in the app (Data button).")
 
 
 def tile(z, x, y):
     """Satellite tiles (Esri World Imagery), cached on disk so viewed areas work offline.
     Imagery (c) Esri, Maxar, Earthstar Geographics. Check Esri's terms for your use."""
-    f = os.path.join(HERE, "tiles", str(z), str(x), str(y) + ".jpg")
+    f = os.path.join(DATA_DIR, "tiles", str(z), str(x), str(y) + ".jpg")
     try:
         return open(f, "rb").read()
     except OSError:

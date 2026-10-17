@@ -1,6 +1,11 @@
 const { app, BrowserWindow, session, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const http = require('node:http');
+const { spawn } = require('node:child_process');
+
+let bridgeProcess = null;
+let bridgeStartRequested = false;
 
 // Safe mode (software rendering) for PCs where the graphics driver gives a blank window.
 // Start with:  Stratos.exe --safe     (the app also switches to it by itself if the GPU crashes)
@@ -17,6 +22,92 @@ function messagePage(title, lines) {
   return 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
 }
 function listDir(d) { try { return fs.readdirSync(d).join(', '); } catch (e) { return '(cannot read: ' + e.message + ')'; } }
+
+function bridgeIsRunning() {
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = value => { if (!settled) { settled = true; resolve(value); } };
+    const req = http.get({ hostname: '127.0.0.1', port: 8765, path: '/stream' }, res => {
+      const isBridge = String(res.headers['content-type'] || '').includes('text/event-stream');
+      res.destroy();
+      finish(isBridge);
+    });
+    req.setTimeout(1500, () => { req.destroy(); finish(false); });
+    req.on('error', () => finish(false));
+  });
+}
+
+function startBridge() {
+  if (bridgeStartRequested) return;
+  bridgeStartRequested = true;
+  const bridgeDir = app.isPackaged ? path.join(process.resourcesPath, 'bridge') : __dirname;
+  const script = path.join(bridgeDir, 'stratos_bridge.py');
+  const addon = path.join(bridgeDir, 'bridge_logbook_addon.py');
+  if (!fs.existsSync(script) || !fs.existsSync(addon)) {
+    note('bridge files are missing from ' + bridgeDir);
+    return;
+  }
+
+  const dataDir = path.join(app.getPath('userData'), 'bridge-data');
+  try { fs.mkdirSync(dataDir, { recursive: true }); }
+  catch (e) { note('could not create bridge data folder: ' + e.message); return; }
+
+  bridgeIsRunning().then(alreadyRunning => {
+    if (alreadyRunning) { note('bridge already running on port 8765'); return; }
+    const commands = process.platform === 'win32'
+      ? [{ command: 'py', args: ['-3'] }, { command: 'python', args: [] }, { command: 'python3', args: [] }]
+      : [{ command: 'python3', args: [] }, { command: 'python', args: [] }];
+
+    const launch = index => {
+      if (index >= commands.length) {
+        note('could not start bridge: Python 3 was not found. Install Python 3 and relaunch Stratos.');
+        return;
+      }
+      const item = commands[index];
+      const child = spawn(item.command, item.args.concat(script), {
+        cwd: bridgeDir,
+        env: { ...process.env, STRATOS_DATA_DIR: dataDir },
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+      bridgeProcess = child;
+      let spawned = false;
+      let triedNext = false;
+      const next = reason => {
+        if (triedNext) return;
+        triedNext = true;
+        if (bridgeProcess === child) bridgeProcess = null;
+        if (index + 1 < commands.length) launch(index + 1);
+        else note('could not start bridge: ' + reason);
+      };
+      child.once('spawn', () => { spawned = true; note('started bridge with ' + item.command); });
+      child.stdout.on('data', data => { const line = String(data).trim(); if (line) note('bridge: ' + line); });
+      child.stderr.on('data', data => { const line = String(data).trim(); if (line) note('bridge error: ' + line); });
+      child.once('error', err => {
+        if (err.code === 'ENOENT') next(item.command + ' was not found');
+        else note('could not start bridge: ' + err.message);
+      });
+      child.once('exit', (code, signal) => {
+        if (bridgeProcess === child) bridgeProcess = null;
+        if (!spawned && !triedNext) next(item.command + ' exited before it could start');
+        else if (code !== 0) note('bridge stopped (code ' + code + (signal ? ', ' + signal : '') + ')');
+      });
+    };
+    launch(0);
+  }).catch(err => note('could not check bridge status: ' + err.message));
+}
+
+function stopBridge() {
+  const child = bridgeProcess;
+  bridgeProcess = null;
+  if (!child || child.killed || !child.pid) return;
+  if (process.platform === 'win32') {
+    const killer = spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+    killer.on('error', () => { try { child.kill(); } catch (_) {} });
+  } else {
+    try { child.kill('SIGTERM'); } catch (_) {}
+  }
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -72,6 +163,7 @@ app.whenReady().then(() => {
     h['Access-Control-Allow-Methods'] = ['GET, POST, OPTIONS'];
     callback({ responseHeaders: h });
   });
+  startBridge();
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
@@ -80,8 +172,10 @@ app.whenReady().then(() => {
 app.on('child-process-gone', (e, d) => {
   if (d.type === 'GPU' && !process.argv.includes('--safe')) {
     note('GPU process gone (' + d.reason + '), restarting in safe mode');
+    stopBridge();
     app.relaunch({ args: process.argv.slice(1).concat('--safe') });
     app.exit(0);
   }
 });
+app.on('before-quit', stopBridge);
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

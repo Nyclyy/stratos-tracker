@@ -26,7 +26,7 @@ Already have a finished run but no Release? Open **Releases > Draft a new releas
 The installer is not code-signed, so Windows SmartScreen may say "Windows protected your PC". Choose **More info > Run anyway**.
 
 ## 4. Your own aircraft from a simulator (optional)
-Run `python3 stratos_bridge.py` on the PC that runs the sim, then open the address it prints in Safari on the iPhone (or in a browser on the PC). X-Plane needs the UDP output turned on; MSFS needs `pip install SimConnect` once. A hosted website cannot reach a PC on its own, so this is the only part that needs the bridge.
+The desktop app starts the bridge automatically when it opens. For the standalone/phone page, run `python stratos_bridge.py` on the PC that runs the sim, then open the address it prints in Safari on the iPhone (or in a browser on the PC). X-Plane needs UDP output turned on; MSFS needs `pip install SimConnect` once. A hosted website cannot reach a PC on its own, so the standalone/phone page still needs the bridge.
 
 ## Notes
 - Aircraft shown on the map are real ADS-B reports from community services. Nothing is simulated. If every service is unreachable the app says so and shows no aircraft.

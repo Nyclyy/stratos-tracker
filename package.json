@@ -24,6 +24,12 @@
       "app/**/*",
       "!app/sw.js"
     ],
+    "extraResources": [
+      { "from": "stratos_bridge.py", "to": "bridge/stratos_bridge.py" },
+      { "from": "bridge_logbook_addon.py", "to": "bridge/bridge_logbook_addon.py" },
+      { "from": "stratos.html", "to": "bridge/stratos.html" },
+      { "from": "logbook.html", "to": "bridge/logbook.html" }
+    ],
     "win": {
       "target": [
         {
