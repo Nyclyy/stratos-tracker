@@ -297,7 +297,6 @@ class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
-
     def do_GET(self):
         if self.path.startswith("/logbook.json"):
             _handle_logbook(self)
