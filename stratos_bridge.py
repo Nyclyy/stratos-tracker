@@ -298,6 +298,10 @@ class H(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
+        if self.path.startswith('/logbook.json'):
+    _handle_logbook(self)
+    return
+    
         if self.path.startswith("/stream"):
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
