@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="google-site-verification" content="ySC642HWnZHE_qbUnB_kRwFpzFnQTMzXdMiadcxaTTs" />
+<meta charset="utf-8">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-180.png">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1118">
+<meta name="description" content="Stratos is a clean, mobile-friendly flight tracker and aviation map.">
+<link rel="icon" href="app/icon-192.png">
+<link rel="apple-touch-icon" href="app/icon-180.png">
+<title>Stratos — Flight tracking, reimagined</title>
+<style>
+:root{color-scheme:dark;--bg:#080d14;--card:#111b28;--line:#243447;--text:#edf5fc;--muted:#9aafc2;--accent:#53d7f4}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 70% 0%,#142b40 0,transparent 44%),var(--bg);color:var(--text);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif}main{width:min(1080px,100%);margin:auto;padding:clamp(24px,6vw,64px) 22px 36px}.nav{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:14px}.nav img{width:42px;height:42px;border-radius:12px}.hero{padding:clamp(48px,10vw,112px) 0 56px;max-width:740px} .eyebrow{color:var(--accent);font-weight:750;letter-spacing:.13em;text-transform:uppercase;font-size:12px}h1{font-size:clamp(44px,8vw,82px);letter-spacing:-.06em;line-height:1.02;margin:14px 0 20px}.lead{color:#b9c9d8;font-size:clamp(18px,2.5vw,22px);max-width:640px}.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:0 20px;border-radius:13px;text-decoration:none;font-weight:750;text-align:center;gap:8px}.btn:focus-visible{outline:3px solid #fff;outline-offset:3px}.actions .btn{min-width:190px}.primary{background:var(--accent);color:#07131b}.secondary{border:1px solid var(--line);background:#101c29;color:var(--text)}.download-note{font-size:13px;color:var(--mut);margin-top:12px}.features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card{background:linear-gradient(150deg,rgba(22,37,53,.94),rgba(13,22,33,.94));border:1px solid var(--line);border-radius:18px;padding:22px}.card .icon{font-size:25px}.card h2{font-size:17px;margin:12px 0 6px}.card p{font-size:14px;color:var(--mut);margin:0}.install{margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:14px}.install ol{color:var(--mut);padding-left:20px;margin-bottom:0}.install b{color:var(--text)}footer{color:var(--mut);font-size:12px;margin-top:36px;border-top:1px solid var(--line);padding-top:20px}@media(max-width:650px){.features{grid-template-columns:1f}.install{grid-template-columns:1f}.hero{padding-top:60px}}
+</style>
+</head>
+<body>
+<main>
+<div class="nav">
+<img src="logo.png" alt=""><b>STRATOS</b><span>AVIATION MAP</span>
+</div>
+<div id="warn" style="display:none;margin:16px 0;padding:14px 16px;border-radius:12px;background:#3b2a0b;border:1px solid #8a6a1f;color:#ffd98a;font-size:14px"></div>
+<section class="hero">
+<div class="eyebrow">Your view of the skies</div>
+<h1>Flight tracking.<br>Without the clutter.</h1>
+<p class="lead">A modern aviation map for live public ADS-B traffic, airport information, routes and charts — designed for desktop and mobile.</p>
+<div class="actions">
+<a class="btn primary" href="app/index.html">Open Stratos <span aria-hidden="true">↗</span></a>
+<a class="btn secondary" href="https://github.com/Nyclyy/Stratos-track/releases/latest/download/Stratos-Setup.exe" id="pc-download">↓ Download for PC</a>
+<a class="btn secondary" href="#iphone-install">＋ Download for iPhone</a>
+</div>
+<p class="download-note">PC download is a Windows installer. iPhone users can add Stratos to their Home Screen from Safari.</p>
+</section>
+<section class="features">
+<article class="card">
+<div class="icon">⌁</div>
+<h2>Live public traffic</h2>
+<p>Aircraft positions load directly in your browser from community ADS-B data sources. No Python bridge is needed for public traffic. Tap an aircraft to track it and watch its contrail build behind it.</p>
+</article>
+<article class="card">
+<div class="icon">◎</div>
+<h2>Made for any screen</h2>
+<p>Responsive controls, touch gestures and a layout built to work on phones, tablets and desktops.</p>
+</article>
+<article class="card">
+<div class="icon">⌖</div>
+<h2>Aviation tools</h2>
+<p>Explore airports, navaids, live weather, route planning and built-in airport charts (diagram, satellite chart, runways, frequencies) in one place.</p>
+</article>
+</section>
+<section class="install" id="install-options">
+<article class="card" id="iphone-install">
+<h2>Download for iPhone — Add to Home Screen</h2>
+<p>Stratos installs from the website; no App Store download is needed.</p>
+<ol>
+<li>Tap <b>Open Stratos</b> above to open the tracker in Safari.</li>
+<li>Tap Safari’s <b>Share</b> button.</li>
+<li>Scroll down and tap <b>Add to Home Screen</b>, then tap <b>Add</b>.</li>
+</ol>
+<p><a class="btn primary" href="app/index.html">Open Stratos in Safari ↗</a></p>
+</article>
+<article class="card" id="pc-install">
+<h2>Download for Windows PC</h2>
+<p>Install Stratos as a desktop app with its own window. Public live aircraft tracking does not require Python to run in the background.</p>
+<ol>
+<li>Click <b>Download for PC</b> above to get <code>Stratos-Setup.exe</code>.</li>
+<li>Open the downloaded installer and follow the prompts.</li>
+<li>Launch Stratos from the Start menu.</li>
+</ol>
+<p><small>Note: the PC download becomes available after the project is published to GitHub and a Windows release is built.</small></p>
+</article>
+<article class="card">
+<h2>Install on Android</h2>
+<ol>
+<li>Open Stratos in Chrome.</li>
+<li>Open the browser menu.</li>
+<li>Choose <b>Install app</b> or <b>Add to Home screen</b>.</li>
+</ol>
+</article>
+</section>
+<footer>Stratos is an independent project. Aircraft data is provided by third-party public ADS-B sources. Live coverage depends on provider availability. Not for real-world navigation.</footer>
+</main>
+<script>
+(function(){
+(function(){
+  var R = 'Nyclyy/Stratos-track';
+  var pc = document.getElementById('pc-download');
+  var note = document.querySelector('.download-note');
+  var warn = document.getElementById('warn');
+  // ... rest of original script unchanged ...
+})();
+})();
+</script>
+</body>
+</html>

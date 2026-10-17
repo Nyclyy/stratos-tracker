@@ -1,0 +1,52 @@
+{
+  "name": "stratos-desktop",
+  "version": "1.0.0",
+  "description": "Stratos aviation map desktop app",
+  "main": "electron-main.cjs",
+  "author": "Stratos",
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis --publish never"
+  },
+  "devDependencies": {
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.stratos.aviationmap",
+    "productName": "Stratos",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron-main.cjs",
+      "app/**/*",
+      "!app/sw.js"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Stratos-Setup.exe",
+      "icon": "app/icon-512.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Stratos"
+    }
+  },
+  "dependencies": {
+    "xml2js": "^0.6.2"
+  }
+}
