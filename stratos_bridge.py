@@ -1,4 +1,7 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3from bridge_logbook_addon import (
+    process_telemetry_for_logbook, _handle_logbook,
+    get_flight_phase, get_current_flight
+)
 """Stratos bridge for X-Plane 12 and MSFS 2020/2024 (Python 3, standard library only).
 
 Receives X-Plane UDP "DATA" output and serves Stratos plus a live stream,
