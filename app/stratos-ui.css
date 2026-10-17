@@ -281,3 +281,206 @@ table td,table th { border-color:rgba(145,168,177,.18); }
   .tab-btn { padding:9px 11px; font-size:12px; }
   #main { padding:14px 12px 22px; }
 }
+
+/* ── STRATOS / Flight-deck visual pass ────────────────────────────── */
+:root {
+  --bg:#0b171d;
+  --land:#13252c;
+  --coast:#354a51;
+  --grid:rgba(166,195,194,.12);
+  --ap:#e7b36c;
+  --nav:#86bdb1;
+  --route:#e7b36c;
+  --own:#df827a;
+  --txt:#e3ebea;
+  --ui:#101e24;
+  --ui2:#17272d;
+  --mut:#91a3a4;
+  --trf:#a5c3d7;
+  --acc:#9bc8b8;
+  --red:#df827a;
+  --grn:#98c5a4;
+  --warn:#e7b36c;
+  --mag:#b5a4c7;
+  --line:rgba(174,197,192,.18);
+  --focus:#e7b36c;
+  font-family:"Segoe UI Variable Text","Bahnschrift","Segoe UI",system-ui,sans-serif;
+  font-synthesis:none;
+}
+:root[data-theme="day"] {
+  --bg:#dce5e2; --land:#e9eeea; --coast:#9aada9; --grid:rgba(54,78,76,.14);
+  --ap:#9a5f20; --nav:#276f66; --route:#a76820; --own:#ac5550;
+  --txt:#1c2b2d; --ui:#f0f3ef; --ui2:#e3eae6; --mut:#5d706f;
+  --trf:#315c78; --acc:#316e65; --red:#a33d3a; --grn:#3b7357;
+  --warn:#915711; --mag:#715884; --line:rgba(48,69,66,.2); --focus:#9a5f20;
+  color-scheme:light;
+}
+:root[data-theme="night"] {
+  --bg:#0b171d; --land:#13252c; --coast:#354a51; --grid:rgba(166,195,194,.12);
+  --ap:#e7b36c; --nav:#86bdb1; --route:#e7b36c; --own:#df827a;
+  --txt:#e3ebea; --ui:#101e24; --ui2:#17272d; --mut:#91a3a4;
+  --trf:#a5c3d7; --acc:#9bc8b8; --red:#df827a; --grn:#98c5a4;
+  --warn:#e7b36c; --mag:#b5a4c7; --line:rgba(174,197,192,.18); --focus:#e7b36c;
+  color-scheme:dark;
+}
+:root[data-theme="contrast"] {
+  --bg:#000; --land:#080808; --coast:#fff; --grid:rgba(255,255,255,.36);
+  --ap:#ff0; --nav:#0ff; --route:#ff0; --own:#fff;
+  --txt:#fff; --ui:#000; --ui2:#171717; --mut:#e6e6e6;
+  --trf:#7f7; --acc:#ff0; --red:#ff7777; --grn:#7f7;
+  --warn:#ff0; --mag:#f7f; --line:rgba(255,255,255,.55); --focus:#ff0;
+  color-scheme:dark;
+}
+
+html,body { background:var(--bg); color:var(--txt); }
+body { letter-spacing:.005em; }
+button,input,select,textarea { font-family:inherit; }
+button { border-radius:4px; box-shadow:none; }
+button:hover:not(:disabled) { transform:none; box-shadow:none; }
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible {
+  outline:2px solid var(--focus); outline-offset:3px;
+}
+::selection { background:var(--acc); color:var(--bg); }
+
+/* Map: a quiet chart field with compact instrument controls. */
+#app { background:var(--bg); }
+.box,#sb,#tabs,#lay,#fc,#sheet,#cv,#tel {
+  background:var(--ui); border:1px solid var(--line); box-shadow:0 8px 22px rgba(0,0,0,.16);
+  -webkit-backdrop-filter:none; backdrop-filter:none;
+}
+#sb { border-radius:4px; }
+#sb span { color:var(--acc); }
+#q { color:var(--txt); }
+#q::placeholder { color:var(--mut); }
+#st { border-color:var(--line); border-radius:3px; color:var(--mut); letter-spacing:.07em; text-transform:uppercase; }
+#res,#lay { border-color:var(--line); border-radius:4px; box-shadow:0 12px 28px rgba(0,0,0,.24); }
+#res div { border-color:var(--line); }
+#res div:hover,#lay button:hover { background:var(--ui2); color:var(--txt); }
+#tabs { border-radius:5px; }
+.tab { border-radius:3px; letter-spacing:.025em; }
+.tab.act { background:var(--ui2); color:var(--acc); box-shadow:inset 2px 0 var(--acc); }
+#tabs::before { border-radius:3px; background:var(--ui2); box-shadow:none; }
+#fab .fab { border-radius:4px; border-color:var(--line); box-shadow:0 6px 14px rgba(0,0,0,.16); }
+#fab .fab.on { background:var(--acc); color:var(--bg); }
+#lay b,.fh { color:var(--acc); letter-spacing:.12em; }
+#sheet,#fc { border-radius:5px; }
+#sheet::before { width:30px; height:2px; border-radius:0; background:var(--acc); }
+.fr { font-variant-numeric:tabular-nums; letter-spacing:-.04em; }
+.pb { background:var(--ui2); }
+.pb u { background:repeating-linear-gradient(90deg,var(--route) 0 8px,transparent 8px 11px); }
+.chips span,.pill { border-radius:3px; }
+.pill.on { color:var(--grn); }
+#chart { background:var(--bg); }
+#cv { border-radius:4px; }
+#ci { background:var(--bg); }
+@media(min-width:768px) {
+  #tabs { border-radius:0 5px 5px 0; }
+  #tabs::before { border-radius:3px; }
+}
+@media(max-width:767px) {
+  #tabs { border-radius:5px; }
+}
+
+/* Weather: report-first hierarchy, with airport code and raw observation up front. */
+#app:has(#search-wrap) { background:var(--bg); }
+#topbar,#bottom-nav {
+  background:var(--ui); border-color:var(--line); box-shadow:0 6px 18px rgba(0,0,0,.13);
+  -webkit-backdrop-filter:none; backdrop-filter:none;
+}
+#topbar { min-height:54px; }
+#topbar a.home { font-size:17px; letter-spacing:.13em; }
+#topbar a.home span { color:var(--acc); }
+#topbar h1 { color:var(--mut); letter-spacing:.14em; font-size:11px; }
+#search-wrap { background:var(--bg); border-color:var(--line); border-radius:0; box-shadow:none; }
+#icao-input,.dep-arr-input { background:var(--ui); border-color:var(--line); border-radius:3px; }
+#icao-input:focus,.dep-arr-input:focus { border-color:var(--acc); box-shadow:0 0 0 2px color-mix(in srgb,var(--acc) 22%,transparent); }
+#search-btn { background:var(--acc); color:var(--bg); border-radius:3px; }
+#recent-strip { border-bottom:1px solid var(--line); }
+.rec-chip { border-radius:3px; background:var(--ui); border-color:var(--line); }
+#main { max-width:1120px; }
+.dep-arr-card,.wx-section,#apt-header {
+  background:var(--ui); border:1px solid var(--line); border-radius:4px; box-shadow:none;
+}
+.dep-arr-card { border-top:1px solid var(--line); border-left:2px solid var(--acc); }
+.dep-arr-card h3,.wx-section h2 { color:var(--acc); letter-spacing:.12em; }
+#apt-header { border-left:3px solid var(--acc); display:grid; grid-template-columns:auto 1fr auto; align-items:center; }
+.apt-id { color:var(--acc); font-weight:750; letter-spacing:.025em; }
+.apt-name { font-size:17px; font-weight:650; }
+.apt-sub,.obs-time { color:var(--mut); }
+.cat-badge { border-radius:3px; padding:4px 9px; font-size:11px; letter-spacing:.09em; }
+.raw-metar,.wstat { background:var(--bg); border:1px solid var(--line); border-radius:3px; }
+.raw-metar { color:var(--acc); }
+.wx-section { padding:16px 18px; }
+.wx-section h2 { font-size:11px; padding-bottom:8px; border-bottom:1px solid var(--line); }
+.decoded-row { border-color:var(--line); }
+.dec-label,.dec-unit { color:var(--mut); }
+.dec-val,.wstat b { font-variant-numeric:tabular-nums; }
+.wstat span { color:var(--mut); letter-spacing:.1em; }
+.notice { border-color:var(--line); border-radius:3px; }
+.taf-period { border-color:var(--line); border-radius:2px; }
+.taf-period::before { background:var(--line); }
+.taf-period.active { border-color:var(--acc); }
+.taf-period.active::before { background:var(--acc); box-shadow:none; }
+.rwy-row { border-color:var(--line); }
+.rwy-id { font-variant-numeric:tabular-nums; }
+#bottom-nav { border-radius:4px; }
+.bnav-item { border-radius:3px; }
+.bnav-item.act { color:var(--acc); background:var(--ui2); }
+@media(min-width:768px) {
+  #bottom-nav { max-width:760px; }
+}
+@media(max-width:520px) {
+  #apt-header { grid-template-columns:auto 1fr; }
+  .apt-right { grid-column:1/-1; align-items:flex-start; flex-direction:row; flex-wrap:wrap; }
+}
+
+/* Logbook: flight records read as a ledger, with tabular instrument figures. */
+#app:has(#tab-bar) { background:var(--bg); }
+#tab-bar { background:var(--ui); border-color:var(--line); border-radius:4px; box-shadow:none; }
+.tab-btn { border-radius:2px; letter-spacing:.055em; }
+.tab-btn.act { color:var(--acc); background:var(--ui2); box-shadow:inset 0 -2px var(--acc); }
+#live-bar { background:var(--ui2); border-color:var(--line); border-left:2px solid var(--grn); border-radius:3px; }
+#live-state-label { color:var(--grn); letter-spacing:.09em; }
+#main { max-width:1120px; }
+.stat-tile,.section,.ac-card,.ach-card {
+  background:var(--ui); border:1px solid var(--line); border-radius:4px; box-shadow:none;
+}
+.stat-tile { padding:14px 16px; }
+.stat-tile::before { width:2px; opacity:1; }
+.stat-tile b,.detail-cell b { font-variant-numeric:tabular-nums; letter-spacing:-.045em; }
+.stat-tile span,.section h2 { letter-spacing:.12em; }
+.section { padding:16px 18px; }
+.section h2 { color:var(--acc); }
+.flight-row { border-color:var(--line); }
+.flight-row:hover { background:var(--ui2); }
+.fl-badge { background:var(--ui2); border-color:var(--line); color:var(--acc); border-radius:2px; font-variant-numeric:tabular-nums; }
+.fl-route { letter-spacing:.01em; }
+.fl-right,.fl-right b { font-variant-numeric:tabular-nums; }
+.ac-card { border-left:2px solid var(--line); }
+.ac-card:hover { border-color:var(--acc); transform:none; }
+.ac-stat,.detail-cell { background:var(--ui2); border:1px solid var(--line); border-radius:3px; }
+.ach-card.earned { border-color:var(--warn); background:var(--ui); }
+.ach-card.locked { opacity:.72; }
+.ach-prog { background:var(--ui2); }
+#detail-panel.show { background:rgba(0,0,0,.68); }
+#detail-inner { background:var(--ui); border:1px solid var(--line); border-radius:4px; box-shadow:0 16px 42px rgba(0,0,0,.35); }
+#profile-section input,#profile-section textarea,#profile-section select { background:var(--bg); border-color:var(--line); border-radius:3px; }
+#profile-section label { color:var(--mut); letter-spacing:.04em; }
+.avatar-circle { background:var(--ui2); color:var(--acc); border:1px solid var(--line); }
+.topbar-btn,.share-btn { border-radius:3px; }
+.save-btn { background:var(--acc); color:var(--bg); border-radius:3px; }
+.share-btn { background:var(--ui2); border-color:var(--line); }
+.pilot-header { border-bottom:1px solid var(--line); }
+.empty-block { color:var(--mut); }
+#bottom-nav { border-radius:4px; }
+.bnav-item { border-radius:3px; }
+.bnav-item.act { color:var(--acc); background:var(--ui2); }
+@media(min-width:768px) {
+  #detail-panel.show { padding:24px; }
+  #detail-inner { width:min(760px,100%); max-height:84dvh; }
+}
+@media(max-width:560px) {
+  #tab-bar { overflow-x:auto; }
+  .tab-btn { flex:0 0 auto; }
+  #main { padding-bottom:calc(22px + env(safe-area-inset-bottom)); }
+}
