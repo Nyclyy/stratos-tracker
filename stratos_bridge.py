@@ -1,13 +1,15 @@
-#!/usr/bin/env python3from bridge_logbook_addon import (
-    process_telemetry_for_logbook, _handle_logbook,
-    get_flight_phase, get_current_flight
-)
+    #!/usr/bin/env python3
 """Stratos bridge for X-Plane 12 and MSFS 2020/2024 (Python 3, standard library only).
 
 Receives X-Plane UDP "DATA" output and serves Stratos plus a live stream,
 so your iPhone can open http://<PC-IP>:8765 in Safari.
 Keep stratos.html in the same folder as this script.
 """
+from bridge_logbook_addon import (
+    process_telemetry_for_logbook, _handle_logbook,
+    get_flight_phase, get_current_flight
+)
+
 import csv, io, json, os, re, socket, struct, sys, threading, time, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -36,6 +38,7 @@ def udp_loop():
                 elif idx == 20:         # lat, lon, alt MSL ft, alt AGL ft
                     now = time.time()
                     state.update(lat=v[0], lon=v[1], alt=v[2], agl=v[3], t=now, src="X-Plane")
+                    process_telemetry_for_logbook(state, airports)
                     if prev is None:
                         prev = (v[2], now)
                     elif now - prev[1] >= 0.5:
