@@ -90,4 +90,7 @@ test('the shipped version is stamped the same in the app, the bridge and the pac
   for (const file of ['bridge_logbook_addon.py', 'app/js/pilot/settings.js']) {
     assert.ok(stamp.includes(file), `the release stamp updates ${file}`);
   }
+  // The tag now matches the committed version, so the build's stamp must accept
+  // an unchanged version instead of failing the release.
+  assert.match(read('.github/workflows/release-windows.yml'), /--allow-same-version/);
 });

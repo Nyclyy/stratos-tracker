@@ -37,12 +37,14 @@ jobs:
       # Every build up to 2.1.5 reported version 2.1.0, so an installed copy could
       # not be told apart from another release. Stamp the tag into the app and the
       # bridge so Settings and the Windows installer both show the real version.
+      # The repository now carries the release version itself, so the stamp has to
+      # tolerate a tag that matches what is already committed.
       - name: Stamp the release version
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          npm version --no-git-tag-version "$VERSION" --silent
+          npm version --no-git-tag-version --allow-same-version "$VERSION" --silent
           python scripts/stamp-version.py "$VERSION"
 
       - name: Run JavaScript and relay tests
