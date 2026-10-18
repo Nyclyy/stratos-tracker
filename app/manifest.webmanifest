@@ -1,14 +1,21 @@
 {
- "name": "Stratos",
+ "name": "Stratos Flight Deck",
  "short_name": "Stratos",
- "description": "Live flight tracker and airport charts",
+ "description": "Flight simulation companion: live map, career logbook, replay, landing analytics, briefings and route planning.",
  "start_url": "./",
  "scope": "./",
  "display": "standalone",
+ "display_override": ["standalone", "minimal-ui"],
  "orientation": "any",
- "background_color": "#111a29",
- "theme_color": "#111a29",
+ "background_color": "#08151d",
+ "theme_color": "#08151d",
  "icons": [
+  {
+   "src": "icon-180.png",
+   "sizes": "180x180",
+   "type": "image/png",
+   "purpose": "any"
+  },
   {
    "src": "icon-192.png",
    "sizes": "192x192",
@@ -31,7 +38,9 @@
  "id": "./",
  "categories": [
   "navigation",
-  "travel"
+  "travel",
+  "productivity"
  ],
- "lang": "en"
+ "lang": "en",
+ "dir": "ltr"
 }

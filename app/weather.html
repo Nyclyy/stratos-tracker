@@ -9,7 +9,7 @@
 <title>Stratos — Weather Center</title>
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('dl.theme') || 'night'; } catch (_) { document.documentElement.dataset.theme = 'night'; }</script>
 <style>
-/* ── Stratos token system (matches stratos.html) ─────────────────── */
+/* ── Stratos token system (matches app/index.html) ───────────────── */
 :root {
   --bg:#0b1118; --land:#121a23; --coast:#3a4a5c; --grid:rgba(160,190,220,.1);
   --ap:#fbbf24; --nav:#34d399; --route:#22d3ee; --own:#fbbf24;
@@ -522,7 +522,7 @@ function renderWeather(id, metarRaw, tafRaw) {
   const cat = flightCat(m);
   const age = m.obsTime ? ageStr(m.obsTime) : '—';
 
-  // Airport lookup from bundled Stratos data (if on the same origin as stratos.html)
+  // Airport lookup from bundled Stratos data (if on the same origin as app/index.html)
   const aptName = ''; // Will be populated if loaded together
 
   let html = '';
@@ -748,7 +748,7 @@ function fmtWind(m) {
 }
 
 /* ── Runway headings (from bundled Stratos airport data) ─────────── */
-// These match the runway pairs in your existing stratos.html airport database
+// These match the runway pairs in the bundled airport database
 const RWY_DB = {
   KSFO:[10,28],KOAK:[12,30],KSJC:[12,30],KRNO:[16,34],KLAX:[25,7],KSAN:[9,27],
   KLAS:[8,26],KPHX:[8,26],KSEA:[16,34],KPDX:[10,28],KBOI:[10,28],KSLC:[16,34],

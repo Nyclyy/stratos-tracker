@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08151d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Stratos">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Stratos pilot career, landing analytics, flight replay, briefings and route planning.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="stratos-ui.css">
+<link rel="stylesheet" href="pilot.css">
+<title>Pilot · Stratos</title>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <a class="brand" href="index.html">
+      <span class="brand-mark" aria-hidden="true">✈</span>
+      <span>STRATOS<small>PILOT</small></span>
+    </a>
+    <span class="spacer"></span>
+    <div id="bridge-pill" class="status-inline" title="Simulator bridge status"><i class="dot dot-disconnected"></i><span>Bridge offline</span></div>
+    <nav class="topbar-links" aria-label="Sections">
+      <a href="index.html">Map</a>
+      <a href="logbook.html">Logbook</a>
+      <a href="weather.html">Weather</a>
+      <a href="live.html">Live</a>
+      <button id="theme-toggle" type="button">Day mode</button>
+    </nav>
+  </header>
+
+  <main class="page">
+    <nav class="subnav" aria-label="Pilot sections">
+      <button data-section="career" type="button">Career</button>
+      <button data-section="landings" type="button">Landings</button>
+      <button data-section="replay" type="button">Replay</button>
+      <button data-section="briefing" type="button">Briefing</button>
+      <button data-section="routes" type="button">Routes</button>
+      <button data-section="airports" type="button">Airports</button>
+      <button data-section="settings" type="button">Settings</button>
+      <span class="spacer"></span>
+      <span id="page-route" class="sr-only">Career</span>
+    </nav>
+    <div id="view" role="region" aria-live="polite"></div>
+  </main>
+</div>
+
+<noscript><p style="padding:24px">Stratos Pilot needs JavaScript. The map and logbook also require JavaScript.</p></noscript>
+<script type="module" src="js/pilot.js"></script>
+<script>
+  // Graceful message when opened from file:// — ES modules are blocked there by
+  // the browser; the packaged desktop app is served by the bridge or Electron.
+  window.addEventListener('error', function (event) {
+    if (document.getElementById('view') && !document.querySelector('#view .card')) {
+      document.getElementById('view').innerHTML = '<div class="notice bad"><div><strong>Stratos could not start.</strong><br>' +
+        String(event.message || 'Unknown error') + '</div></div>';
+    }
+  });
+  try {
+    if (navigator.serviceWorker) navigator.serviceWorker.register('sw.js').catch(function () {});
+  } catch (_) {}
+</script>
+</body>
+</html>

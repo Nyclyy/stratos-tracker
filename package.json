@@ -1,58 +1,25 @@
 {
   "name": "stratos-desktop",
-  "version": "1.0.0",
-  "description": "Stratos aviation map desktop app",
+  "version": "2.1.0",
+  "description": "Stratos flight simulation companion: map, logbook, replay, landing analytics and secure phone access",
   "main": "electron-main.cjs",
   "author": "Stratos",
-  "license": "UNLICENSED",
+  "license": "MIT",
+  "private": true,
   "scripts": {
     "start": "electron .",
-    "dist:win": "electron-builder --win nsis --publish never"
+    "test": "node --test tests/lib.test.mjs tests/modules.test.mjs tests/ui.test.mjs tests/relay.test.mjs",
+    "test:py": "python3 -m unittest -v tests.test_bridge",
+    "dist:win": "electron-builder --config electron-builder.config.cjs --win nsis --publish never",
+    "test:integration": "node --test tests/integration.test.mjs"
   },
   "devDependencies": {
     "electron": "^37.2.0",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26.0.12",
+    "linkedom": "^0.18.12"
   },
-  "build": {
-    "appId": "com.stratos.aviationmap",
-    "productName": "Stratos",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "electron-main.cjs",
-      "app/**/*",
-      "!app/sw.js"
-    ],
-    "extraResources": [
-      { "from": "stratos_bridge.py", "to": "bridge/stratos_bridge.py" },
-      { "from": "bridge_logbook_addon.py", "to": "bridge/bridge_logbook_addon.py" },
-      { "from": "stratos.html", "to": "bridge/stratos.html" },
-      { "from": "logbook.html", "to": "bridge/logbook.html" }
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "artifactName": "Stratos-Setup.exe",
-      "icon": "app/icon-512.png"
-    },
-    "nsis": {
-      "oneClick": true,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": false,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Stratos",
-      "runAfterFinish": true
-    }
+  "engines": {
+    "node": ">=20"
   },
-  "dependencies": {
-    "xml2js": "^0.6.2"
-  }
+  "type": "module"
 }
