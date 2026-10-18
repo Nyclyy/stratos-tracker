@@ -92,6 +92,10 @@ test('dashboard layout helpers clamp moves and reject bad stored data', async ()
   assert.deepEqual(normalizeLayout({ cards: [] }).cards, DEFAULT_CARDS, 'empty layout falls back');
   assert.deepEqual(normalizeLayout({ cards: ['bogus'] }).cards, DEFAULT_CARDS, 'unknown keys fall back');
   assert.deepEqual(normalizeLayout({ cards: ['rank', 'rank', 'bogus', 'week'] }).cards, ['rank', 'week'], 'duplicates and unknown keys dropped');
+  // What was saved must come back in the same order, dense flag included.
+  const reloaded = normalizeLayout({ cards: ['week', 'landings', 'rank'], dense: true, version: 1 });
+  assert.deepEqual(reloaded.cards, ['week', 'landings', 'rank'], 'saved order survives a reload');
+  assert.equal(reloaded.dense, true, 'saved density survives a reload');
   assert.equal(normalizeLayout({ cards: ['week'], dense: 1 }).dense, true);
   assert.equal(normalizeLayout({ cards: ['week'] }).dense, false);
   for (const key of normalizeLayout({ cards: ['rank', 'week'] }).cards) {
