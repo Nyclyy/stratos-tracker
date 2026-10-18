@@ -135,7 +135,16 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 #sheet::-webkit-scrollbar-thumb,#res::-webkit-scrollbar-thumb,#ci::-webkit-scrollbar-thumb{background:var(--coast);border-radius:99px}
 @media(prefers-reduced-motion:reduce){*{transition-duration:.01ms!important;animation-duration:.01ms!important}}
 @media(max-width:420px){button{min-height:38px}}
-</style></head><body><div id="app">
+/* Application shell: a slim status bar and the career strip sit above the map.
+   The map keeps its own overlays and rail; only the frame around it changes. */
+.shell{display:grid;grid-template-rows:auto minmax(0,1fr);height:100dvh;min-height:0;background:var(--bg)}
+.main{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;overflow:hidden}
+#app{height:100%;min-height:0}
+</style><link rel="stylesheet" href="shell.css"></head><body><div class="shell">
+<header id="appbar" class="tb"></header>
+<div class="main">
+<section id="homestats" class="stats" aria-label="Career totals"></section>
+<div id="app">
 <canvas id="map" aria-label="Aviation chart map"></canvas>
 <div id="attr">© OpenStreetMap contributors · Esri imagery</div>
 <div id="top"><div id="sb"><span>&#8981;</span><input id="q" placeholder="Search airports and navaids" autocomplete="off" aria-label="Search"></div><button id="st">No live data</button></div>
@@ -149,6 +158,8 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 <div id="chart"></div>
 <div id="sheet" class="box"></div>
 <div id="tel" class="box"><div><b id="tGS">–</b><span>GS kt</span></div><div><b id="tAL">–</b><span>ALT ft</span></div><div><b id="tHD">–</b><span>HDG°</span></div><div><b id="tVS">–</b><span>VS fpm</span></div><div><b id="tDS">–</b><span>DEST nm</span></div><div><b id="tEt">–</b><span>ETA</span></div></div>
+</div>
+</div>
 </div>
 <script>
 const A=`KSFO|San Francisco Intl|37.619|-122.375|13|10,1|120.5|135.1|29012KT 10SM FEW015 16/11 A3002
@@ -821,4 +832,9 @@ h+='<h3 style="margin-top:14px">Weather</h3><code>'+a.metar+'</code><div class="
 return h+'<div style="margin-top:14px">'+faaHtml(a)+'</div>'}
 $('#cvx').onclick=closeCharts;$('#cvf').onclick=chFit;$('#cvs').onclick=e=>{const p=e.target.dataset&&e.target.dataset.p;if(p)chPage(p)};
 try{if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').then(reg=>{reg.addEventListener('updatefound',()=>{const w=reg.installing;if(!w)return;w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller){const b=document.getElementById('st');if(b){b.textContent='Update ready — reopen Stratos';b.onclick=()=>location.reload()}}})})}).catch(()=>{})}}catch(_){}
-</script></body></html>
+</script>
+<script type="module">
+  import { mountShell } from './js/shell.js';
+  mountShell({ page: 'home', stats: true });
+</script>
+</body></html>

@@ -285,3 +285,35 @@ test('weather center drops its own chrome only when embedded', async () => {
   const standalone = boot('');
   assert.equal(standalone.document.documentElement.getAttribute('data-embed'), null, 'the standalone page keeps its chrome');
 });
+
+test('the shell reports simulator state honestly and never invents a connection', async () => {
+  installDom();
+  document.body.innerHTML = '<div class="shell"><header id="appbar"></header><section id="homestats"></section></div>';
+  const { mountShell } = await import('../app/js/shell.js');
+
+  globalThis.fetch = async () => { throw new Error('no bridge here'); };
+  const offline = mountShell({ page: 'home', stats: true });
+  await new Promise(resolve => setTimeout(resolve, 40));
+
+  assert.equal(document.querySelectorAll('[data-status]').length, 2, 'simulator and live status are separate');
+  const sim = document.querySelector('[data-status="sim"]');
+  assert.match(sim.textContent, /offline/i);
+  assert.ok(!sim.className.includes('is-live'), 'an unreachable bridge is never shown as connected');
+  assert.match(document.querySelector('[data-status="live"]').textContent, /no live data/i);
+  assert.ok(document.querySelector('.tb-perf').options.length >= 3, 'the resource profile selector keeps every mode');
+  assert.equal(document.querySelectorAll('.stat-card').length, 4, 'four home totals');
+  assert.match(document.querySelector('#homestats').textContent, /0\.0 h/, 'no logbook means honest zeros');
+  offline.destroy();
+
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({ version: '2.1.6', simulator: { connected: true, source: 'xplane' } }),
+  });
+  const live = mountShell({ page: 'home', stats: false });
+  await new Promise(resolve => setTimeout(resolve, 40));
+  const sim2 = document.querySelector('[data-status="sim"]');
+  assert.match(sim2.textContent, /simulator live/i);
+  assert.ok(sim2.className.includes('is-live'));
+  assert.match(document.querySelector('[data-status="live"]').textContent, /live tracking/i);
+  live.destroy();
+});
