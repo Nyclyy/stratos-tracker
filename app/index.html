@@ -146,6 +146,10 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 .app-shell[data-collapsed="1"]{--rail:62px}
 .app-shell[data-collapsed="1"] .tab span,.app-shell[data-collapsed="1"] #tabs .rail-toggle span{display:none}
 @media(max-width:767px){#tabs .rail-toggle{display:none}}
+@media(max-width:767px){
+/* The tab bar is a shell row now, so these overlays no longer clear it. */
+#sheet{bottom:12px}.live #sheet{bottom:12px}#attr{bottom:10px}#tel{bottom:12px}
+}
 @media(min-width:768px){
 .app-shell{--rail:84px;grid-template-columns:var(--rail) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
 .app-shell .tb{grid-column:1/-1;grid-row:1}
