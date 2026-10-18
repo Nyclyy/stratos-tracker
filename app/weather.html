@@ -257,6 +257,12 @@ a:hover { text-decoration: underline; }
   #watch .watch-add .s-field { max-width:none; flex:1 1 auto; }
   #watch .watch-head { gap:6px; }
 }
+/* Embedded in the map page's METAR panel: the panel owns the frame and title. */
+html[data-embed="1"] #topbar, html[data-embed="1"] #bottom-nav { display:none; }
+html[data-embed="1"] body, html[data-embed="1"] #app { background:transparent; }
+html[data-embed="1"] #main { padding:10px 0 0; max-width:none; }
+html[data-embed="1"] #search-wrap { width:100%; margin-top:0; }
+html[data-embed="1"] #recent-strip { width:100%; }
 </style>
 <link rel="stylesheet" href="stratos-ui.css">
 </head>
@@ -1100,6 +1106,11 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && wa
 setWatchAuto(watchAuto);
 renderWatch();
 if (watchList.length) refreshWatch(false);
+
+// The map page embeds this centre in a panel and supplies its own heading.
+if (new URLSearchParams(location.search).has('embed')) {
+  document.documentElement.setAttribute('data-embed', '1');
+}
 
 // Check URL param on load
 const initId = new URLSearchParams(location.search).get('id');

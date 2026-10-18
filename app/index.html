@@ -93,6 +93,13 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 @media(min-width:768px){#attr{left:92px;bottom:8px}}
 #pdf{display:none;position:absolute;inset:0;z-index:9;background:var(--bg)}.pdh{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--ui);border-bottom:1px solid var(--ui2)}.pdh b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pdh a{font-size:12px;color:var(--mut)}
 .pdb{position:absolute;top:56px;left:0;right:0;bottom:0;overflow:auto;-webkit-overflow-scrolling:touch}#pdf2{width:100%;height:100%;border:0;background:#fff}
+.wxhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.wxhead h3{margin:0}
+.wxhead a{margin-left:auto;font-size:11px;color:var(--mut);text-decoration:none}
+.wxhead a:hover{color:var(--acc)}
+.wxframe iframe{display:block;width:100%;height:min(70dvh,520px);border:0;border-radius:12px;background:transparent}
+@media(min-width:768px){.wxframe iframe{height:calc(100dvh - 150px)}}
+
 /* ── Premium pass ──────────────────────────────────────────────────
    Type, rhythm, controls and readouts. Uses only this page's tokens. */
 :root{
@@ -601,12 +608,13 @@ $('#tGS').textContent=Math.round(gs);$('#tAL').textContent=Math.round(own.alt);$
 function getMetar(a){if(location.protocol!='http:'||(a.mf&&Date.now()-a.mf<600000))return;a.mf=Date.now();fetch('/metar?ids='+a.id).then(r=>r.text()).then(t=>{t=t.trim().split('\n')[0];if(t){a.metar=t;a.mt=Date.now();if(panel=='sel'&&sel==a)render();if($('#chart').style.display=='block'&&sel==a)openChart(a)}}).catch(()=>{})}
 let wxList=[];try{wxList=JSON.parse(localStorage.getItem('dl.wx')||'[]')}catch(_){}
 function wxAdd(a){if(!wxList.includes(a.id)){wxList.unshift(a.id);wxList=wxList.slice(0,8);try{localStorage.setItem('dl.wx',JSON.stringify(wxList))}catch(_){}}}
-function mRef(a){if(CH.on&&CH.a===a)chHead();if((panel=='sel'&&sel==a)||panel=='wx')render();if($('#chart').style.display=='block'&&sel==a)openChart(a)}
+function mRef(a){if(CH.on&&CH.a===a)chHead();if(panel=='sel'&&sel==a)render();if($('#chart').style.display=='block'&&sel==a)openChart(a)}
 function getMetar(a,force){if(!force&&a.mf&&Date.now()-a.mf<300000)return;a.mf=Date.now();wxAdd(a);return mget(a);
 if(location.protocol!='http:'){a.me='METAR needs the bridge. The weather service blocks direct browser requests, and this preview has no internet access.';mRef(a);return}
 fetch('/metar?ids='+a.id).then(r=>r.text()).then(t=>{t=(t||'').trim().split('\n')[0];if(t){a.metar=t;a.mt=Date.now();a.me=''}else a.me='No METAR reported for this airport.';mRef(a)}).catch(()=>{a.me='METAR fetch failed. Is the bridge running with internet?';mRef(a)})}
-function wxHtml(){const m=new Map(A.map(z=>[z.id,z])),rows=wxList.map(i=>m.get(i)).filter(Boolean);rows.forEach(a=>getMetar(a));
-return '<h3>Weather (METAR)</h3><div class="m">Airports you open are added here and refreshed every 5 minutes. Works without X-Plane or live tracking.</div>'+(rows.length?rows.map(a=>'<div style="margin-top:10px"><b>'+a.id+'</b> <span class="m">'+a.name+'</span><code>'+(a.mt?a.metar:(a.me||'Loading...'))+'</code><div class="m">'+mAge(a)+'</div></div>').join(''):'<div class="m" style="margin-top:8px">No airports yet. Search for one or tap an airport on the map.</div>')+'<div class="row"><button onclick="wxList.forEach(i=>{const a=A.find(z=>z.id==i);if(a)getMetar(a,true)})">Refresh now</button></div>'}
+function wxHtml(){
+return '<div class="wxhead"><h3>Weather Center</h3><a href="weather.html" target="_top">Open full page</a></div>'
++'<div class="wxframe"><iframe src="weather.html?embed=1" title="Stratos Weather Center" loading="lazy"></iframe></div>'}
 $('#bWx').onclick=()=>{panel=panel=='wx'?null:'wx';render()};
 async function loadOsm(a){try{let l=null;try{const c=await idb('get',0,'osm:'+a.id);if(c)l=JSON.parse(c)}catch(_){}
 if(!l){if(location.protocol=='http:'){l=await(await fetch('/osm?id='+a.id+'&lat='+a.lat+'&lon='+a.lon)).json()}else{const q='[out:json][timeout:30];(way["aeroway"~"^(runway|taxiway|taxilane|apron|terminal)$"](around:5000,'+a.lat+','+a.lon+'););out geom;',d=await(await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q)})).json();l=d.elements.filter(e=>e.type=='way'&&e.geometry).map(e=>[e.tags.aeroway,e.tags.ref||'',e.geometry.map(p=>[p.lat,p.lon])])}

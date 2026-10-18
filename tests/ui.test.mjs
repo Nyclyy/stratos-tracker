@@ -256,3 +256,32 @@ test('weather center names the airport when the lookup answers and falls back to
   assert.equal(window.document.getElementById('apt-name').textContent, 'KJFK', 'the code is the fallback');
   assert.equal(window.document.getElementById('apt-extra').textContent, '', 'no stray location line');
 });
+
+test('weather center drops its own chrome only when embedded', async () => {
+  const { parseHTML } = await import('linkedom');
+  const fs = await import('node:fs');
+  const html = fs.readFileSync(new URL('../app/weather.html', import.meta.url), 'utf8');
+  const boot = search => {
+    const { window } = parseHTML(html);
+    const define = (key, value) => Object.defineProperty(globalThis, key, { value, configurable: true });
+    define('window', window);
+    define('document', window.document);
+    define('navigator', window.navigator);
+    define('location', { protocol: 'http:', hostname: 'localhost', href: 'http://localhost/app/weather.html' + search, search, hash: '' });
+    define('localStorage', { store: new Map(), getItem(k) { return this.store.get(k) ?? null; }, setItem(k, v) { this.store.set(k, String(v)); }, removeItem(k) { this.store.delete(k); } });
+    define('fetch', async () => ({ ok: false, status: 503, json: async () => ({}), text: async () => '' }));
+    define('HTMLElement', window.HTMLElement);
+    define('Event', window.Event);
+    define('CustomEvent', window.CustomEvent);
+    const inline = [...window.document.querySelectorAll('script:not([src])')].map(node => node.textContent).join('\n');
+    new Function(inline)();
+    return window;
+  };
+
+  const embedded = boot('?embed=1');
+  assert.equal(embedded.document.documentElement.getAttribute('data-embed'), '1', 'the map panel gets a chrome-free page');
+  assert.ok(embedded.document.getElementById('bottom-nav'), 'the nav still exists in the markup, only hidden by CSS');
+
+  const standalone = boot('');
+  assert.equal(standalone.document.documentElement.getAttribute('data-embed'), null, 'the standalone page keeps its chrome');
+});
