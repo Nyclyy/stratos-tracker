@@ -5,6 +5,7 @@ import {
   duplicateSavedRoute, searchPlaces, defaultRouteName,
 } from '../lib/planner.js';
 import { BUNDLED_NAVAIDS } from '../data/airports.js';
+import { fetchSimbriefPlan } from '../lib/simbrief.js';
 import { MiniMap } from '../minimap.js';
 import { esc, fmtDate, num, tag, toast, downloadText, pickFile, askText } from '../ui.js';
 import { wireSearch } from './common.js';
@@ -115,17 +116,9 @@ export async function mount(root, ctx) {
   async function importSimbrief() {
     const entered = await askText('Import SimBrief', 'SimBrief username or Pilot ID', 'e.g. pilot123 or 123456');
     if (!entered) return;
-    const id = entered;
-    const query = /^\d+$/.test(id.trim()) ? `userid=${encodeURIComponent(id.trim())}` : `username=${encodeURIComponent(id.trim())}`;
     try {
-      const response = await fetch(`https://www.simbrief.com/api/xml.fetcher.php?${query}&json=v2`);
-      if (response.status === 400) throw new Error('SimBrief did not recognise that username or Pilot ID. Check it in SimBrief account settings (numbers are Pilot IDs, letters are Navigraph usernames).');
-      if (!response.ok) throw new Error(`SimBrief returned HTTP ${response.status}.`);
-      const data = await response.json();
-      const fixes = data.navlog && data.navlog.fix;
-      if (!Array.isArray(fixes) || !fixes.length) throw new Error('The SimBrief plan contains no waypoints.');
-      const origin = data.origin && data.origin.icao_code ? data.origin.icao_code : null;
-      const destination = data.destination && data.destination.icao_code ? data.destination.icao_code : null;
+      const plan = await fetchSimbriefPlan(entered);
+      const { origin, destination, fixes, general } = plan;
       points = fixes.map((fix, index) => ({
         id: String(fix.ident || `WP${index + 1}`).toUpperCase(),
         name: fix.name || fix.ident || 'Waypoint',
@@ -138,9 +131,9 @@ export async function mount(root, ctx) {
       name = `${origin || points[0].id} → ${destination || points[points.length - 1].id} (SimBrief)`;
       currentId = null;
       dirty = true;
-      const cruise = Number(data.general && data.general.cruise_altitude);
+      const cruise = Number(general.cruise_altitude);
       if (Number.isFinite(cruise) && cruise > 0) cruiseAlt = cruise;
-      const tas = Number(data.general && data.general.cruise_tas);
+      const tas = Number(general.cruise_tas);
       if (Number.isFinite(tas) && tas > 0) cruiseKts = tas;
       persistActive();
       toast(`Imported ${points.length} waypoints from SimBrief. Weather, winds and fuel are not imported.`, 'good');

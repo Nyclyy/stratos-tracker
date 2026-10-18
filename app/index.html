@@ -367,13 +367,16 @@ function askSimbriefId(){return new Promise(res=>{const b=document.createElement
 $('#bSim').onclick=async()=>{
   const id=await askSimbriefId();
   if(!id)return;
-  const q=/^\d+$/.test(id.trim())?`userid=${encodeURIComponent(id.trim())}`:`username=${encodeURIComponent(id.trim())}`;
   try{
+    const q=/^\d+$/.test(id)?`userid=${encodeURIComponent(id)}`:`username=${encodeURIComponent(id)}`;
     const r=await fetch(`https://www.simbrief.com/api/xml.fetcher.php?${q}&json=v2`);
-    if(r.status===400)throw new Error('SimBrief did not recognise that username or Pilot ID. Check it in SimBrief account settings.');if(!r.ok)throw new Error('SimBrief returned HTTP '+r.status);
+    if(r.status===400)throw new Error('SimBrief did not recognise that username or Pilot ID, or there is no flight plan saved for it. Check the number in SimBrief account settings and make sure you generated a plan.');
+    if(!r.ok)throw new Error('SimBrief returned HTTP '+r.status);
     const d=await r.json();
-    const fp=d.navlog&&d.navlog.fix;
-    if(!Array.isArray(fp)||!fp.length)throw new Error('No waypoints found in flight plan');
+    let fp=d.navlog&&Array.isArray(d.navlog.fix)?d.navlog.fix:[];
+    if(!fp.length){const x=await fetch(`https://www.simbrief.com/api/xml.fetcher.php?${q}`);if(x.ok){const doc=new DOMParser().parseFromString(await x.text(),'text/xml');fp=Array.from(doc.querySelectorAll('navlog > fix')).map(f=>{const t=n=>(f.querySelector(n)?.textContent||'').trim();return{ident:t('ident'),name:t('name'),pos_lat:t('pos_lat'),pos_long:t('pos_long'),altitude_feet:t('altitude_feet'),type:t('type')}})}}
+    if(!fp.length){const st=d.fetch&&d.fetch.status?' SimBrief said: '+d.fetch.status+'.':'';throw new Error('No waypoints found in the SimBrief plan.'+st+' Response fields: '+(Object.keys(d).join(', ')||'none')+'.')}
+    const imported={origin:d.origin&&d.origin.icao_code,destination:d.destination&&d.destination.icao_code};
     route=fp.map((w,i)=>({
       id:w.ident||('WP'+(i+1)),
       name:w.name||w.ident||'Waypoint',
@@ -384,7 +387,7 @@ $('#bSim').onclick=async()=>{
     })).filter(w=>!isNaN(w.lat)&&!isNaN(w.lon));
     save();trav=0;panel='route';render();
     if(route.length){V.lon=route[0].lon;V.lat=route[0].lat;V.tz=null;setFol(false)}
-    alert('SimBrief plan loaded: '+(d.origin?d.origin.icao_code:'')+' → '+(d.destination?d.destination.icao_code:'')+' ('+route.length+' waypoints)');
+    alert('SimBrief plan loaded: '+(imported.origin||'')+' → '+(imported.destination||'')+' ('+route.length+' waypoints)');
   }catch(e){
     alert('SimBrief import error: '+(e.message||e));
   }

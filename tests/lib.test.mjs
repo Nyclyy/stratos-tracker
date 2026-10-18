@@ -17,6 +17,7 @@ import {
   searchPlaces, createSavedRoute, renameSavedRoute, duplicateSavedRoute, estimateFlightTime,
 } from '../app/js/lib/planner.js';
 import { parseTelemetry, getResourceProfile, RESOURCE_MODES } from '../app/js/lib/telemetry.js';
+import { fetchSimbriefPlan, simbriefQuery } from '../app/js/lib/simbrief.js';
 
 const KSFO = { lat: 37.6188, lon: -122.3754 };
 const KLAX = { lat: 33.9425, lon: -118.4081 };
@@ -352,4 +353,35 @@ test('resource profiles expose consistent keys', () => {
     assert.ok(profile.mapFps > 0 && profile.streamHz > 0 && profile.trafficIntervalMs >= 1000);
   }
   assert.equal(getResourceProfile('nope').key, 'normal');
+});
+
+test('simbrief: query uses userid for numeric Pilot IDs and username otherwise', () => {
+  assert.equal(simbriefQuery('123456'), 'userid=123456');
+  assert.equal(simbriefQuery(' pilot 1 '), 'username=pilot%201');
+});
+
+test('simbrief: reads navlog fixes from JSON and rejects a plan with no waypoints', async () => {
+  const realFetch = globalThis.fetch;
+  const respond = body => ({ ok: true, status: 200, json: async () => body, text: async () => '' });
+  try {
+    globalThis.fetch = async () => respond({ origin: { icao_code: 'KSFO' }, destination: { icao_code: 'KLAX' }, navlog: { fix: [{ ident: 'SADDE', pos_lat: '37.6', pos_long: '-122.4', type: 'fix' }] } });
+    const plan = await fetchSimbriefPlan('pilot');
+    assert.equal(plan.origin, 'KSFO');
+    assert.equal(plan.fixes[0].ident, 'SADDE');
+
+    const { DOMParser: LinkedDOMParser } = await import('linkedom');
+    globalThis.DOMParser ??= LinkedDOMParser;
+    const xml = '<OFP><navlog><fix><ident>DCT1</ident><pos_lat>40.1</pos_lat><pos_long>-75.2</pos_long><type>fix</type></fix></navlog></OFP>';
+    globalThis.fetch = async (url) => (url.includes('json=v2')
+      ? respond({ fetch: { status: 'Error: nothing' } })
+      : { ok: true, status: 200, json: async () => ({}), text: async () => xml });
+    const fromXml = await fetchSimbriefPlan('pilot');
+    assert.equal(fromXml.fixes[0].ident, 'DCT1');
+    assert.equal(fromXml.fixes[0].pos_lat, '40.1');
+
+    globalThis.fetch = async () => respond({ fetch: { status: 'Error: nothing' } });
+    await assert.rejects(fetchSimbriefPlan('pilot'), /No waypoints found.*Error: nothing/);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
