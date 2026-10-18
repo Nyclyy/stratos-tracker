@@ -6,7 +6,6 @@
 <title>Stratos - flight tracker and charts</title>
 <style>
 :root{--bg:#bcd6e4;--land:#efe9d6;--coast:#5c7b8b;--grid:rgba(40,70,90,.16);--ap:#c2410c;--nav:#0f766e;--route:#6d28d9;--own:#e11d48;--txt:#1b2a33;--ui:rgba(255,253,246,.94);--ui2:#e6e0cd;--mut:#5d6b73;--trf:#1d4ed8;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-:root[data-theme=night]{--bg:#0b1118;--land:#15222d;--coast:#3d5a6e;--grid:rgba(150,190,220,.11);--ap:#fb923c;--nav:#2dd4bf;--route:#a78bfa;--own:#fb7185;--txt:#dce8ef;--ui:rgba(14,26,37,.94);--ui2:#1f3141;--mut:#8ea3b1;--trf:#7dd3fc;color-scheme:dark}
 :root[data-theme=contrast]{--bg:#000;--land:#0d0d0d;--coast:#fff;--grid:rgba(255,255,255,.3);--ap:#ff0;--nav:#0ff;--route:#f0f;--own:#fff;--txt:#fff;--ui:#000;--ui2:#333;--mut:#ddd;--trf:#7f7;color-scheme:dark}
 html,body{height:100%;min-height:100%;margin:0;background:var(--bg);color:var(--txt);font:14px/1.35 "Trebuchet MS","Segoe UI",system-ui,sans-serif;overscroll-behavior:none}
 #app{position:relative;height:100vh;height:100dvh;min-height:320px;overflow:hidden;isolation:isolate}
@@ -31,9 +30,14 @@ textarea{width:100%;height:150px;box-sizing:border-box;background:var(--ui2);col
 html{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}textarea,input{-webkit-user-select:text;user-select:text}button{min-height:36px}
 #chart{position:absolute;inset:0;background:var(--bg);z-index:5;display:none;overflow:auto;padding:10px}#chart svg{width:100%;max-height:60vh;display:block}
 @media(max-width:420px){#tel b{font-size:13px}#tel span{font-size:10px}#top{left:8px;right:62px;top:8px}#sb{padding:0 12px}#q{padding:12px 0;font-size:16px}#fab{right:8px;top:8px;gap:7px}.fab{width:42px;height:42px}#res{left:8px;right:58px;top:62px}#sheet{left:8px;right:8px;bottom:72px;max-height:min(48dvh,420px);padding:12px;border-radius:16px}#tabs{padding-bottom:max(7px,env(safe-area-inset-bottom));}button{padding:8px 10px}}
-:root{--acc:#2563eb}:root[data-theme=night]{--acc:#60a5fa}:root[data-theme=contrast]{--acc:#fde047}
+:root{--acc:#2563eb}:root[data-theme=contrast]{--acc:#fde047}
 html,body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,system-ui,sans-serif}
-.box,#sb,.fab,#lay,#st{-webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4)}
+/* Instrument surfaces. Opaque instead of a per-frame backdrop blur: the map
+   canvas repaints underneath, so blur would re-composite on every frame. */
+:root{--surface:color-mix(in srgb,var(--bg) 84%,var(--ui2))}
+.box,#sb,.fab,#lay,#st,#sheet,#res,#tabs,#fc,#cv,#tel{-webkit-backdrop-filter:none;backdrop-filter:none}
+.box,#sb,.fab,#lay,#st,#sheet,#res,#fc,#cv,#tel{background:var(--surface)}
+#res div,#tabs{border-color:var(--ui2)}
 button{border-radius:12px;padding:9px 14px;font-weight:600;border-color:transparent;background:var(--ui2)}
 button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-theme=contrast] button.on{color:#000}
 #top{position:absolute;top:10px;left:12px;right:72px;display:flex;flex-direction:column;gap:8px;max-width:520px;background:none;border:0;box-shadow:none;z-index:2}
@@ -79,7 +83,7 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 .mg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.mg>div{background:var(--ui2);border-radius:14px;padding:10px 12px}.mg b{display:block;font-size:24px;font-variant-numeric:tabular-nums;line-height:1.15}.mg span{font-size:11px;color:var(--mut);letter-spacing:.05em}.mg .big{grid-column:1/-1}.mg .big b{font-size:34px}
 .pill{border-radius:999px;padding:5px 11px;font-size:11px;font-weight:800;letter-spacing:.06em;background:var(--ui2);color:var(--mut);white-space:nowrap}.pill.on{background:rgba(52,211,153,.16);color:#34d399}
 .spark{width:100%;height:56px;display:block;margin-top:2px}.dot.lost{background:#fbbf24;box-shadow:0 0 8px #fbbf24}
-#cv{display:none;position:absolute;top:0;left:0;right:0;z-index:6;padding:10px 12px 8px;background:var(--ui);border-bottom:1px solid var(--ui2);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+#cv{display:none;position:absolute;top:0;left:0;right:0;z-index:6;padding:10px 12px 8px;background:var(--surface);border-bottom:1px solid var(--ui2)}
 .chartmode #cv{display:block}.cvh{display:flex;align-items:center;gap:10px}.cvt{flex:1;min-width:0;display:flex;flex-direction:column}.cvt b{font-size:22px}.cvt span{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #ci{display:none;position:absolute;left:0;right:0;bottom:0;top:124px;background:var(--bg);color:var(--txt);z-index:5;overflow:auto;padding:14px 16px 30px}.chartinfo #ci{display:block}
 .chartmode #top,.chartmode #fab,.chartmode #tabs,.chartmode #sheet,.chartmode #fc,.chartmode #lay,.chartmode #res{display:none!important}
@@ -87,6 +91,41 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 @media(min-width:768px){#attr{left:92px;bottom:8px}}
 #pdf{display:none;position:absolute;inset:0;z-index:9;background:var(--bg)}.pdh{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--ui);border-bottom:1px solid var(--ui2)}.pdh b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pdh a{font-size:12px;color:var(--mut)}
 .pdb{position:absolute;top:56px;left:0;right:0;bottom:0;overflow:auto;-webkit-overflow-scrolling:touch}#pdf2{width:100%;height:100%;border:0;background:#fff}
+/* ── Premium pass ──────────────────────────────────────────────────
+   Type, rhythm, controls and readouts. Uses only this page's tokens. */
+:root{
+  --r-sm:8px; --r-md:12px; --r-lg:18px;
+  --sh-1:0 1px 2px rgba(0,0,0,.16),0 6px 18px rgba(0,0,0,.14);
+  --sh-2:0 10px 30px rgba(0,0,0,.26);
+  --t-fast:110ms; --t:160ms; --ease:cubic-bezier(.2,.7,.3,1);
+}
+html,body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button{border-radius:var(--r-sm);min-height:34px;transition:background-color var(--t) var(--ease),border-color var(--t) var(--ease),color var(--t) var(--ease)}
+button:hover{border-color:var(--acc)}
+button.on{background:var(--acc);color:#06161d;border-color:var(--acc);border-radius:var(--r-sm)}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#sb{box-shadow:var(--sh-1);border-radius:999px}
+#res,#sheet,#lay,#cv{box-shadow:var(--sh-2)}
+#res{border-radius:var(--r-md);overscroll-behavior:contain}
+#res div{transition:background-color var(--t-fast) var(--ease)}
+#res div:hover,#lay button:hover{background:var(--ui2)}
+#sheet{border-radius:var(--r-lg)}
+.tab{border-radius:var(--r-sm);transition:color var(--t) var(--ease),background-color var(--t) var(--ease)}
+.tab.act{color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,transparent);box-shadow:inset 0 2px 0 var(--acc)}
+.fab{box-shadow:var(--sh-1)}
+.fr,.fg b,.mg b,#tel b,.pill,.pb s,.fh i{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+.fg b,.mg b{letter-spacing:-.03em;font-weight:750}
+.fh,.pill{letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+.mg>div{background:var(--ui2);border:1px solid color-mix(in srgb,var(--ui2) 60%,var(--coast));border-radius:var(--r-md);padding:12px 14px}
+.mg .big b{font-size:32px;line-height:1.1}
+table{font-size:13px}
+th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);font-weight:700;position:sticky;top:0;background:var(--surface);z-index:1}
+td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padding:6px}
+#sheet,#res,#ci{scrollbar-width:thin;scrollbar-color:var(--coast) transparent}
+#sheet::-webkit-scrollbar,#res::-webkit-scrollbar,#ci::-webkit-scrollbar{width:8px;height:8px}
+#sheet::-webkit-scrollbar-thumb,#res::-webkit-scrollbar-thumb,#ci::-webkit-scrollbar-thumb{background:var(--coast);border-radius:99px}
+@media(prefers-reduced-motion:reduce){*{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+@media(max-width:420px){button{min-height:38px}}
 </style></head><body><div id="app">
 <canvas id="map" aria-label="Aviation chart map"></canvas>
 <div id="attr">© OpenStreetMap contributors · Esri imagery</div>
