@@ -57,6 +57,12 @@ function renderNav() {
   });
 }
 
+function bindNav() {
+  document.querySelectorAll('[data-section]').forEach(button => {
+    button.addEventListener('click', () => buildContext().go(button.dataset.section));
+  });
+}
+
 function setBridgePill() {
   const el = document.getElementById('bridge-pill');
   if (!el) return;
@@ -122,6 +128,11 @@ async function boot() {
   const params = new URLSearchParams(location.search);
   if (params.get('mode') && getResourceProfile(params.get('mode'))) state.mode = params.get('mode');
 
+  // Honour deep links such as pilot.html#/replay?flight=ID from the logbook.
+  const initial = parseHash();
+  state.route = initial.route;
+  state.params = initial.params;
+  bindNav();
   renderNav();
   showSkeleton();
   await Promise.all([
