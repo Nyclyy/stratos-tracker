@@ -34,7 +34,9 @@ html{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}textar
 html,body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,system-ui,sans-serif}
 /* Instrument surfaces. Opaque instead of a per-frame backdrop blur: the map
    canvas repaints underneath, so blur would re-composite on every frame. */
-:root{--surface:color-mix(in srgb,var(--bg) 84%,var(--ui2))}
+:root{--surface:#c3d8e0}
+:root[data-theme=night]{--surface:#0d141c}
+:root[data-theme=contrast]{--surface:#080808}
 .box,#sb,.fab,#lay,#st,#sheet,#res,#tabs,#fc,#cv,#tel{-webkit-backdrop-filter:none;backdrop-filter:none}
 .box,#sb,.fab,#lay,#st,#sheet,#res,#fc,#cv,#tel{background:var(--surface)}
 #res div,#tabs{border-color:var(--ui2)}
