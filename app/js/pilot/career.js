@@ -3,29 +3,73 @@ import { getDashboardLayout, saveDashboardLayout } from '../lib/store.js';
 import { esc, fmtDate, hoursText, num, statTile, barChart, lineChart, tag, emptyState } from '../ui.js';
 import { flightRow } from './common.js';
 
+/** Tiles shown on a fresh dashboard. */
+export const DEFAULT_CARDS = ['hours', 'flights', 'distance', 'airports'];
+
+/** Everything the customizer can offer, in catalogue order. */
+export const WIDGETS = [
+  { key: 'hours', label: 'Flight hours' },
+  { key: 'flights', label: 'Completed flights' },
+  { key: 'distance', label: 'Distance' },
+  { key: 'airports', label: 'Airports visited' },
+  { key: 'landings', label: 'Landing quality' },
+  { key: 'aircraft', label: 'Aircraft flown' },
+  { key: 'rank', label: 'Current rank' },
+  { key: 'week', label: 'Flights this week' },
+  { key: 'month', label: 'Flights this month' },
+];
+
+export const WIDGET_KEYS = WIDGETS.map(widget => widget.key);
+
+/** Move one entry, clamping the destination. Returns a new array. */
+export function moveWidget(list, from, to) {
+  const next = Array.isArray(list) ? list.slice() : [];
+  if (from === to) return next;
+  if (from < 0 || from >= next.length || to < 0 || to >= next.length) return next;
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
+/** Coerce a stored layout into something safe to render: no unknown or duplicate keys. */
+export function normalizeLayout(saved) {
+  const raw = saved && Array.isArray(saved.cards) ? saved.cards : [];
+  const seen = new Set();
+  const cards = raw.filter(key => {
+    if (!WIDGET_KEYS.includes(key) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return {
+    cards: cards.length ? cards : DEFAULT_CARDS.slice(),
+    dense: Boolean(saved && saved.dense),
+  };
+}
+
 export async function mount(root, ctx) {
   const career = ctx.career;
   const flights = ctx.flights;
   let drill = null;
   let dialog = null;
 
-  const DEFAULT_CARDS = ['hours', 'flights', 'distance', 'airports'];
-  const CARD_META = {
-    hours: { label: 'Flight hours', render: () => statTile('Flight hours', hoursText(career.hours), `${career.flights} completed flights`, 'accent') },
-    flights: { label: 'Completed flights', render: () => statTile('Completed flights', num(career.flights), `${num(career.landings.count)} landings logged`) },
-    distance: { label: 'Distance', render: () => statTile('Distance', `${num(career.distanceNm)} nm`, `avg ${num(career.averageDistanceNm)} nm per flight`) },
-    airports: { label: 'Airports visited', render: () => statTile('Airports visited', num(career.airportsVisited), `${career.aircraftFlown} aircraft types`) },
-    landings: { label: 'Landing quality', render: () => statTile('Landing quality', career.landings.averageFpm != null ? `${career.landings.averageFpm} fpm` : '—', career.landings.count ? `average over ${career.landings.count} landings` : 'no landing data yet') },
-    aircraft: { label: 'Aircraft flown', render: () => statTile('Aircraft flown', num(career.aircraftFlown), `${career.airportsVisited} airports visited`) },
-    rank: { label: 'Current rank', render: () => statTile('Current rank', esc(career.rank.name), `${hoursText(career.hours)} recorded`) },
-    week: { label: 'Flights this week', render: () => statTile('This week', num(career.windows.week), 'completed flights') },
-    month: { label: 'Flights this month', render: () => statTile('This month', num(career.windows.month), 'completed flights') },
-  };
-  const saved = await getDashboardLayout().catch(() => null);
-  let cards = Array.isArray(saved?.cards) ? saved.cards.filter(key => CARD_META[key]) : DEFAULT_CARDS.slice();
-  if (!cards.length) cards = DEFAULT_CARDS.slice();
-  let dense = Boolean(saved?.dense);
+  const saved = normalizeLayout(await getDashboardLayout().catch(() => null));
+  let cards = saved.cards.slice();
+  let dense = saved.dense;
   root.classList.toggle('dash-dense', dense);
+
+  // One renderer per widget key. These only run for the widgets actually placed
+  // on the dashboard, so an unused tile costs nothing.
+  const RENDER = {
+    hours: () => statTile('Flight hours', hoursText(career.hours), `${career.flights} completed flights`, 'accent'),
+    flights: () => statTile('Completed flights', num(career.flights), `${num(career.landings.count)} landings logged`),
+    distance: () => statTile('Distance', `${num(career.distanceNm)} nm`, `avg ${num(career.averageDistanceNm)} nm per flight`),
+    airports: () => statTile('Airports visited', num(career.airportsVisited), `${career.aircraftFlown} aircraft types`),
+    landings: () => statTile('Landing quality', career.landings.averageFpm != null ? `${career.landings.averageFpm} fpm` : '—', career.landings.count ? `average over ${career.landings.count} landings` : 'no landing data yet'),
+    aircraft: () => statTile('Aircraft flown', num(career.aircraftFlown), `${career.airportsVisited} airports visited`),
+    rank: () => statTile('Current rank', esc(career.rank.name), `${hoursText(career.hours)} recorded`),
+    week: () => statTile('This week', num(career.windows.week), 'completed flights'),
+    month: () => statTile('This month', num(career.windows.month), 'completed flights'),
+  };
 
   const completed = flights.filter(f => f.complete && !f.incomplete);
   const incomplete = flights.filter(f => !f.complete || f.incomplete);
@@ -86,7 +130,7 @@ export async function mount(root, ctx) {
       </div>
 
       <div class="grid grid-4 dashboard-cards">
-        ${cards.map(key => `<div data-card="${key}">${CARD_META[key].render()}</div>`).join('')}
+        ${cards.map(key => RENDER[key]()).join('')}
       </div>
 
       <div class="section-title"><h2>Progress</h2><span class="hint">Ranks are milestones based on recorded hours, not a licence.</span></div>
@@ -195,61 +239,147 @@ export async function mount(root, ctx) {
     root.querySelector('[data-customize]')?.addEventListener('click', openCustomize);
   };
 
+  function widgetRow(key, on) {
+    const meta = WIDGETS.find(widget => widget.key === key) || { label: key };
+    return `<div class="row widget-row" data-key="${key}" role="listitem">
+        <button class="drag-handle" data-drag aria-label="Reorder ${esc(meta.label)}" title="Drag to reorder">⠿</button>
+        <label class="row" style="align-items:center;gap:8px;flex:1;cursor:pointer"><input type="checkbox" value="${key}" ${on ? 'checked' : ''}> <span>${esc(meta.label)}</span></label>
+        <span class="muted small widget-pos" data-pos>0</span>
+        <button class="btn small ghost" data-up="${key}" aria-label="Move ${esc(meta.label)} up">↑</button>
+        <button class="btn small ghost" data-down="${key}" aria-label="Move ${esc(meta.label)} down">↓</button>
+      </div>`;
+  }
+
+  function focusCustomize() {
+    const button = root.querySelector('[data-customize]');
+    if (button && typeof button.focus === 'function') button.focus();
+  }
+
   function openCustomize() {
     dialog?.remove();
     dialog = document.createElement('div');
     dialog.className = 'dialog-backdrop';
-    const enabled = new Set(cards);
-    dialog.innerHTML = `<div class="dialog" role="dialog" aria-modal="true" aria-label="Customize dashboard">
-      <div class="row" style="margin-bottom:12px"><h2>Dashboard widgets</h2><span class="spacer"></span><button class="btn small" data-close>Close</button></div>
-      <p class="help" style="margin-top:0">Choose the tiles shown at the top and put them in the order you want. Layout is stored on this device.</p>
-      <div id="widget-list" class="stack">
-        ${Object.keys(CARD_META).map(key => `<div class="row widget-row" data-key="${key}" style="align-items:center;gap:8px;border:1px solid var(--coast);border-radius:10px;padding:8px 10px">
-          <label class="row" style="align-items:center;gap:8px;flex:1;cursor:pointer"><input type="checkbox" value="${key}" ${enabled.has(key) ? 'checked' : ''}> <span>${esc(CARD_META[key].label)}</span></label>
-          <button class="btn small ghost" data-up="${key}" aria-label="Move up">↑</button>
-          <button class="btn small ghost" data-down="${key}" aria-label="Move down">↓</button>
-        </div>`).join('')}
+    // Placed widgets keep their order; the rest follow as available to add.
+    const order = cards.concat(WIDGET_KEYS.filter(key => !cards.includes(key)));
+    const placed = new Set(cards);
+    dialog.innerHTML = `<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dash-customize-title">
+      <div class="row" style="margin-bottom:10px"><h2 id="dash-customize-title">Dashboard widgets</h2><span class="spacer"></span><button class="btn small" data-close>Close</button></div>
+      <p class="help" style="margin-top:0">Drag a row by its handle, or use the arrows, to set the order. Untick a widget to remove it. The layout is saved on this device.</p>
+      <div id="widget-list" class="stack" role="list">
+        ${order.map(key => widgetRow(key, placed.has(key))).join('')}
       </div>
+      <p class="sr-only" id="widget-status" role="status" aria-live="polite"></p>
       <label class="row" style="align-items:center;gap:8px;margin-top:12px;cursor:pointer"><input type="checkbox" id="dash-dense" ${dense ? 'checked' : ''}> Compact tiles</label>
-      <div class="btn-row" style="margin-top:14px"><button class="btn primary" data-save>Save layout</button><button class="btn ghost" data-reset>Reset default</button></div>
+      <div class="btn-row" style="margin-top:14px"><button class="btn primary" data-save>Save layout</button><button class="btn ghost" data-reset>Reset to default</button></div>
     </div>`;
     document.body.appendChild(dialog);
-    const close = () => { dialog?.remove(); dialog = null; };
+
+    const list = dialog.querySelector('#widget-list');
+    const status = dialog.querySelector('#widget-status');
+    const rows = () => [...list.querySelectorAll('.widget-row')];
+    const orderOf = () => rows().map(row => row.dataset.key);
+    const labelOf = key => (WIDGETS.find(widget => widget.key === key) || { label: key }).label;
+    const renumber = () => rows().forEach((row, index) => {
+      const position = row.querySelector('[data-pos]');
+      if (position) position.textContent = String(index + 1);
+    });
+    const announce = message => { if (status) status.textContent = message; };
+    // One place applies an ordering, so dragging and the arrows cannot disagree.
+    const applyOrder = next => {
+      for (const key of next) {
+        const row = list.querySelector(`.widget-row[data-key="${key}"]`);
+        if (row) list.appendChild(row);
+      }
+      renumber();
+    };
+    renumber();
+
+    const close = () => {
+      dialog?.remove();
+      dialog = null;
+      focusCustomize();
+    };
     dialog.addEventListener('click', event => { if (event.target === dialog) close(); });
+    dialog.addEventListener('keydown', event => {
+      if (event.key === 'Escape') { event.stopPropagation(); close(); }
+    });
     dialog.querySelector('[data-close]').addEventListener('click', close);
-    dialog.querySelectorAll('[data-up]').forEach(button => button.addEventListener('click', () => {
-      const row = button.closest('.widget-row');
-      const previous = row.previousElementSibling;
-      if (previous) row.parentElement.insertBefore(row, previous);
-    }));
-    dialog.querySelectorAll('[data-down]').forEach(button => button.addEventListener('click', () => {
-      const row = button.closest('.widget-row');
-      const next = row.nextElementSibling;
-      if (next) row.parentElement.insertBefore(next, row);
-    }));
+
+    const step = (key, delta) => {
+      const current = orderOf();
+      const index = current.indexOf(key);
+      const next = moveWidget(current, index, index + delta);
+      if (next.join() === current.join()) return;
+      applyOrder(next);
+      announce(`${labelOf(key)} moved to position ${next.indexOf(key) + 1} of ${next.length}.`);
+    };
+    dialog.querySelectorAll('[data-up]').forEach(button => button.addEventListener('click', () => step(button.dataset.up, -1)));
+    dialog.querySelectorAll('[data-down]').forEach(button => button.addEventListener('click', () => step(button.dataset.down, 1)));
+
+    // Pointer dragging covers mouse and touch; the arrows stay for keyboard use.
+    let dragKey = null;
+    const endDrag = () => {
+      if (!dragKey) return;
+      list.querySelector(`.widget-row[data-key="${dragKey}"]`)?.classList.remove('dragging');
+      announce(`${labelOf(dragKey)} moved to position ${orderOf().indexOf(dragKey) + 1} of ${rows().length}.`);
+      dragKey = null;
+    };
+    list.addEventListener('pointerdown', event => {
+      const handle = event.target.closest?.('[data-drag]');
+      if (!handle) return;
+      const row = handle.closest('.widget-row');
+      if (!row) return;
+      dragKey = row.dataset.key;
+      row.classList.add('dragging');
+      handle.setPointerCapture?.(event.pointerId);
+      event.preventDefault();
+    });
+    list.addEventListener('pointermove', event => {
+      if (!dragKey || typeof document.elementFromPoint !== 'function') return;
+      const over = document.elementFromPoint(event.clientX, event.clientY)?.closest?.('.widget-row');
+      if (!over || over.dataset.key === dragKey) return;
+      const dragged = list.querySelector(`.widget-row[data-key="${dragKey}"]`);
+      if (!dragged) return;
+      const box = over.getBoundingClientRect();
+      const after = event.clientY > box.top + box.height / 2;
+      list.insertBefore(dragged, after ? over.nextSibling : over);
+      renumber();
+    });
+    list.addEventListener('pointerup', endDrag);
+    list.addEventListener('pointercancel', endDrag);
+
     dialog.querySelector('[data-reset]').addEventListener('click', async () => {
       cards = DEFAULT_CARDS.slice();
       dense = false;
-      try { await saveDashboardLayout({ cards, dense }); }
+      try { await saveDashboardLayout({ cards: cards.slice(), dense, version: 1 }); }
       catch (_) { ctx.toast('The layout could not be saved on this device.', 'bad'); return; }
       root.classList.toggle('dash-dense', dense);
       close();
       render();
-      ctx.toast('Dashboard layout reset.');
+      focusCustomize();
+      ctx.toast('Dashboard layout reset to the default tiles.', 'good');
     });
+
     dialog.querySelector('[data-save]').addEventListener('click', async () => {
-      const chosen = [...dialog.querySelectorAll('#widget-list input:checked')].map(input => input.value).filter(key => CARD_META[key]);
+      const chosen = rows()
+        .filter(row => row.querySelector('input[type="checkbox"]')?.checked)
+        .map(row => row.dataset.key)
+        .filter(key => WIDGET_KEYS.includes(key));
       if (!chosen.length) { ctx.toast('Choose at least one widget.', 'bad'); return; }
-      cards = chosen;
       const nextDense = Boolean(dialog.querySelector('#dash-dense').checked);
-      try { await saveDashboardLayout({ cards, dense: nextDense }); }
+      try { await saveDashboardLayout({ cards: chosen, dense: nextDense, version: 1 }); }
       catch (_) { ctx.toast('The layout could not be saved on this device.', 'bad'); return; }
+      cards = chosen;
       dense = nextDense;
       root.classList.toggle('dash-dense', dense);
       close();
       render();
+      focusCustomize();
       ctx.toast('Dashboard layout saved.', 'good');
     });
+
+    const firstHandle = list.querySelector('[data-drag]');
+    if (firstHandle && typeof firstHandle.focus === 'function') firstHandle.focus();
   }
 
   render();

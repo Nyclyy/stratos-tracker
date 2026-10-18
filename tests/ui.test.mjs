@@ -26,7 +26,7 @@ function installDom() {
 test('career dashboard renders and opens its widget customizer', async () => {
   installDom();
   const { computeCareer } = await import('../app/js/lib/stats.js');
-  const { mount } = await import('../app/js/pilot/career.js');
+  const { mount, WIDGET_KEYS } = await import('../app/js/pilot/career.js');
   const now = Date.now();
   const flights = Array.from({ length: 12 }, (_, index) => ({
     id: `f${index}`,
@@ -56,7 +56,9 @@ test('career dashboard renders and opens its widget customizer', async () => {
   assert.ok(customize, 'customize button exists');
   customize.dispatchEvent(new window.Event('click', { bubbles: true }));
   assert.ok(document.querySelector('.dialog-backdrop'), 'dialog opens');
-  assert.equal(document.querySelectorAll('.widget-row').length, 9);
+  // Every catalogued widget is offered, so the count follows the catalogue.
+  assert.equal(document.querySelectorAll('.widget-row').length, WIDGET_KEYS.length);
+  assert.ok(document.querySelector('.widget-row [data-drag]'), 'rows expose a drag handle');
 });
 
 test('settings page renders bridge and phone sections', async () => {
@@ -75,4 +77,52 @@ test('settings page renders bridge and phone sections', async () => {
   assert.match(root.textContent, /Simulator bridge/);
   assert.match(root.textContent, /Phone access/);
   assert.match(root.textContent, /Resource profile/);
+});
+
+test('dashboard layout helpers clamp moves and reject bad stored data', async () => {
+  const { moveWidget, normalizeLayout, DEFAULT_CARDS, WIDGET_KEYS } = await import('../app/js/pilot/career.js');
+  assert.deepEqual(moveWidget(['a', 'b', 'c'], 0, 2), ['b', 'c', 'a']);
+  assert.deepEqual(moveWidget(['a', 'b', 'c'], 2, 0), ['c', 'a', 'b']);
+  assert.deepEqual(moveWidget(['a', 'b', 'c'], 1, 1), ['a', 'b', 'c'], 'no-op move keeps order');
+  assert.deepEqual(moveWidget(['a', 'b', 'c'], 0, 9), ['a', 'b', 'c'], 'out of range is ignored');
+  assert.deepEqual(moveWidget(['a', 'b', 'c'], -1, 0), ['a', 'b', 'c'], 'negative index is ignored');
+  assert.deepEqual(moveWidget(null, 0, 1), []);
+
+  assert.deepEqual(normalizeLayout(null).cards, DEFAULT_CARDS, 'missing layout falls back');
+  assert.deepEqual(normalizeLayout({ cards: [] }).cards, DEFAULT_CARDS, 'empty layout falls back');
+  assert.deepEqual(normalizeLayout({ cards: ['bogus'] }).cards, DEFAULT_CARDS, 'unknown keys fall back');
+  assert.deepEqual(normalizeLayout({ cards: ['rank', 'rank', 'bogus', 'week'] }).cards, ['rank', 'week'], 'duplicates and unknown keys dropped');
+  assert.equal(normalizeLayout({ cards: ['week'], dense: 1 }).dense, true);
+  assert.equal(normalizeLayout({ cards: ['week'] }).dense, false);
+  for (const key of normalizeLayout({ cards: ['rank', 'week'] }).cards) {
+    assert.ok(WIDGET_KEYS.includes(key), `${key} is a real widget`);
+  }
+});
+
+test('customizer arrows reorder rows and renumber positions', async () => {
+  installDom();
+  const { computeCareer } = await import('../app/js/lib/stats.js');
+  const { mount } = await import('../app/js/pilot/career.js');
+  const now = Date.now();
+  const flights = Array.from({ length: 3 }, (_, index) => ({
+    id: `r${index}`, complete: true, startTime: now - index * 86400000,
+    takeoffTime: now - index * 86400000, landingTime: now - index * 86400000 + 3600000,
+    depAirport: 'EGLL', arrAirport: 'KJFK', aircraft: 'B738', distanceNm: 3000,
+    maxAlt: 35000, landing: { vsFpm: -140, gsKt: 130, runway: { id: '27L' } }, track: [],
+  }));
+  const root = document.getElementById('view');
+  await mount(root, { career: computeCareer(flights), flights, toast() {}, openFlight() {}, async reload() {} });
+  root.querySelector('[data-customize]').dispatchEvent(new window.Event('click', { bubbles: true }));
+
+  const rows = () => [...document.querySelectorAll('.widget-row')];
+  const firstKey = rows()[0].dataset.key;
+  assert.equal(rows()[0].querySelector('[data-pos]').textContent, '1');
+  rows()[0].querySelector('[data-down]').dispatchEvent(new window.Event('click', { bubbles: true }));
+  assert.equal(rows()[1].dataset.key, firstKey, 'row moved down one place');
+  assert.equal(rows()[1].querySelector('[data-pos]').textContent, '2', 'positions renumber');
+
+  // Moving the first row up is a no-op, not a crash.
+  const topKey = rows()[0].dataset.key;
+  rows()[0].querySelector('[data-up]').dispatchEvent(new window.Event('click', { bubbles: true }));
+  assert.equal(rows()[0].dataset.key, topKey);
 });

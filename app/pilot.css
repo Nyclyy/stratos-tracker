@@ -300,4 +300,20 @@ textarea.input { min-height: 110px; resize: vertical; font-family: var(--mono); 
 .dash-dense .dashboard-cards .stat { padding: 9px 12px; }
 .dash-dense .dashboard-cards .stat-value { font-size: 20px; }
 .dash-dense .dashboard-cards .stat-hint { display: none; }
-.widget-row[data-key] { background: color-mix(in srgb, var(--ui2) 60%, transparent); }
+.widget-row[data-key] {
+  background: color-mix(in srgb, var(--ui2) 60%, transparent);
+  align-items: center; gap: 8px; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: var(--radius);
+}
+.widget-row.dragging { opacity: .6; border-color: var(--acc); }
+.drag-handle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 30px; padding: 0; flex: 0 0 auto;
+  background: transparent; border: 1px solid transparent;
+  border-radius: var(--radius-sm); color: var(--mut);
+  cursor: grab; touch-action: none; font-size: 14px; line-height: 1;
+}
+.drag-handle:hover { color: var(--txt); border-color: var(--line); }
+.drag-handle:active { cursor: grabbing; }
+.widget-pos { min-width: 1.6em; text-align: right; font-variant-numeric: tabular-nums; }
+@media(max-width:480px) { .widget-row[data-key] { flex-wrap: wrap; } }
