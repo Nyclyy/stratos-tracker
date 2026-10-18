@@ -75,3 +75,19 @@ test('pilot section modules evaluate without a browser DOM', async () => {
     );
   }
 });
+
+test('the shipped version is stamped the same in the app, the bridge and the package', () => {
+  const root = path.resolve(import.meta.dirname, '..');
+  const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+  const pkg = JSON.parse(read('package.json')).version;
+  const bridge = read('bridge_logbook_addon.py').match(/^VERSION = "([^"]+)"/m)?.[1];
+  const settings = read('app/js/pilot/settings.js')
+    .match(/<strong>Stratos<\/strong><span class="tag">v([\d.]+)<\/span>/)?.[1];
+  assert.match(pkg, /^\d+\.\d+\.\d+$/, 'package.json carries a release version');
+  assert.equal(bridge, pkg, 'the bridge reports the release version');
+  assert.equal(settings, pkg, 'the Settings page shows the release version');
+  const stamp = read('scripts/stamp-version.py');
+  for (const file of ['bridge_logbook_addon.py', 'app/js/pilot/settings.js']) {
+    assert.ok(stamp.includes(file), `the release stamp updates ${file}`);
+  }
+});
