@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08151d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Stratos Live">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Live simulator telemetry from your PC on your phone, securely paired through the Stratos relay.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="stratos-ui.css">
+<link rel="stylesheet" href="pilot.css">
+<style>
+  .live-shell { max-width: 620px; margin: 0 auto; padding: 14px 14px calc(84px + env(safe-area-inset-bottom)); }
+  .live-hero { display: flex; flex-direction: column; gap: 6px; padding: 18px; border-radius: 18px; border: 1px solid var(--coast); background: var(--ui2); }
+  .live-route { font-family: var(--mono); font-size: 26px; font-weight: 700; letter-spacing: .02em; }
+  .telemetry { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .telemetry .stat { padding: 13px 14px; }
+  .telemetry .stat-value { font-size: 28px; }
+  .live-map { height: 260px; }
+  .pair-card { max-width: 440px; margin: 30px auto; }
+  .bottom-live { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 2px; padding: 6px 8px calc(8px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--bg) 92%, transparent); border-top: 1px solid var(--coast); backdrop-filter: blur(12px); z-index: 30; }
+  .bottom-live a { flex: 1; text-align: center; font-size: 11px; color: var(--mut); padding: 7px 0; border-radius: 8px; }
+  .bottom-live a[aria-current="page"] { color: var(--txt); background: var(--ui2); }
+  .bottom-live b { display: block; font-size: 18px; line-height: 1.2; }
+</style>
+<title>Live · Stratos</title>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true">✈</span><span>STRATOS<small>LIVE</small></span></a>
+    <span class="spacer"></span>
+    <div id="live-status" class="status-inline" role="status" aria-live="polite"><i class="dot dot-disconnected"></i><span>Not connected</span></div>
+  </header>
+  <main id="live-view" class="live-shell"></main>
+  <nav class="bottom-live" aria-label="Bottom navigation">
+    <a href="index.html"><b>⊕</b>Map</a>
+    <a href="live.html" aria-current="page"><b>◉</b>Live</a>
+    <a href="logbook.html"><b>▤</b>Logbook</a>
+    <a href="pilot.html"><b>◈</b>Pilot</a>
+  </nav>
+</div>
+<script type="module" src="js/live.js"></script>
+</body>
+</html>

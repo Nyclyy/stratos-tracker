@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.vercel/
+.env
+.env.*
+*.log
+__pycache__/
+*.pyc
+stratos_pack.json
+relay/data/
+.DS_Store
+Thumbs.db

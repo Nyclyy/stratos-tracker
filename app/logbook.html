@@ -224,6 +224,7 @@ a { color: var(--acc); }
   <a class="home" href="index.html">STRA<span>T</span>OS</a>
   <h1>Logbook</h1>
   <div class="spacer"></div>
+  <a class="topbar-btn" href="pilot.html">Pilot</a>
   <button class="topbar-btn" onclick="exportCSV()">Export CSV</button>
 </header>
 
@@ -303,18 +304,24 @@ a { color: var(--acc); }
 <nav id="bottom-nav">
   <a class="bnav-item" href="index.html"><span class="icon">⊕</span>Map</a>
   <a class="bnav-item" href="weather.html"><span class="icon">⛅</span>Weather</a>
+  <a class="bnav-item" href="live.html"><span class="icon">◉</span>Live</a>
   <a class="bnav-item act" href="#overview" onclick="switchTab(document.querySelector('.tab-btn[data-tab=overview]')); return false;"><span class="icon">📋</span>Logbook</a>
+  <a class="bnav-item" href="pilot.html"><span class="icon">◈</span>Pilot</a>
   <a class="bnav-item" href="#profile" onclick="switchTab(document.querySelector('.tab-btn[data-tab=profile]')); return false;"><span class="icon">✈</span>Profile</a>
 </nav>
 
 </div>
+<script type="module">
+  import { BUNDLED_AIRPORTS } from './js/data/airports.js';
+  window.StratosAirports = BUNDLED_AIRPORTS;
+</script>
 <script>
 'use strict';
 
 /* ════════════════════════════════════════════════════════════════════
    STORAGE  (IndexedDB with localStorage fallback)
 ═══════════════════════════════════════════════════════════════════════ */
-const DB_NAME = 'stratos_logbook', DB_VER = 2;
+const DB_NAME = 'stratos_logbook', DB_VER = 3;
 let db = null;
 
 function idbOpen() {
@@ -329,6 +336,9 @@ function idbOpen() {
       }
       if (!d.objectStoreNames.contains('profile')) {
         d.createObjectStore('profile', { keyPath: 'key' });
+      }
+      if (!d.objectStoreNames.contains('settings')) {
+        d.createObjectStore('settings', { keyPath: 'key' });
       }
     };
     req.onsuccess = e => { db = e.target.result; res(db); };
@@ -541,9 +551,18 @@ function haversineNm(a, b) {
 }
 
 function nearestAirport(lat, lon) {
-  // Uses airport data embedded in stratos.html if available on same origin
-  // Fallback: reverse-geocode guess from coordinates
-  return null; // Will be populated when bridge sends airport ID
+  // Bundled OurAirports snapshot (loaded as an ES module in this page).
+  const list = window.StratosAirports || [];
+  let best = null, bestNm = 8;
+  const toRad = Math.PI / 180;
+  for (const airport of list) {
+    const dLat = (airport.lat - lat) * toRad;
+    const dLon = (airport.lon - lon) * toRad;
+    const h = Math.sin(dLat/2)**2 + Math.cos(lat*toRad)*Math.cos(airport.lat*toRad)*Math.sin(dLon/2)**2;
+    const nm = 3440.065 * 2 * Math.asin(Math.sqrt(Math.min(1, Math.max(0, h))));
+    if (nm < bestNm) { bestNm = nm; best = airport.id; }
+  }
+  return best;
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -552,14 +571,31 @@ function nearestAirport(lat, lon) {
 let bridgeES = null, bridgeConnected = false;
 let liveFlightSeconds = 0;
 
+let bridgeOwnsRecording = false;
+let lastBridgePhase = null;
+let lastBridgeSync = 0;
+
 function connectBridge(base) {
   if (bridgeES) bridgeES.close();
   try {
-    bridgeES = new EventSource(base + '/stream');
+    bridgeES = new EventSource(base + '/stream?hz=2');
+    bridgeES.onopen = () => { bridgeConnected = true; syncBridgeLogbook(base, true); };
     bridgeES.onmessage = e => {
       try {
         const data = JSON.parse(e.data);
         bridgeConnected = true;
+        // The bridge records flights in its own logbook, including landing
+        // analytics. The browser must not create a second copy.
+        if (typeof data.flightPhase === 'string') {
+          bridgeOwnsRecording = true;
+          updateBridgeLive(data);
+          const phase = data.flightPhase;
+          if (phase === 'PARKED' && lastBridgePhase && lastBridgePhase !== 'PARKED') {
+            setTimeout(() => syncBridgeLogbook(base, false), 1500);
+          }
+          lastBridgePhase = phase;
+          return;
+        }
         processTelemetry(data);
       } catch(_) {}
     };
@@ -567,9 +603,54 @@ function connectBridge(base) {
   } catch(_) {}
 }
 
+function updateBridgeLive(data) {
+  const bar = document.getElementById('live-bar');
+  if (!bar) return;
+  if (data.flightPhase === 'PARKED' && !data.currentFlight) { bar.classList.remove('show'); return; }
+  bar.classList.add('show');
+  document.getElementById('live-state-label').textContent = data.flightPhase || 'PARKED';
+  const flight = data.currentFlight;
+  if (flight && flight.takeoffTime) {
+    clearInterval(liveTimerInt);
+    const tick = () => {
+      const seconds = Math.max(0, Math.floor((Date.now() - flight.takeoffTime) / 1000));
+      document.getElementById('live-timer').textContent = fmtDurSec(seconds);
+    };
+    tick();
+    liveTimerInt = setInterval(tick, 1000);
+  }
+}
+
+async function syncBridgeLogbook(base, quiet) {
+  if (Date.now() - lastBridgeSync < 5000) return;
+  lastBridgeSync = Date.now();
+  try {
+    const response = await fetch(base + '/logbook.json', { cache: 'no-store', credentials: location.protocol === 'file:' ? 'omit' : 'include' });
+    if (!response.ok) return;
+    const remote = await response.json();
+    if (!Array.isArray(remote) || !remote.length) return;
+    const local = await dbAll('flights');
+    const known = new Set(local.map(f => f.id));
+    let added = 0;
+    for (const flight of remote) {
+      if (!flight || !flight.id) continue;
+      if (known.has(flight.id)) continue;
+      await dbPut('flights', { ...flight, recordedBy: flight.recordedBy || 'bridge' });
+      known.add(flight.id);
+      added++;
+    }
+    if (added) {
+      await loadAndRender();
+      if (!quiet) showToast('Imported ' + added + ' flight' + (added === 1 ? '' : 's') + ' from the bridge.');
+    }
+  } catch (_) {}
+}
+
 // Auto-connect if on local bridge
 if (location.protocol === 'http:') {
   connectBridge(location.origin);
+} else if (location.protocol === 'file:') {
+  connectBridge('http://127.0.0.1:8765');
 }
 
 function updateLiveBar(f) {
@@ -795,9 +876,10 @@ function renderOverview() {
         <p style="margin:0;font-size:13px">Flights are automatically recorded when you fly in X-Plane 12 or MSFS with the Stratos bridge running.</p>
         <div style="background:var(--ui2);border:1px solid var(--coast);border-radius:12px;padding:14px;margin-top:14px;text-align:left;font-size:13px">
           <b style="display:block;margin-bottom:8px">To start logging:</b>
-          1. Run <code style="background:var(--land);padding:2px 6px;border-radius:4px">python3 stratos_bridge.py</code> on your PC<br>
-          2. Open X-Plane 12 or MSFS and start a flight<br>
-          3. Open this page via <code style="background:var(--land);padding:2px 6px;border-radius:4px">http://[your-PC-IP]:8765/logbook.html</code>
+          1. Open the Stratos desktop app — it starts the bridge automatically<br>
+          2. Start a flight in X-Plane 12 or MSFS 2020/2024<br>
+          3. Flights import here automatically when the bridge is reachable<br>
+          <span style="color:var(--mut)">Manual start: <code style="background:var(--land);padding:2px 6px;border-radius:4px">python3 stratos_bridge.py</code> (X-Plane needs UDP rows 3, 17, 20; MSFS needs <code>pip install SimConnect</code>)</span>
         </div>
       </div>`;
   } else {
@@ -843,13 +925,18 @@ function flightRowHtml(f) {
   const dist = f.distanceNm ? f.distanceNm.toFixed(0) + ' nm' : '—';
   const date = f.startTime ? new Date(f.startTime).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}) : '—';
   const incomplete = f.incomplete || !f.complete;
+  const landing = f.landing && f.landing.vsFpm != null ? f.landing : null;
+  const landingText = landing
+    ? landing.vsFpm + ' fpm' + (landing.runway ? ' · RWY ' + landing.runway.id : '') + (landing.classification ? ' · ' + landing.classification.key : '')
+    : (f.landingVS != null ? Math.round(f.landingVS) + ' fpm' : '');
+  const replayable = Array.isArray(f.track) && f.track.length > 1;
   return `<div class="flight-row ${incomplete?'fl-incomplete':''}" onclick="openFlight('${f.id}')">
     <div class="fl-badge">${dep}→${arr}</div>
     <div class="fl-main">
       <div class="fl-route">${dep} → ${arr}</div>
-      <div class="fl-sub">${f.aircraft || '—'} ${f.callsign ? '· ' + f.callsign : ''} ${incomplete ? '· <span style="color:var(--warn)">Incomplete</span>' : ''}</div>
+      <div class="fl-sub">${f.aircraft || '—'} ${f.callsign ? '· ' + f.callsign : ''} ${landingText ? '· ' + landingText : ''} ${incomplete ? '· <span style="color:var(--warn)">Incomplete</span>' : ''}</div>
     </div>
-    <div class="fl-right"><b>${dur}</b>${dist}<br><span>${date}</span></div>
+    <div class="fl-right"><b>${dur}</b>${dist}<br><span>${date}</span>${replayable ? '<br><span style="color:var(--acc)">Replay ›</span>' : ''}</div>
   </div>`;
 }
 
@@ -863,7 +950,7 @@ function renderAircraft() {
     return;
   }
   el.innerHTML = sorted.map(([name, data]) => `
-    <div class="ac-card" onclick="openAircraft('${name.replace(/'/g,"\\'")}')">
+    <div class="ac-card" onclick="openAircraft(decodeURIComponent('${encodeURIComponent(name)}'))">
       <div class="ac-type">${name}</div>
       <div class="ac-reg">${data.reg || ''} · Last flown ${data.last ? new Date(data.last).toLocaleDateString(undefined,{month:'short',day:'numeric'}) : '—'}</div>
       <div class="ac-stats">
@@ -912,30 +999,31 @@ function renderAchievements() {
 }
 
 /* ── Profile tab ── */
+function escHtml(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
 function renderProfileTab() {
-  const shareUrl = location.origin + '/pilot/' + (profile.username || 'me');
   document.getElementById('profile-section').innerHTML = `
     <div class="section">
       <h2>Your Profile</h2>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
-        <div class="avatar-circle">${profile.avatar || '✈'}</div>
+        <div class="avatar-circle">${escHtml(profile.avatar || '✈')}</div>
         <div>
-          <div style="font-size:18px;font-weight:800">${profile.displayName || 'Pilot'}</div>
-          <div style="font-size:12px;color:var(--mut)">${profile.username ? '@' + profile.username : 'Set a username below'}</div>
+          <div style="font-size:18px;font-weight:800">${escHtml(profile.displayName || 'Pilot')}</div>
+          <div style="font-size:12px;color:var(--mut)">${profile.username ? '@' + escHtml(profile.username) : 'Set a username below'}</div>
         </div>
       </div>
 
       <label>Display Name
-        <input id="p-name" value="${profile.displayName || ''}" placeholder="Your name">
+        <input id="p-name" value="${escHtml(profile.displayName || '')}" placeholder="Your name">
       </label>
       <label>Username (for your shareable link)
-        <input id="p-user" value="${profile.username || ''}" placeholder="e.g. nyclyy" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_-]/g,'')">
+        <input id="p-user" value="${escHtml(profile.username || '')}" placeholder="e.g. nyclyy" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_-]/g,'')">
       </label>
       <label>Avatar (emoji)
-        <input id="p-avatar" value="${profile.avatar || '✈'}" placeholder="✈" maxlength="4">
+        <input id="p-avatar" value="${escHtml(profile.avatar || '✈')}" placeholder="✈" maxlength="4">
       </label>
       <label>Bio
-        <textarea id="p-bio" rows="3" placeholder="A few words about your flying">${profile.bio || ''}</textarea>
+        <textarea id="p-bio" rows="3" placeholder="A few words about your flying">${escHtml(profile.bio || '')}</textarea>
       </label>
       <label>Preferred Simulator
         <select id="p-sim">
@@ -947,15 +1035,10 @@ function renderProfileTab() {
     </div>
 
     <div class="section" style="margin-top:12px">
-      <h2>Shareable Profile</h2>
-      <p style="font-size:13px;color:var(--mut);margin:0 0 10px">Your public profile can be shared with other pilots. Only information you choose to make public is visible.</p>
-      <div style="background:var(--land);border:1px solid var(--coast);border-radius:8px;padding:10px 12px;font-size:13px;font-variant-numeric:tabular-nums;word-break:break-all">
-        ${shareUrl}
-      </div>
-      <button class="share-btn" onclick="copyShareUrl('${shareUrl}')">📋 Copy profile link</button>
+      <h2>Privacy</h2>
+      <p style="font-size:13px;color:var(--mut);margin:0 0 10px">This profile and your logbook are stored only in this browser. Stratos does not upload them. Public profile links are not enabled in this build because there is no account system.</p>
       <div style="margin-top:10px;font-size:12px;color:var(--mut)">
-        Note: Public profiles require a backend. Currently your logbook is stored locally in this browser.
-        To make it shareable across devices, see the <a href="#" onclick="showCloudSetup()">cloud setup guide</a>.
+        To view your logbook on a phone, pair the phone dashboard in <a href="pilot.html#/settings">Pilot → Settings</a>. That shares live telemetry and recent flights with the paired phone only.
       </div>
     </div>
 
@@ -984,7 +1067,7 @@ function copyShareUrl(url) {
 }
 
 function showCloudSetup() {
-  alert('To enable cross-device sync and public profiles:\n\n1. Set up Cloudflare D1 (free tier) via the Cloudflare dashboard.\n2. Deploy a Cloudflare Worker that reads/writes your logbook.\n3. Add your Worker URL as VITE_API_URL in your environment.\n\nDetailed instructions coming in the next update.');
+  location.href = 'pilot.html#/settings';
 }
 
 /* ── Detail panel ── */
@@ -993,9 +1076,11 @@ function openFlight(id) {
   if (!f) return;
   const dur = f.takeoffTime && f.landingTime ? fmtHours((f.landingTime-f.takeoffTime)/3600000) : '—';
   const dist = f.distanceNm ? f.distanceNm.toFixed(1) + ' nm' : '—';
-  const vs = f.landingVS !== null && f.landingVS !== undefined ? Math.round(f.landingVS) + ' fpm' : '—';
+  const landing = f.landing && f.landing.vsFpm != null ? f.landing : null;
+  const vs = landing ? landing.vsFpm + ' fpm' + (landing.runway ? ' · RWY ' + landing.runway.id : '') : (f.landingVS !== null && f.landingVS !== undefined ? Math.round(f.landingVS) + ' fpm' : '—');
   const date = f.startTime ? new Date(f.startTime).toLocaleString() : '—';
   const incomplete = f.incomplete || !f.complete;
+  const replayable = Array.isArray(f.track) && f.track.length > 1;
 
   document.getElementById('detail-inner').innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -1014,8 +1099,21 @@ function openFlight(id) {
       ${f.registration ? `<div class="detail-cell"><span>REGISTRATION</span><b>${f.registration}</b></div>` : ''}
     </div>
     <div style="font-size:12px;color:var(--mut);margin-top:8px">Departed: ${date}</div>
-    ${f.track.length > 2 ? `<div style="margin-top:8px;font-size:12px;color:var(--mut)">Track: ${f.track.length} points recorded</div>` : ''}
+    ${replayable ? `<div style="margin-top:8px;font-size:12px;color:var(--mut)">Track: ${f.track.length} recorded samples${landing ? ' · touchdown at ' + landing.lat.toFixed(4) + ', ' + landing.lon.toFixed(4) : ''}</div>` : '<div style="margin-top:8px;font-size:12px;color:var(--mut)">No recorded position track for this flight, so replay is unavailable.</div>'}
+    ${landing ? `<div class="section" style="margin-top:12px;padding:12px">
+      <h2>Landing analysis</h2>
+      <div class="detail-grid">
+        <div class="detail-cell"><span>VERTICAL SPEED</span><b>${landing.vsFpm} fpm</b></div>
+        <div class="detail-cell"><span>GROUND SPEED</span><b>${landing.gsKt != null ? landing.gsKt + ' kt' : '—'}</b></div>
+        <div class="detail-cell"><span>RUNWAY</span><b>${landing.runway ? landing.runway.id : 'not matched'}</b></div>
+        <div class="detail-cell"><span>FROM THRESHOLD</span><b>${landing.runway ? Math.round(landing.runway.distanceFromThresholdFt).toLocaleString() + ' ft' : '—'}</b></div>
+        <div class="detail-cell"><span>RATING</span><b>${landing.classification ? landing.classification.key : '—'}</b></div>
+        <div class="detail-cell"><span>SOURCE</span><b>${landing.vsSource || 'recorded'}</b></div>
+      </div>
+      <div style="font-size:11px;color:var(--mut);margin-top:6px">Runway and touchdown distance are estimates from the recorded position. Ratings use configurable per-aircraft thresholds.</div>
+    </div>` : ''}
     <div style="display:flex;gap:8px;margin-top:14px">
+      ${replayable ? `<button onclick="location.href='pilot.html#/replay?flight=' + encodeURIComponent('${f.id}')" style="flex:1;background:var(--acc);border:1px solid var(--acc);border-radius:8px;color:#04212b;font:inherit;font-weight:700;padding:10px;cursor:pointer">Replay flight</button>` : ''}
       <button onclick="deleteFlight('${f.id}')" style="flex:1;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3);border-radius:8px;color:var(--red);font:inherit;padding:10px;cursor:pointer">Delete flight</button>
     </div>`;
   document.getElementById('detail-panel').classList.add('show');
@@ -1091,36 +1189,6 @@ function exportCSV() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   DEMO FLIGHT IMPORT  (for testing without simulator)
-   Opens a test entry — remove in production
-═══════════════════════════════════════════════════════════════════════ */
-async function addDemoFlight() {
-  const demo = {
-    id: 'flt_demo_' + Date.now(),
-    state: 'COMPLETE',
-    startTime: Date.now() - 7200000,
-    takeoffTime: Date.now() - 7000000,
-    landingTime: Date.now() - 3800000,
-    endTime: Date.now() - 3700000,
-    depAirport: 'CYUL',
-    arrAirport: 'KJFK',
-    aircraft: 'Boeing 737-800',
-    registration: 'C-FNND',
-    callsign: 'AC901',
-    sim: 'X-Plane 12',
-    maxAlt: 37000,
-    distanceNm: 292,
-    fuelDep: 14200, fuelArr: 8400,
-    landingVS: -148,
-    track: [],
-    complete: true, incomplete: false
-  };
-  await dbPut('flights', demo);
-  await loadAndRender();
-  showToast('Demo flight added.');
-}
-
-/* ════════════════════════════════════════════════════════════════════
    UTILITIES
 ═══════════════════════════════════════════════════════════════════════ */
 function fmtHours(h) {
@@ -1159,7 +1227,6 @@ window.openFlight   = openFlight;
 window.openAircraft = openAircraft;
 window.closeDetail  = closeDetail;
 window.deleteFlight = deleteFlight;
-window.addDemoFlight = addDemoFlight;
 window.clearAllFlights = clearAllFlights;
 window.exportCSV    = exportCSV;
 window.saveProfileForm = saveProfileForm;

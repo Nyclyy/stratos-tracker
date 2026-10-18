@@ -1,94 +1,220 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta name="google-site-verification" content="ySC642HWnZHE_qbUnB_kRwFpzFnQTMzXdMiadcxaTTs" />
 <meta charset="utf-8">
-<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-180.png">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b1118">
-<meta name="description" content="Stratos is a clean, mobile-friendly flight tracker and aviation map.">
+<meta name="theme-color" content="#08151d">
+<meta name="description" content="Stratos is a lightweight flight simulation companion: live map, career logbook, replay, landing analytics, briefings, route planning and secure phone access.">
+<title>Stratos — the flight deck for your sim</title>
 <link rel="icon" href="app/icon-192.png">
 <link rel="apple-touch-icon" href="app/icon-180.png">
-<title>Stratos — Flight tracking, reimagined</title>
 <style>
-:root{color-scheme:dark;--bg:#080d14;--card:#111b28;--line:#243447;--text:#edf5fc;--muted:#9aafc2;--accent:#53d7f4}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 70% 0%,#142b40 0,transparent 44%),var(--bg);color:var(--text);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif}main{width:min(1080px,100%);margin:auto;padding:clamp(24px,6vw,64px) 22px 36px}.nav{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:14px}.nav img{width:42px;height:42px;border-radius:12px}.hero{padding:clamp(48px,10vw,112px) 0 56px;max-width:740px} .eyebrow{color:var(--accent);font-weight:750;letter-spacing:.13em;text-transform:uppercase;font-size:12px}h1{font-size:clamp(44px,8vw,82px);letter-spacing:-.06em;line-height:1.02;margin:14px 0 20px}.lead{color:#b9c9d8;font-size:clamp(18px,2.5vw,22px);max-width:640px}.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:0 20px;border-radius:13px;text-decoration:none;font-weight:750;text-align:center;gap:8px}.btn:focus-visible{outline:3px solid #fff;outline-offset:3px}.actions .btn{min-width:190px}.primary{background:var(--accent);color:#07131b}.secondary{border:1px solid var(--line);background:#101c29;color:var(--text)}.download-note{font-size:13px;color:var(--mut);margin-top:12px}.features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card{background:linear-gradient(150deg,rgba(22,37,53,.94),rgba(13,22,33,.94));border:1px solid var(--line);border-radius:18px;padding:22px}.card .icon{font-size:25px}.card h2{font-size:17px;margin:12px 0 6px}.card p{font-size:14px;color:var(--mut);margin:0}.install{margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:14px}.install ol{color:var(--mut);padding-left:20px;margin-bottom:0}.install b{color:var(--text)}footer{color:var(--mut);font-size:12px;margin-top:36px;border-top:1px solid var(--line);padding-top:20px}@media(max-width:650px){.features{grid-template-columns:1f}.install{grid-template-columns:1f}.hero{padding-top:60px}}
+:root{color-scheme:dark;--bg:#08151d;--panel:#0f2029;--panel-2:#132a35;--line:#294754;--text:#e7f0f2;--muted:#91a8b1;--accent:#79c9bb;--warm:#f2b65f;--mono:ui-monospace,SFMono-Regular,Consolas,monospace}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:radial-gradient(900px 480px at 78% -10%,#163743 0,transparent 62%),radial-gradient(700px 420px at -10% 20%,#102b31 0,transparent 60%),var(--bg);color:var(--text);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif}
+a{color:var(--accent)}
+.wrap{width:min(1120px,100%);margin:auto;padding:0 22px}
+header{padding:22px 0}
+.nav{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--muted)}
+.nav img{width:40px;height:40px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+.nav b{color:var(--text);letter-spacing:.14em}
+.nav .spacer{flex:1}
+.nav a{color:var(--muted);text-decoration:none;padding:6px 2px}
+.nav a:hover{color:var(--text)}
+.hero{padding:clamp(44px,8vw,92px) 0 44px;display:grid;grid-template-columns:minmax(0,1.12fr) minmax(300px,.88fr);gap:clamp(28px,5vw,64px);align-items:center}
+.eyebrow{color:var(--accent);font-weight:750;letter-spacing:.14em;text-transform:uppercase;font-size:12px}
+h1{font-size:clamp(42px,6.7vw,76px);letter-spacing:-.055em;line-height:1.01;margin:14px 0 18px;font-weight:800}
+h1 span{color:var(--warm)}
+.lead{color:#b9c9d8;font-size:clamp(17px,2.2vw,20px);max-width:620px;margin:0}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 20px;border-radius:12px;text-decoration:none;font-weight:750;border:1px solid transparent;transition:transform .14s ease,background .14s ease}
+.btn:hover{transform:translateY(-1px)}
+.btn:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.primary{background:var(--accent);color:#04212b}
+.secondary{border-color:var(--line);background:rgba(19,42,53,.72);color:var(--text)}
+.small{font-size:13px;color:var(--muted);margin:14px 0 0}
+.panel{background:linear-gradient(160deg,rgba(20,43,54,.9),rgba(11,26,34,.94));border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,.3)}
+.mock-head{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent)}
+.mock-route{font:700 clamp(26px,4vw,36px)/1.2 var(--mono);letter-spacing:.02em;margin:18px 0 4px}
+.mock-route em{font-style:normal;color:var(--muted)}
+.mock-sub{font-size:12px;color:var(--muted)}
+.mock-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:16px}
+.mock-grid div{background:rgba(8,21,29,.72);border:1px solid rgba(41,71,84,.7);border-radius:12px;padding:10px 12px}
+.mock-grid b{display:block;font:700 21px/1.2 var(--mono)}
+.mock-grid span{font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.mock-path{height:64px;margin-top:14px;border-radius:12px;background:linear-gradient(180deg,rgba(121,201,187,.08),transparent);position:relative;overflow:hidden}
+.mock-path svg{position:absolute;inset:0;width:100%;height:100%}
+section{padding:clamp(34px,5vw,58px) 0;border-top:1px solid rgba(41,71,84,.55)}
+.section-head{max-width:680px;margin-bottom:26px}
+h2{font-size:clamp(25px,3.4vw,34px);letter-spacing:-.03em;margin:0 0 8px}
+.section-head p{margin:0;color:var(--muted)}
+.features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.card{background:rgba(15,32,41,.8);border:1px solid var(--line);border-radius:16px;padding:18px}
+.card .icon{font-size:20px;color:var(--accent)}
+.card h3{font-size:16px;margin:10px 0 5px}
+.card p{font-size:13px;color:var(--muted);margin:0}
+.install{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.install .card{display:flex;flex-direction:column}
+.install ol{padding-left:18px;color:var(--muted);font-size:13px;margin:8px 0 14px}
+.install .card .btn{margin-top:auto;min-height:42px;font-size:14px}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:rgba(121,201,187,.1);border:1px solid rgba(121,201,187,.28);border-radius:999px;padding:4px 9px}
+.badge.warn{color:var(--warm);background:rgba(242,182,95,.09);border-color:rgba(242,182,95,.3)}
+.notice{display:none;margin-top:12px;padding:10px 12px;border-radius:10px;font-size:12px;color:#ffd98a;background:rgba(242,182,95,.08);border:1px solid rgba(242,182,95,.28)}
+details{background:rgba(15,32,41,.7);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:10px}
+summary{cursor:pointer;font-weight:650;font-size:14px}
+details p{color:var(--muted);font-size:13px;margin:10px 0 0}
+footer{color:var(--muted);font-size:12px;padding:26px 0 40px;border-top:1px solid var(--line)}
+footer a{color:var(--muted)}
+@media(max-width:900px){.hero{grid-template-columns:1fr;padding-top:24px}.features,.install{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){.features,.install{grid-template-columns:1fr}.nav{font-size:12px}.nav .hide{display:none}.actions .btn{flex:1 1 100%}.mock-route{font-size:26px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto;transition:none!important}.btn:hover{transform:none}}
 </style>
 </head>
 <body>
+<div class="wrap">
+<header>
+  <nav class="nav" aria-label="Main">
+    <img src="app/icon-192.png" alt="">
+    <b>STRATOS</b>
+    <span class="hide">FLIGHT DECK</span>
+    <span class="spacer"></span>
+    <a href="app/">Open app</a>
+    <a class="hide" href="#features">Features</a>
+    <a class="hide" href="#install">Install</a>
+    <a href="https://github.com/Nyclyy/stratos-tracker" target="_blank" rel="noopener">GitHub ↗</a>
+  </nav>
+</header>
+
 <main>
-<div class="nav">
-<img src="logo.png" alt=""><b>STRATOS</b><span>AVIATION MAP</span>
+<div class="hero">
+  <div>
+    <div class="eyebrow">Flight simulation companion</div>
+    <h1>Every flight.<br><span>Properly recorded.</span></h1>
+    <p class="lead">A lightweight map, career logbook, replay, landing analysis, briefing and route planner for X-Plane and Microsoft Flight Simulator — with secure access from your iPhone.</p>
+    <div class="actions">
+      <a class="btn primary" href="app/">Open Stratos <span aria-hidden="true">↗</span></a>
+      <a class="btn secondary" id="pc-download" href="https://github.com/Nyclyy/stratos-tracker/releases/latest" rel="noopener">↓ Download for Windows</a>
+      <a class="btn secondary" href="#install">Use on iPhone</a>
+    </div>
+    <p class="small" id="download-note">Windows installer · iPhone installs from Safari, no App Store needed · Free and open source</p>
+    <div class="notice" id="download-warning">The Windows installer is not published on this repository yet. The button opens the releases page; you can also run the app in your browser.</div>
+  </div>
+
+  <div class="panel" aria-label="Example of the live flight view">
+    <div class="mock-head"><i class="live-dot"></i> Simulator telemetry · example layout</div>
+    <div class="mock-route">EGLL <em>→</em> KJFK</div>
+    <div class="mock-sub">B77W · recorded from your simulator, not demo traffic</div>
+    <div class="mock-grid">
+      <div><b>35 000</b><span>Altitude ft</span></div>
+      <div><b>481</b><span>Ground speed kt</span></div>
+      <div><b>287°</b><span>Heading</span></div>
+      <div><b>0</b><span>Vertical speed fpm</span></div>
+    </div>
+    <div class="mock-path" aria-hidden="true">
+      <svg viewBox="0 0 360 64" preserveAspectRatio="none"><path d="M4 52 C70 8 118 58 180 30 S300 10 356 22" fill="none" stroke="#79c9bb" stroke-width="2" stroke-dasharray="3 4" opacity=".85"/><circle cx="4" cy="52" r="3" fill="#f2b65f"/><circle cx="356" cy="22" r="3" fill="#f2b65f"/></svg>
+    </div>
+    <p class="small">Connectivity, aircraft and position come from the bridge. If it is offline, Stratos says so instead of inventing data.</p>
+  </div>
 </div>
-<div id="warn" style="display:none;margin:16px 0;padding:14px 16px;border-radius:12px;background:#3b2a0b;border:1px solid #8a6a1f;color:#ffd98a;font-size:14px"></div>
-<section class="hero">
-<div class="eyebrow">Your view of the skies</div>
-<h1>Flight tracking.<br>Without the clutter.</h1>
-<p class="lead">A modern aviation map for live public ADS-B traffic, airport information, routes and charts — designed for desktop and mobile.</p>
-<div class="actions">
-<a class="btn primary" href="app/index.html">Open Stratos <span aria-hidden="true">↗</span></a>
-<a class="btn secondary" href="https://github.com/Nyclyy/Stratos-track/releases/latest/download/Stratos-Setup.exe" id="pc-download">↓ Download for PC</a>
-<a class="btn secondary" href="#iphone-install">＋ Download for iPhone</a>
-</div>
-<p class="download-note">PC download is a Windows installer. iPhone users can add Stratos to their Home Screen from Safari.</p>
+
+<section id="features">
+  <div class="section-head">
+    <h2>Built for the way sim pilots actually fly</h2>
+    <p>Recorded data first. Estimates are labelled. Nothing is uploaded unless you pair a phone.</p>
+  </div>
+  <div class="features">
+    <article class="card"><div class="icon">◉</div><h3>Live map &amp; traffic</h3><p>Public ADS-B traffic, airports, navaids, charts and METAR/TAF. Your own aircraft appears when the bridge is connected.</p></article>
+    <article class="card"><div class="icon">◈</div><h3>Career logbook</h3><p>Hours, distance, airports, aircraft, routes and records, calculated once from your real flights without double counting.</p></article>
+    <article class="card"><div class="icon">↺</div><h3>Flight replay</h3><p>Scrub through the recorded track with a moving aircraft, altitude/speed profiles and clear markers for recorded versus interpolated values.</p></article>
+    <article class="card"><div class="icon">↘</div><h3>Landing analytics</h3><p>Touchdown rate, ground speed, runway and distance from the threshold where the data supports it — with per-aircraft thresholds.</p></article>
+    <article class="card"><div class="icon">☁</div><h3>Briefing &amp; routes</h3><p>Build a route, validate waypoints, import/export PLN, FMS and GPX, then brief weather with source and freshness.</p></article>
+    <article class="card"><div class="icon">▤</div><h3>Phone live view</h3><p>A secure PWA reads telemetry through an outbound relay. No inbound port, no command channel, no App Store account.</p></article>
+  </div>
 </section>
-<section class="features">
-<article class="card">
-<div class="icon">⌁</div>
-<h2>Live public traffic</h2>
-<p>Aircraft positions load directly in your browser from community ADS-B data sources. No Python bridge is needed for public traffic. Tap an aircraft to track it and watch its contrail build behind it.</p>
-</article>
-<article class="card">
-<div class="icon">◎</div>
-<h2>Made for any screen</h2>
-<p>Responsive controls, touch gestures and a layout built to work on phones, tablets and desktops.</p>
-</article>
-<article class="card">
-<div class="icon">⌖</div>
-<h2>Aviation tools</h2>
-<p>Explore airports, navaids, live weather, route planning and built-in airport charts (diagram, satellite chart, runways, frequencies) in one place.</p>
-</article>
+
+<section id="install">
+  <div class="section-head">
+    <h2>Install Stratos</h2>
+    <p>The website, Windows app and iPhone app use the same application files, so features stay consistent.</p>
+  </div>
+  <div class="install">
+    <article class="card">
+      <span class="badge">Windows</span>
+      <h3 style="margin-top:10px">Desktop app</h3>
+      <ol>
+        <li>Download <code>Stratos-Setup.exe</code>.</li>
+        <li>Run the installer. SmartScreen may warn because the build is not code-signed — choose <b>More info → Run anyway</b>.</li>
+        <li>Launch Stratos. The simulator bridge starts with the app.</li>
+      </ol>
+      <a class="btn primary" href="https://github.com/Nyclyy/stratos-tracker/releases/latest" rel="noopener">Download installer</a>
+      <p class="small">All releases: <a href="https://github.com/Nyclyy/stratos-tracker/releases" target="_blank" rel="noopener">GitHub Releases ↗</a></p>
+    </article>
+    <article class="card">
+      <span class="badge">iPhone</span>
+      <h3 style="margin-top:10px">Add to Home Screen</h3>
+      <ol>
+        <li>Open <a href="app/">Stratos</a> in <b>Safari</b>.</li>
+        <li>Tap <b>Share</b>, then <b>Add to Home Screen</b>.</li>
+        <li>Open the icon and connect it to your PC in <b>Pilot → Settings → Phone access</b>.</li>
+      </ol>
+      <a class="btn secondary" href="app/">Open in Safari ↗</a>
+      <p class="small">Needs HTTPS for installation. Live telemetry needs the relay and the desktop bridge running.</p>
+    </article>
+    <article class="card">
+      <span class="badge">Browser</span>
+      <h3 style="margin-top:10px">Use it now</h3>
+      <ol>
+        <li>Open the tracker — no install.</li>
+        <li>Browse public traffic and airports.</li>
+        <li>Open <b>Pilot</b> for the logbook, replay, landings and flight planning.</li>
+      </ol>
+      <a class="btn secondary" href="app/pilot.html">Open Pilot ↗</a>
+      <p class="small">Your logbook is stored locally in the browser or the desktop app.</p>
+    </article>
+  </div>
+
+  <details>
+    <summary>Simulator setup</summary>
+    <p><b>X-Plane 11/12:</b> Settings → Data Output, enable rows 3, 17 and 20 to UDP port 49003 on the PC running the bridge. <b>MSFS 2020/2024:</b> start a flight; install the optional SimConnect Python package once if available. The bridge reports exactly which source is connected and when telemetry goes stale.</p>
+  </details>
+  <details>
+    <summary>Phone relay and privacy</summary>
+    <p>The desktop bridge pushes snapshots outbound to a relay you host. The phone pairs with a short-lived code and receives a separate read token. The relay has no command channel to the PC, tokens are hashed at rest, and the bridge is never exposed to the internet. Pairing and revocation are in Pilot → Settings.</p>
+  </details>
 </section>
-<section class="install" id="install-options">
-<article class="card" id="iphone-install">
-<h2>Download for iPhone — Add to Home Screen</h2>
-<p>Stratos installs from the website; no App Store download is needed.</p>
-<ol>
-<li>Tap <b>Open Stratos</b> above to open the tracker in Safari.</li>
-<li>Tap Safari’s <b>Share</b> button.</li>
-<li>Scroll down and tap <b>Add to Home Screen</b>, then tap <b>Add</b>.</li>
-</ol>
-<p><a class="btn primary" href="app/index.html">Open Stratos in Safari ↗</a></p>
-</article>
-<article class="card" id="pc-install">
-<h2>Download for Windows PC</h2>
-<p>Install Stratos as a desktop app with its own window. Public live aircraft tracking does not require Python to run in the background.</p>
-<ol>
-<li>Click <b>Download for PC</b> above to get <code>Stratos-Setup.exe</code>.</li>
-<li>Open the downloaded installer and follow the prompts.</li>
-<li>Launch Stratos from the Start menu.</li>
-</ol>
-<p><small>Note: the PC download becomes available after the project is published to GitHub and a Windows release is built.</small></p>
-</article>
-<article class="card">
-<h2>Install on Android</h2>
-<ol>
-<li>Open Stratos in Chrome.</li>
-<li>Open the browser menu.</li>
-<li>Choose <b>Install app</b> or <b>Add to Home screen</b>.</li>
-</ol>
-</article>
-</section>
-<footer>Stratos is an independent project. Aircraft data is provided by third-party public ADS-B sources. Live coverage depends on provider availability. Not for real-world navigation.</footer>
 </main>
+
+<footer>
+  Stratos is an independent project. Aircraft data comes from third-party public ADS-B sources; airport data from OurAirports (public domain); weather from NOAA Aviation Weather. Map and chart providers keep their own terms. Not for real-world navigation. · <a href="README-DEPLOY.md">Deployment notes</a> · <a href="SOURCES_AND_LICENSING.md">Sources &amp; licensing</a>
+</footer>
+</div>
+
 <script>
-(function(){
-(function(){
-  var R = 'Nyclyy/Stratos-track';
-  var pc = document.getElementById('pc-download');
-  var note = document.querySelector('.download-note');
-  var warn = document.getElementById('warn');
-  // ... rest of original script unchanged ...
-})();
+(function () {
+  var repo = 'Nyclyy/stratos-tracker';
+  var asset = 'https://github.com/' + repo + '/releases/latest/download/Stratos-Setup.exe';
+  var button = document.getElementById('pc-download');
+  var warning = document.getElementById('download-warning');
+  var note = document.getElementById('download-note');
+  button.href = asset;
+  fetch('https://api.github.com/repos/' + repo + '/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
+    .then(function (response) { return response.ok ? response.json() : null; })
+    .then(function (release) {
+      if (!release) return;
+      var found = (release.assets || []).some(function (item) { return /^Stratos-Setup\.exe$/i.test(item.name); });
+      if (found) {
+        button.href = asset;
+        button.textContent = '↓ Download for Windows';
+        note.textContent = 'Windows installer · version ' + String(release.tag_name || '').replace(/^v/, '') + ' · iPhone installs from Safari';
+      } else {
+        button.href = 'https://github.com/' + repo + '/releases/latest';
+        button.textContent = '↓ Open latest release';
+        warning.style.display = 'block';
+      }
+    })
+    .catch(function () { /* offline: keep the direct asset link */ });
 })();
 </script>
 </body>
