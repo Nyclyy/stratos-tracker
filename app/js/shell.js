@@ -87,6 +87,7 @@ function buildBar(bar, { theme = false } = {}) {
     </a>
     <nav class="tb-nav" aria-label="Pages">
       <a href="index.html" data-page="home">Map</a>
+      <a href="discover.html" data-page="discover">Discover</a>
       <a href="logbook.html" data-page="logbook">Logbook</a>
       <a href="weather.html" data-page="weather">Weather</a>
       <a href="live.html" data-page="live">Live</a>

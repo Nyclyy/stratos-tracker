@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#070e17">
+<meta name="description" content="Stratos Route Discovery: pick a mood, pick a duration, and get three flight ideas built from real airport data.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="stratos-ui.css">
+<link rel="stylesheet" href="pilot.css">
+<link rel="stylesheet" href="shell.css">
+<link rel="stylesheet" href="discover.css">
+<title>Discover · Stratos</title>
+</head>
+<body>
+<div class="shell">
+  <header id="appbar" class="tb"></header>
+
+  <main class="page discover">
+    <div class="hero">
+      <h1>Where do you want to fly today?</h1>
+      <p>Choose your mood. We'll find the route.</p>
+      <span class="hint" id="db-note">Loading airport database…</span>
+    </div>
+
+    <section class="cats" id="categories" aria-label="Flight experience"></section>
+
+    <section class="controls card" aria-label="Flight preferences">
+      <div class="control-group">
+        <span class="control-label" id="duration-label">How long?</span>
+        <div class="chips" id="durations" role="group" aria-labelledby="duration-label"></div>
+      </div>
+      <div class="control-group">
+        <label class="control-label" for="aircraft">Aircraft</label>
+        <select id="aircraft"></select>
+      </div>
+      <div class="control-group">
+        <label class="control-label" for="departure">Departure (optional)</label>
+        <input class="input" id="departure" list="airport-list" placeholder="Any airport, e.g. EGLL" autocomplete="off" spellcheck="false">
+        <datalist id="airport-list"></datalist>
+      </div>
+      <div class="control-group">
+        <label class="control-label" for="region">Region (optional)</label>
+        <select id="region"></select>
+      </div>
+      <div class="control-group">
+        <span class="control-label" id="difficulty-label">Difficulty</span>
+        <div class="chips" id="difficulty" role="group" aria-labelledby="difficulty-label"></div>
+      </div>
+      <div class="find-row">
+        <button class="btn primary" id="find" type="button">Find My Adventure</button>
+        <button class="btn ghost" id="reset" type="button">Reset</button>
+      </div>
+    </section>
+
+    <section class="results" id="results" aria-live="polite">
+      <div class="empty notice">
+        <div><strong>Pick a mood above.</strong><br>Aircraft, duration and departure are all optional — the defaults are tuned for a one to two hour flight in a turboprop.</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<noscript><p style="padding:24px">Route Discovery needs JavaScript.</p></noscript>
+<script type="module" src="js/discover.js"></script>
+</body>
+</html>

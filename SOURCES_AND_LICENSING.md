@@ -6,6 +6,14 @@
 - **OpenStreetMap** — Open Database License (ODbL). Airport layout/taxiway geometry is queried from the Overpass API (or the bridge cache). Main map tiles come from OpenStreetMap and Esri World Imagery; replay/route preview tiles come from CARTO. Attribution is shown on both map surfaces: “© OpenStreetMap contributors · Esri imagery” and “© OpenStreetMap contributors · © CARTO”. See https://openstreetmap.org/copyright and the respective provider terms.
 - The bridge can build an offline data pack from these sources. The pack is user-generated and is not redistributed by the project.
 
+## Route Discovery
+
+- Route recommendations are computed locally from the same airport records above: identifiers, coordinates, elevation and published runway lengths. Distances are great-circle distances; durations are estimates at a fixed cruise speed plus ground time, never ATC routings or winds.
+- Terrain mentions come from a coarse set of geographic boxes (Alps, Rockies, Andes, Himalaya, Scandinavia, Iceland, Caribbean, Mediterranean, Japan, Hawaii, New Zealand, Patagonia, Southeast Asia, North Africa, Australia) sampled along the great circle. They describe terrain the path plausibly overflies, not a verified overflight of a specific landmark. No landmark, procedure, airway or navaid is invented.
+- Storm Chasing is a **simulated** scenario. No live storm data is fetched or implied, and nothing on the page is real-world weather advice.
+- Night Flight notes that lighting and city scenery depend on the user's simulator; no scenery database is queried.
+- Preview map tiles are the same CARTO/OpenStreetMap tiles used by replay, with attribution shown under the map.
+
 ## Weather
 
 - **NOAA Aviation Weather Center** — U.S. Government work, public domain. METAR/TAF are fetched from `https://aviationweather.gov/api/data/` either through `/api/weather` (Vercel) or the bridge’s `/weather`. Source and observation time are shown. NOAA availability is not guaranteed.

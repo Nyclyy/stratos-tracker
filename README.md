@@ -15,6 +15,7 @@ Stratos runs as a static website/PWA, an Electron desktop app, and an optional l
 | Landing analytics with per-aircraft thresholds | Working; runway/touchdown values are estimates |
 | Career dashboard, records, milestones, drill-down | Working, with customizable tiles |
 | Route planner, PLN/FMS/GPX import/export, SimBrief import | Working; estimates are labelled |
+| Route Discovery (mood → three route ideas → planner) | Working; airports, distances and runway claims come from the airport database, and stretched durations are labelled |
 | Airport explorer and briefing | Working; NOTAMs are not implemented |
 | PWA / iPhone Home Screen | Implemented; HTTPS deployment and pairing required |
 | Phone relay with short-lived pairing codes | Working, tested end-to-end locally |

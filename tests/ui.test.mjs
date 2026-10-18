@@ -344,9 +344,9 @@ test('the home sidebar is a real rail that collapses and remembers the choice', 
     assert.ok(rail.closest('.app-shell'), 'the rail lives in the shell, not inside the map');
     assert.equal(document.querySelector('#app #tabs'), null, 'the map no longer owns the navigation');
     const items = [...rail.querySelectorAll('.tab')].filter(item => !item.classList.contains('rail-toggle'));
-    assert.equal(items.length, 10, 'ten destinations in the sidebar');
+    assert.equal(items.length, 11, 'eleven destinations in the sidebar');
     const hrefs = [...rail.querySelectorAll('a.tab')].map(a => a.getAttribute('href'));
-    assert.deepEqual(hrefs, ['logbook.html', 'pilot.html#airports', 'pilot.html#career', 'pilot.html#settings']);
+    assert.deepEqual(hrefs, ['discover.html', 'logbook.html', 'pilot.html#airports', 'pilot.html#career', 'pilot.html#settings']);
     for (const id of ['bMap', 'bLive', 'bCh', 'bRoute', 'bWx', 'bData']) {
       assert.ok(document.getElementById(id), `${id} still drives its map panel`);
     }
@@ -373,4 +373,75 @@ test('the shared stylesheet never imposes a page layout grid', async () => {
   assert.ok(!/grid-template|display:\s*grid/.test(rules), 'shell.css must stay out of the page grid');
   const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
   assert.match(page, /grid-template-columns:var\(--rail\) minmax\(0,1fr\)/, 'the page owns the two-column grid');
+});
+
+test('the discover page turns a mood into three cards and hands one to the planner', async () => {
+  installDom();
+  const fs = await import('node:fs');
+  const { parseHTML } = await import('linkedom');
+  const html = fs.readFileSync(new URL('../app/discover.html', import.meta.url), 'utf8');
+  const { window } = parseHTML(html);
+  class FakeResizeObserver { observe() {} disconnect() {} }
+  for (const [key, value] of [
+    ['window', window], ['document', window.document], ['navigator', window.navigator],
+    ['HTMLElement', window.HTMLElement], ['Event', window.Event], ['CustomEvent', window.CustomEvent],
+    ['location', { protocol: 'http:', hostname: 'localhost', href: 'http://localhost/app/discover.html', search: '', hash: '' }],
+    ['ResizeObserver', FakeResizeObserver],
+  ]) {
+    Object.defineProperty(globalThis, key, { value, configurable: true });
+  }
+  globalThis.fetch = async () => { throw new Error('no bridge in this test'); };
+
+  await import('../app/js/discover.js');
+  await new Promise(resolve => setTimeout(resolve, 80));
+
+  const click = el => el.dispatchEvent(new window.Event('click', { bubbles: true }));
+  assert.equal(document.querySelectorAll('[data-category]').length, 10, 'ten moods are offered');
+  assert.ok(document.getElementById('db-note').textContent.includes('airport'), 'the data source is stated');
+
+  click(document.querySelector('[data-category="mountain"]'));
+  assert.equal(document.querySelector('[data-category="mountain"]').getAttribute('aria-pressed'), 'true');
+  click(document.getElementById('find'));
+
+  const cards = document.querySelectorAll('.route-card');
+  assert.equal(cards.length, 3, 'three recommendations');
+  assert.ok(document.querySelector('.map-panel'), 'a map preview is present');
+  assert.ok(cards[0].textContent.includes('estimated'));
+
+  const second = cards[1];
+  click(second);
+  assert.equal(second.getAttribute('aria-selected'), 'true', 'selecting a card updates the preview');
+  assert.equal(cards[0].getAttribute('aria-selected'), 'false');
+
+  click(second.querySelector('[data-act="fly"]'));
+  const active = JSON.parse(localStorage.getItem('stratos.activeRoute'));
+  assert.ok(active && Array.isArray(active.points) && active.points.length >= 2, 'the route is handed to the planner');
+  assert.equal(active.points[0].kind, 'apt');
+  assert.ok(localStorage.getItem('dl.route'), 'the map route payload is written too');
+
+  assert.equal(document.querySelectorAll('[data-act="save"]').length, 3, 'each card offers Save Route');
+
+  click(document.getElementById('again'));
+  assert.equal(document.querySelectorAll('.route-card').length, 3, 'alternatives still return three cards');
+  window.StratosShell?.destroy();
+});
+
+test('the existing route planner opens a Discover route without a rebuild', async () => {
+  installDom();
+  const points = [
+    { id: 'LSZH', name: 'Zurich', lat: 47.458, lon: 8.548, elev: 1416, kind: 'apt' },
+    { id: 'LOWI', name: 'Innsbruck', lat: 47.26, lon: 11.344, elev: 1906, kind: 'apt' },
+  ];
+  localStorage.setItem('stratos.activeRoute', JSON.stringify({ id: null, name: 'Alpine Escape', points }));
+
+  const { mount } = await import('../app/js/pilot/routes.js');
+  const root = document.getElementById('view');
+  await mount(root, { directory: [], toast() {}, async reload() {} });
+
+  const text = root.textContent;
+  assert.match(text, /Alpine Escape/, 'the planner shows the handoff name');
+  assert.match(text, /LSZH/);
+  assert.match(text, /LOWI/);
+  const stored = JSON.parse(localStorage.getItem('stratos.activeRoute'));
+  assert.deepEqual(stored.points.map(p => p.id), ['LSZH', 'LOWI'], 'the planner keeps the handed-over waypoints');
 });

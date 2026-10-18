@@ -18,3 +18,7 @@ relay.json
 aircraft.json
 osm_cache/
 tiles/
+
+# Local preview server state
+preview.log
+preview.pid

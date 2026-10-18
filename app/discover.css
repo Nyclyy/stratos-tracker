@@ -1,0 +1,154 @@
+/* Route Discovery. Reuses the Stratos tokens from stratos-ui.css; nothing here
+   paints continuously, and only one map canvas is ever alive. */
+
+.discover .hero { margin-bottom: 18px; }
+.discover .hero h1 { font-size: clamp(24px, 3.4vw, 34px); letter-spacing: -.02em; }
+.discover .hero p { color: var(--mut); margin-top: 6px; font-size: 14px; }
+.discover .hero .hint { display: inline-block; margin-top: 10px; font-size: 11px; color: var(--mut); opacity: .85; }
+
+/* ── Category cards ─────────────────────────────────────────────── */
+.discover .cats {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(188px, 1fr));
+  margin-bottom: 16px;
+}
+.discover .cat {
+  position: relative; text-align: left; cursor: pointer;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 13px 14px 14px; border-radius: 12px;
+  background: var(--ui); border: 1px solid var(--line);
+  color: var(--txt); font: inherit;
+  transition: border-color .14s ease, background-color .14s ease, transform .14s ease;
+}
+.discover .cat:hover { border-color: color-mix(in srgb, var(--acc) 45%, var(--line)); transform: translateY(-1px); }
+.discover .cat:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.discover .cat .cat-icon {
+  width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--acc) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--acc) 24%, transparent);
+  color: var(--acc);
+}
+.discover .cat .cat-icon svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.discover .cat b { font-size: 13.5px; font-weight: 700; letter-spacing: .01em; }
+.discover .cat small { font-size: 11px; line-height: 1.45; color: var(--mut); }
+.discover .cat[aria-pressed="true"] {
+  border-color: var(--acc);
+  background: color-mix(in srgb, var(--acc) 9%, var(--ui));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--acc) 35%, transparent) inset;
+}
+.discover .cat[aria-pressed="true"]::after {
+  content: ""; position: absolute; top: 10px; right: 10px;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--acc);
+  box-shadow: 0 0 8px var(--acc);
+}
+
+/* ── Controls ───────────────────────────────────────────────────── */
+.discover .controls {
+  display: grid; gap: 14px 18px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  padding: 16px; margin-bottom: 22px;
+}
+.discover .control-group { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.discover .control-label { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--mut); font-weight: 700; }
+.discover .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.discover .chip {
+  padding: 7px 11px; border-radius: 999px; cursor: pointer;
+  background: var(--ui2); border: 1px solid var(--line); color: var(--mut);
+  font: inherit; font-size: 12px; font-weight: 600;
+  transition: color .14s ease, border-color .14s ease, background-color .14s ease;
+}
+.discover .chip:hover { color: var(--txt); border-color: color-mix(in srgb, var(--acc) 40%, var(--line)); }
+.discover .chip[aria-pressed="true"] {
+  color: #04212b; background: var(--acc); border-color: var(--acc);
+}
+.discover .input, .discover select {
+  height: 36px; padding: 0 10px; border-radius: 9px;
+  background: var(--ui2); border: 1px solid var(--line); color: var(--txt);
+  font: inherit; font-size: 12.5px;
+}
+.discover .input::placeholder { color: var(--mut); }
+.discover .find-row { display: flex; align-items: flex-end; gap: 8px; grid-column: 1 / -1; }
+.discover .btn.primary {
+  background: var(--acc); border-color: transparent; color: #04212b;
+  font-weight: 750; min-height: 40px; padding: 0 22px; font-size: 13px;
+}
+.discover .btn.primary:hover { filter: brightness(1.06); }
+.discover .btn.ghost { background: none; border-color: var(--line); color: var(--mut); }
+.discover .btn.ghost:hover { color: var(--txt); border-color: var(--acc); }
+
+/* ── Results ────────────────────────────────────────────────────── */
+.discover .results { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); align-items: start; }
+.discover .results > .empty { grid-column: 1 / -1; }
+.discover .result-head {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding-bottom: 2px;
+}
+.discover .result-head h2 { font-size: 16px; }
+.discover .result-head .hint { font-size: 11.5px; color: var(--mut); }
+.discover .result-head .spacer { flex: 1; }
+.discover .route-list { display: flex; flex-direction: column; gap: 10px; }
+
+.discover .route-card {
+  padding: 14px 16px; border-radius: 12px;
+  background: var(--ui); border: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 10px;
+  cursor: pointer; transition: border-color .14s ease, background-color .14s ease;
+}
+.discover .route-card:hover { border-color: color-mix(in srgb, var(--acc) 40%, var(--line)); }
+.discover .route-card[aria-selected="true"] {
+  border-color: var(--acc);
+  background: color-mix(in srgb, var(--acc) 7%, var(--ui));
+}
+.discover .route-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.discover .route-head h3 { font-size: 15px; font-weight: 700; }
+.discover .route-head .pill { margin-left: auto; }
+.discover .route-head .pill.warn {
+  margin-left: 0;
+  color: #f6c453; border-color: rgba(246, 196, 83, .45);
+  background: rgba(246, 196, 83, .1);
+}
+.discover .route-track { font-size: 12.5px; color: var(--txt); display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.discover .route-track .icao { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--acc); }
+.discover .route-track .arrow { color: var(--mut); }
+.discover .route-track .name { color: var(--mut); }
+.discover .route-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.discover .route-metrics div { background: var(--ui2); border: 1px solid var(--line); border-radius: 9px; padding: 7px 9px; min-width: 0; }
+.discover .route-metrics b { display: block; font-size: 13px; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.discover .route-metrics span { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--mut); }
+.discover .route-why { font-size: 12.5px; line-height: 1.55; color: #b9c9d8; }
+.discover .route-highlights { display: flex; flex-wrap: wrap; gap: 5px; }
+.discover .route-highlights span {
+  font-size: 10.5px; padding: 3px 8px; border-radius: 999px;
+  background: var(--ui2); border: 1px solid var(--line); color: var(--mut);
+}
+.discover .route-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.discover .route-actions .btn { min-height: 32px; font-size: 11.5px; padding: 0 11px; }
+
+.discover .map-panel {
+  position: sticky; top: calc(var(--shell-bar) + 12px);
+  border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--line); background: var(--ui);
+  display: flex; flex-direction: column;
+}
+.discover .map-panel .map-canvas { width: 100%; height: 300px; display: block; background: #050a10; }
+.discover .map-meta { padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--line); }
+.discover .map-meta b { font-size: 13px; }
+.discover .map-meta span { font-size: 11px; color: var(--mut); }
+.discover .map-meta .legend { display: flex; gap: 10px; margin-top: 4px; }
+.discover .map-meta .legend i { width: 7px; height: 7px; border-radius: 50%; background: var(--acc); display: inline-block; margin-right: 4px; }
+
+.discover .notice { border-radius: 10px; }
+.discover .notice ul { margin: 4px 0 0 16px; padding: 0; }
+.discover .notice li { margin: 2px 0; }
+
+@media (max-width: 980px) {
+  .discover .results { grid-template-columns: minmax(0, 1fr); }
+  .discover .map-panel { position: static; order: -1; }
+  .discover .map-panel .map-canvas { height: 240px; }
+}
+@media (max-width: 560px) {
+  .discover .route-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .discover .find-row { flex-direction: column; align-items: stretch; }
+  .discover .cats { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .discover .cat small { display: none; }
+}

@@ -4,13 +4,16 @@ Date: 2026-10-18. Environment: Linux x64 cloud VM, Node v24.21.0, Python 3 (Free
 
 ## Passed
 
-The `npm test` total is 33: 23 data-path tests, 2 module-graph tests, 6 DOM tests and 2 relay tests.
+The `npm test` total is 53: 23 data-path tests, 2 module-graph tests, 7 DOM tests, 13 Route Discovery tests and 2 relay tests (6 more DOM tests are reported in the same run).
 
 | Check | Command | Result |
 | --- | --- | --- |
 | Pure modules: geo, landing, career, replay, planner, telemetry | `npm test` | 23/23 pass |
 | Module graph: every local import exists and is exported | `npm test` | 2/2 pass |
 | DOM: career dashboard/customizer, settings render, dashboard layout helpers, customizer arrow reordering, weather center watchlist, weather center station naming | `npm test` | 6/6 pass |
+| Route Discovery: all 10 categories × 5 durations return three distinct cards; distance equals the sum of great-circle legs; airports exist in the database with real coordinates; estimated hours match the chosen aircraft; seeds repeat and vary; departure and region constraints honoured; easier/harder change the offering; island legs stay short and island-only; long haul keeps ≥500 nm; cards declare when they fall outside the requested window; region claims follow the great circle across the antimeridian; bush requests either use real short fields or declare the limitation | `node --test tests/discover.test.mjs` | 13/13 pass |
+| Route Discovery DOM: ten moods render, three cards appear with a map panel, selecting a card updates the preview, Fly This Route writes the planner payload, alternatives return three cards | `npm test` | pass |
+| Discovery engine timing (bundled 152 airports) | in-process measurement | 17–67 ms per generation; 100–180 ms with a synthetic 900-airport pool |
 | Relay: pairing, ingest, state, revoke, origin and rate limits | `npm test` | 2/2 pass |
 | Bridge lifecycle, dedupe, recovery, landing analysis | `npm run test:py` | 10/10 pass |
 | Real bridge + relay: health, static shell, SSE, pair → claim → snapshot → revoke | `npm run test:integration` | 2/2 pass (~10.5 s) |
@@ -29,6 +32,8 @@ The integration test is the important one: it starts the real Python bridge and 
 
 | Check | Why |
 | --- | --- |
+| Route Discovery visual review in a real browser, and the map preview tiles | Same missing Chromium libraries as below. Card layout, selection states, the single reusable `MiniMap` canvas and the mobile breakpoints are covered by a linkedom DOM test and CSS review only; the map is described as implemented but not visually confirmed here. |
+| Route Discovery with the bridge's worldwide airport list | Needs the Python bridge with its airport pack. The bundled snapshot has 152 airports and no field shorter than 5,000 ft, so Bush Flying falls back to demanding-terrain alternatives and says so; island hopping is limited to the New Zealand, Japan and Southeast Asia fields it contains. |
 | Chromium layout, canvas, service worker install, iPhone Home Screen | Playwright downloaded Chromium, but the VM lacks `libnss3`, `libatk*`, `libgbm` etc. `playwright install-deps` requires `sudo`, which is blocked by the container’s no-new-privileges policy. Two linkedom DOM smoke tests cover the career dashboard and settings render; full browser layout, canvas and service-worker installation are not claimed. |
 | Windows installer build and launch | Building an NSIS Windows target on Linux requires Wine; no Windows runner was available. The GitHub Actions workflow is the reproducible build path and has not been run from this session. |
 | Updating from an older installed version | Needs a Windows host with the previous build. The build keeps `deleteAppDataOnUninstall:false`; the IndexedDB upgrade only adds stores. |
