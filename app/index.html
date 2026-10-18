@@ -61,7 +61,7 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 .live #tel{display:grid}.live #sheet{bottom:142px}
 #lay{width:240px}#ms{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 
-:root[data-theme=night]{--bg:#0b1118;--land:#121a23;--coast:#3a4a5c;--grid:rgba(160,190,220,.1);--ap:#fbbf24;--nav:#34d399;--route:#22d3ee;--own:#fbbf24;--txt:#e6edf4;--ui:rgba(13,18,25,.94);--ui2:#1a2330;--mut:#8696a8;--trf:#93c5fd;--acc:#22d3ee}
+:root[data-theme=night]{--bg:#060c14;--land:#0d1721;--coast:#28425a;--grid:rgba(140,180,220,.08);--ap:#f6c453;--nav:#5eead4;--route:#22d3ee;--own:#f8b84e;--txt:#e8f1fa;--ui:rgba(9,16,25,.96);--ui2:#152230;--mut:#8299ae;--trf:#8fb8ff;--acc:#38bdf8}
 #tel{display:none!important}.live #sheet{bottom:76px}
 #fc{display:none;top:68px;left:12px;right:72px;max-width:520px;padding:12px 14px;border-radius:18px;z-index:2}
 .fh{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut);font-weight:700;letter-spacing:.05em}.fh i{font-style:normal;color:#34d399}
@@ -161,6 +161,25 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 .tab.act::before{content:"";position:absolute;left:-6px;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--acc)}
 #tabs .tab{position:relative}
 #top{left:12px}#fc{left:12px}#res{left:12px}#lay{left:12px}#fab{left:12px;bottom:18px}#attr{left:10px}
+}
+
+/* ── Midnight rail ────────────────────────────────────────────────
+   The rail is chrome, so it must not inherit the generic button fill that
+   turned the live tab into a solid cyan block. */
+#tabs{background:var(--surface)}
+#tabs .tab{background:none;border:0;color:var(--mut)}
+#tabs .tab:hover{background:rgba(255,255,255,.045);color:var(--txt)}
+#tabs .tab.act,#tabs .tab.on{background:rgba(56,189,248,.12);color:var(--acc)}
+#tabs .tab.on b{color:var(--acc)}
+@media(min-width:768px){
+.app-shell{--rail:76px}
+.app-shell[data-collapsed="1"]{--rail:56px}
+#tabs{padding:8px 5px}
+.tab{min-height:46px;gap:3px;border-radius:11px}
+.tab b{font-size:17px}
+.tab span{font-size:9.5px;letter-spacing:.07em;text-transform:uppercase}
+#tabs .tab.act{box-shadow:none}
+#tabs .tab.act::before{left:-5px;top:8px;bottom:8px;width:2px;border-radius:0 2px 2px 0;background:var(--acc);box-shadow:0 0 10px var(--acc)}
 }
 </style><link rel="stylesheet" href="shell.css"></head><body><div class="app-shell">
 <header id="appbar" class="tb"></header>

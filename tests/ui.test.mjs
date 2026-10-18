@@ -363,3 +363,13 @@ test('the home sidebar is a real rail that collapses and remembers the choice', 
     shell.destroy();
   }
 });
+
+test('the shared stylesheet never imposes a page layout grid', async () => {
+  // shell.css loads after the page's own <style>, so a grid template here would
+  // silently win and collapse the sidebar/map columns. The page owns its grid.
+  const fs = await import('node:fs');
+  const css = fs.readFileSync(new URL('../app/shell.css', import.meta.url), 'utf8');
+  const rules = [...css.matchAll(/\.app-shell\s*\{([^}]*)\}/g)].map(match => match[1]).join('\n');
+  assert.ok(!/grid-template|display:\s*grid/.test(rules), 'shell.css must stay out of the page grid');
+  assert.match(css, /--shell-rail:\s*\d+px/, 'the rail keeps a concrete width token');
+});

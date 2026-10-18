@@ -6,25 +6,17 @@
 /* Tokens live on :root: the top bar is mounted on pages that are not the grid
    shell (logbook, pilot), and they need the same measurements there. */
 :root {
-  --shell-bar: 54px;
-  --shell-rail: 84px;
-  --shell-line: var(--line, var(--ui2, #1a2330));
-  --shell-panel: var(--surface, var(--ui, #0d141c));
-  --shell-soft: var(--ui2, #1a2330);
-  --shell-ink: var(--txt, #e6edf4);
-  --shell-mute: var(--mut, #8696a8);
-  --shell-accent: var(--acc, #22d3ee);
+  --shell-bar: 52px;
+  --shell-rail: 76px;
+  --shell-line: rgba(126, 176, 220, .13);
+  --shell-panel: #070e17;
+  --shell-soft: rgba(255, 255, 255, .045);
+  --shell-ink: #e8f1fa;
+  --shell-mute: #8299ae;
+  --shell-accent: #38bdf8;
   --shell-good: #34d399;
-  --shell-warn: #fbbf24;
-}
-
-.app-shell {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  grid-template-columns: minmax(0, 1fr);
-  height: 100dvh;
-  min-height: 0;
-  background: var(--bg, #0b1118);
+  --shell-warn: #f6c453;
+  --shell-font: "Bahnschrift", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
 }
 
 /* ── Top bar ─────────────────────────────────────────────────────── */
@@ -198,3 +190,51 @@
 @media (prefers-reduced-motion: reduce) {
   .app-shell .rail-item { transition: none; }
 }
+
+
+/* ── Midnight finish ───────────────────────────────────────────────
+   A quieter bar, a denser rail and flatter surfaces. Everything here is
+   static colour and one 120 ms hover fade; nothing paints per frame. */
+.tb {
+  gap: 12px;
+  background: var(--shell-panel);
+  border-bottom: 1px solid var(--shell-line);
+  font-family: var(--shell-font);
+}
+.tb-brand { letter-spacing: .19em; font-size: 12.5px; }
+.tb-mark {
+  width: 26px; height: 26px; border-radius: 8px;
+  background: color-mix(in srgb, var(--shell-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--shell-accent) 26%, transparent);
+}
+.tb-brand small { font-size: 8px; letter-spacing: .24em; color: #5f768c; }
+.tb-nav a { font-size: 11.5px; padding: 6px 10px; border-radius: 7px; }
+.tb-nav a:hover { background: var(--shell-soft); border-color: transparent; }
+.tb-nav a[aria-current="page"] {
+  color: var(--shell-accent); background: color-mix(in srgb, var(--shell-accent) 11%, transparent);
+  border-color: transparent;
+}
+.tb .status {
+  height: 26px; padding: 0 10px; border-radius: 999px;
+  background: rgba(255, 255, 255, .03); border: 1px solid var(--shell-line);
+  font-size: 10.5px; letter-spacing: .05em; font-weight: 650;
+}
+.tb .status i { width: 6px; height: 6px; }
+.tb .tb-perf {
+  height: 26px; border-radius: 7px; background: rgba(255, 255, 255, .03);
+  border: 1px solid var(--shell-line); font-size: 10.5px; padding: 0 7px;
+  color: var(--shell-ink);
+}
+.tb .tb-avatar {
+  width: 26px; height: 26px;
+  background: color-mix(in srgb, var(--shell-accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--shell-accent) 30%, transparent);
+}
+.app-main .stats { background: var(--shell-line); border-bottom: 1px solid var(--shell-line); }
+.shell .stats { background: var(--shell-line); }
+
+/* Stat strip: quiet labels, crisp numbers. */
+.stats .stat-card { background: var(--shell-panel); padding: 10px 16px; min-height: 56px; justify-content: center; }
+.stats .stat-card b { font-size: 18px; letter-spacing: -.015em; }
+.stats .stat-card span { font-size: 9.5px; letter-spacing: .12em; color: #6f879c; }
+.stats .stat-card.is-empty b { color: #55708a; }
