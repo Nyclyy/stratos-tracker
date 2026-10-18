@@ -288,7 +288,7 @@ test('weather center drops its own chrome only when embedded', async () => {
 
 test('the shell reports simulator state honestly and never invents a connection', async () => {
   installDom();
-  document.body.innerHTML = '<div class="shell"><header id="appbar"></header><section id="homestats"></section></div>';
+  document.body.innerHTML = '<div class="app-shell"><header id="appbar"></header><section id="homestats"></section></div>';
   const { mountShell } = await import('../app/js/shell.js');
 
   globalThis.fetch = async () => { throw new Error('no bridge here'); };
@@ -316,4 +316,50 @@ test('the shell reports simulator state honestly and never invents a connection'
   assert.ok(sim2.className.includes('is-live'));
   assert.match(document.querySelector('[data-status="live"]').textContent, /live tracking/i);
   live.destroy();
+});
+
+
+test('the home sidebar is a real rail that collapses and remembers the choice', async () => {
+  installDom();
+  const fs = await import('node:fs');
+  const { parseHTML } = await import('linkedom');
+  const html = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  const { window } = parseHTML(html);
+  for (const [key, value] of [
+    ['window', window],
+    ['document', window.document],
+    ['navigator', window.navigator],
+    ['HTMLElement', window.HTMLElement],
+    ['Event', window.Event],
+    ['location', { protocol: 'http:', hostname: 'localhost', href: 'http://localhost/app/index.html', hash: '' }],
+  ]) {
+    Object.defineProperty(globalThis, key, { value, configurable: true });
+  }
+  globalThis.fetch = async () => { throw new Error('no bridge'); };
+
+  const { mountShell } = await import('../app/js/shell.js');
+  const shell = mountShell({ page: 'home', stats: false });
+  try {
+    const rail = document.querySelector('#tabs');
+    assert.ok(rail.closest('.app-shell'), 'the rail lives in the shell, not inside the map');
+    assert.equal(document.querySelector('#app #tabs'), null, 'the map no longer owns the navigation');
+    const items = [...rail.querySelectorAll('.tab')].filter(item => !item.classList.contains('rail-toggle'));
+    assert.equal(items.length, 10, 'ten destinations in the sidebar');
+    const hrefs = [...rail.querySelectorAll('a.tab')].map(a => a.getAttribute('href'));
+    assert.deepEqual(hrefs, ['logbook.html', 'pilot.html#airports', 'pilot.html#career', 'pilot.html#settings']);
+    for (const id of ['bMap', 'bLive', 'bCh', 'bRoute', 'bWx', 'bData']) {
+      assert.ok(document.getElementById(id), `${id} still drives its map panel`);
+    }
+    assert.equal(document.querySelectorAll('[data-status]').length, 2, 'the bar still reports status');
+
+    const toggle = rail.querySelector('.rail-toggle');
+    toggle.dispatchEvent(new window.Event('click', { bubbles: true }));
+    assert.equal(document.querySelector('.app-shell').dataset.collapsed, '1');
+    assert.equal(localStorage.getItem('stratos.rail'), 'collapsed');
+    toggle.dispatchEvent(new window.Event('click', { bubbles: true }));
+    assert.equal(document.querySelector('.app-shell').dataset.collapsed, undefined);
+    assert.equal(localStorage.getItem('stratos.rail'), 'open');
+  } finally {
+    shell.destroy();
+  }
 });

@@ -3,7 +3,9 @@
    from the page tokens (--surface/--ui/--ui2/--acc/--txt/--mut) with fallbacks
    for pages that did not define the full set. */
 
-.shell {
+/* Tokens live on :root: the top bar is mounted on pages that are not the grid
+   shell (logbook, pilot), and they need the same measurements there. */
+:root {
   --shell-bar: 54px;
   --shell-rail: 84px;
   --shell-line: var(--line, var(--ui2, #1a2330));
@@ -14,6 +16,9 @@
   --shell-accent: var(--acc, #22d3ee);
   --shell-good: #34d399;
   --shell-warn: #fbbf24;
+}
+
+.app-shell {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   grid-template-columns: minmax(0, 1fr);
@@ -23,71 +28,79 @@
 }
 
 /* ── Top bar ─────────────────────────────────────────────────────── */
-.shell .tb {
+.tb {
   grid-row: 1;
+  height: var(--shell-bar);
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 10px;
-  height: var(--shell-bar);
   padding: 0 12px;
   padding-top: env(safe-area-inset-top, 0px);
   box-sizing: content-box;
   background: var(--shell-panel);
   border-bottom: 1px solid var(--shell-line);
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 40;
 }
-.shell .tb-brand {
+.tb-brand {
   display: flex; align-items: center; gap: 9px;
   color: var(--shell-ink); text-decoration: none; font-weight: 750;
   font-size: 13px; letter-spacing: .16em; white-space: nowrap;
 }
-.shell .tb-brand:hover { text-decoration: none; }
-.shell .tb-mark {
+.tb-brand:hover { text-decoration: none; }
+.tb-mark {
   width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center;
   background: var(--shell-soft); border: 1px solid var(--shell-line); color: var(--shell-accent);
 }
-.shell .tb-mark svg { width: 16px; height: 16px; }
-.shell .tb-brand small {
+.tb-mark svg { width: 16px; height: 16px; }
+.tb-brand small {
   display: block; font-size: 8.5px; letter-spacing: .2em; color: var(--shell-mute);
   font-weight: 600; margin-top: -2px;
 }
-.shell .tb-gap { flex: 1 1 auto; }
+.tb-nav { display: flex; gap: 2px; margin-left: 4px; }
+.tb-nav a {
+  color: var(--shell-mute); font-size: 12px; font-weight: 650; text-decoration: none;
+  padding: 6px 9px; border-radius: 8px; border: 1px solid transparent;
+}
+.tb-nav a:hover { color: var(--shell-ink); background: var(--shell-soft); border-color: var(--shell-line); text-decoration: none; }
+.tb-nav a[aria-current="page"] { color: var(--shell-ink); background: var(--shell-soft); border-color: var(--shell-line); }
+.tb-gap { flex: 1 1 auto; }
 
-.shell .tb-stats { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
-.shell .status {
+.tb-stats { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
+.tb .status {
   display: inline-flex; align-items: center; gap: 7px;
   height: 28px; padding: 0 11px; border-radius: 999px;
   background: var(--shell-soft); border: 1px solid var(--shell-line);
   font-size: 11px; font-weight: 650; letter-spacing: .04em;
   color: var(--shell-mute); white-space: nowrap;
 }
-.shell .status i { width: 7px; height: 7px; border-radius: 50%; background: var(--shell-mute); flex: 0 0 auto; }
-.shell .status.is-live { color: var(--shell-good); }
-.shell .status.is-live i { background: var(--shell-good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--shell-good) 18%, transparent); }
-.shell .status.is-wait { color: var(--shell-warn); }
-.shell .status.is-wait i { background: var(--shell-warn); }
-.shell .status.is-off { color: var(--shell-mute); }
-.shell .status.is-off i { background: var(--shell-mute); }
+.tb .status i { width: 7px; height: 7px; border-radius: 50%; background: var(--shell-mute); flex: 0 0 auto; }
+.tb .status.is-live { color: var(--shell-good); }
+.tb .status.is-live i { background: var(--shell-good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--shell-good) 18%, transparent); }
+.tb .status.is-wait { color: var(--shell-warn); }
+.tb .status.is-wait i { background: var(--shell-warn); }
+.tb .status.is-off { color: var(--shell-mute); }
+.tb .status.is-off i { background: var(--shell-mute); }
 
-.shell .tb-perf {
+.tb-perf {
   height: 28px; padding: 0 8px; border-radius: 8px;
   background: var(--shell-soft); border: 1px solid var(--shell-line);
   color: var(--shell-ink); font: inherit; font-size: 11px; font-weight: 600;
   cursor: pointer;
 }
-.shell .tb-perf:hover { border-color: var(--shell-accent); }
-.shell .tb-actions { display: flex; align-items: center; gap: 6px; }
-.shell .tb-btn {
+.tb-perf:hover { border-color: var(--shell-accent); }
+.tb-actions { display: flex; align-items: center; gap: 6px; }
+.tb-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   height: 30px; min-width: 30px; padding: 0 9px; border-radius: 8px;
   background: none; border: 1px solid transparent; color: var(--shell-mute);
   font: inherit; font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer;
 }
-.shell .tb-btn:hover { color: var(--shell-ink); background: var(--shell-soft); border-color: var(--shell-line); text-decoration: none; }
-.shell .tb-btn svg { width: 16px; height: 16px; }
-.shell .tb-avatar {
+.tb-btn:hover { color: var(--shell-ink); background: var(--shell-soft); border-color: var(--shell-line); text-decoration: none; }
+.tb-btn svg { width: 16px; height: 16px; }
+.tb-avatar {
   width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
   background: color-mix(in srgb, var(--shell-accent) 16%, transparent);
   border: 1px solid color-mix(in srgb, var(--shell-accent) 34%, transparent);
@@ -95,7 +108,7 @@
 }
 
 /* ── Navigation rail ─────────────────────────────────────────────── */
-.shell .rail {
+.app-shell .rail {
   grid-row: 2;
   width: var(--shell-rail);
   display: flex; flex-direction: column; gap: 2px;
@@ -106,7 +119,7 @@
   scrollbar-width: thin;
   z-index: 30;
 }
-.shell .rail-item {
+.app-shell .rail-item {
   position: relative;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   min-height: 52px; padding: 5px 2px; border-radius: 10px;
@@ -114,73 +127,74 @@
   background: none; border: 0; font: inherit;
   transition: background-color .14s ease, color .14s ease;
 }
-.shell .rail-item:hover { color: var(--shell-ink); background: var(--shell-soft); text-decoration: none; }
-.shell .rail-item svg { width: 19px; height: 19px; }
-.shell .rail-item span {
+.app-shell .rail-item:hover { color: var(--shell-ink); background: var(--shell-soft); text-decoration: none; }
+.app-shell .rail-item svg { width: 19px; height: 19px; }
+.app-shell .rail-item span {
   font-size: 10px; font-weight: 600; letter-spacing: .02em;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.shell .rail-item[aria-current="page"] {
+.app-shell .rail-item[aria-current="page"] {
   color: var(--shell-accent);
   background: color-mix(in srgb, var(--shell-accent) 11%, transparent);
 }
-.shell .rail-item[aria-current="page"]::before {
+.app-shell .rail-item[aria-current="page"]::before {
   content: ""; position: absolute; left: -6px; top: 10px; bottom: 10px;
   width: 3px; border-radius: 0 3px 3px 0; background: var(--shell-accent);
 }
-.shell .rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: 2px; padding-top: 6px; }
-.shell .rail-toggle { color: var(--shell-mute); }
-.shell[data-collapsed="1"] { --shell-rail: 62px; }
-.shell[data-collapsed="1"] .rail-item span { display: none; }
-.shell[data-collapsed="1"] .rail-item { min-height: 44px; }
-.shell[data-collapsed="1"] .tb-brand small { display: none; }
+.app-shell .rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: 2px; padding-top: 6px; }
+.app-shell .rail-toggle { color: var(--shell-mute); }
+.app-shell[data-collapsed="1"] { --shell-rail: 62px; }
+.app-shell[data-collapsed="1"] .rail-item span { display: none; }
+.app-shell[data-collapsed="1"] .rail-item { min-height: 44px; }
+.app-shell[data-collapsed="1"] .tb-brand small { display: none; }
 
 /* ── Content column ──────────────────────────────────────────────── */
-.shell .main {
+.app-shell .app-main {
   grid-row: 2; display: grid; grid-template-rows: auto minmax(0, 1fr);
   min-width: 0; min-height: 0;
 }
-.shell .main > #app { height: 100%; min-height: 0; }
+.app-shell .app-main > #app { height: 100%; min-height: 0; }
 
 /* ── Home statistics strip ───────────────────────────────────────── */
-.shell .stats {
+.app-shell .stats {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px;
   background: var(--shell-line); border-bottom: 1px solid var(--shell-line);
   /* Reserved even while the totals load: the map sizes its canvas once from
      its own box, so a strip that appears late would leave it stale. */
   min-height: 52px;
 }
-.shell .stat-card {
+.app-shell .stat-card {
   background: var(--shell-panel); padding: 9px 14px; min-width: 0;
   display: flex; flex-direction: column; gap: 1px;
 }
-.shell .stat-card b {
+.app-shell .stat-card b {
   font-size: 17px; font-weight: 750; letter-spacing: -.01em; color: var(--shell-ink);
   font-variant-numeric: tabular-nums; line-height: 1.2;
 }
-.shell .stat-card span {
+.app-shell .stat-card span {
   font-size: 10px; font-weight: 650; letter-spacing: .09em; text-transform: uppercase;
   color: var(--shell-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.shell .stat-card.is-empty b { color: var(--shell-mute); }
+.app-shell .stat-card.is-empty b { color: var(--shell-mute); }
 
 /* ── Compact screens ─────────────────────────────────────────────── */
 @media (max-width: 767px) {
-  .shell { --shell-bar: 48px; }
-  .shell .rail { display: none; }
-  .shell .main { grid-row: 2; }
-  .shell .tb-brand small { display: none; }
-  .shell .tb-stats .status span { display: none; }
-  .shell .tb-stats .status { padding: 0 9px; }
-  .shell .stat-card { padding: 7px 10px; }
-  .shell .stat-card b { font-size: 15px; }
-  .shell .stat-card span { font-size: 9px; letter-spacing: .06em; }
+  .app-shell { --shell-bar: 48px; }
+  .tb-nav { display: none; }
+  .app-shell .rail { display: none; }
+  .app-shell .app-main { grid-row: 2; }
+  .tb-brand small { display: none; }
+  .tb-stats .status span { display: none; }
+  .tb-stats .status { padding: 0 9px; }
+  .app-shell .stat-card { padding: 7px 10px; }
+  .app-shell .stat-card b { font-size: 15px; }
+  .app-shell .stat-card span { font-size: 9px; letter-spacing: .06em; }
 }
 @media (max-width: 420px) {
-  .shell .tb-perf { display: none; }
+  .tb-perf { display: none; }
 }
 
 /* Nothing animates for people who ask the system to stop it. */
 @media (prefers-reduced-motion: reduce) {
-  .shell .rail-item { transition: none; }
+  .app-shell .rail-item { transition: none; }
 }

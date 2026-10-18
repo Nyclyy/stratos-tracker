@@ -67,7 +67,7 @@ code, kbd, pre { font-family: var(--mono); font-size: 12px; }
 
 .subnav {
   display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none;
-  border-bottom: 1px solid var(--coast); margin-bottom: 22px; position: sticky; top: 56px; z-index: 20;
+  border-bottom: 1px solid var(--coast); margin-bottom: 22px; position: sticky; top: var(--shell-bar, 54px); z-index: 20;
   background: color-mix(in srgb, var(--bg) 94%, transparent);
 }
 .subnav::-webkit-scrollbar { display: none; }

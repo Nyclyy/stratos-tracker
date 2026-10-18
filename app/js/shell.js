@@ -77,7 +77,7 @@ function renderStatus() {
   }
 }
 
-function buildBar(bar) {
+function buildBar(bar, { theme = false } = {}) {
   const mode = readMode();
   const modeName = (RESOURCE_MODES[mode] || RESOURCE_MODES.normal).name;
   bar.innerHTML = `
@@ -85,6 +85,12 @@ function buildBar(bar) {
       <span class="tb-mark">${ICON.plane}</span>
       <span>STRATOS<small>FLIGHT DECK</small></span>
     </a>
+    <nav class="tb-nav" aria-label="Pages">
+      <a href="index.html" data-page="home">Map</a>
+      <a href="logbook.html" data-page="logbook">Logbook</a>
+      <a href="weather.html" data-page="weather">Weather</a>
+      <a href="live.html" data-page="live">Live</a>
+    </nav>
     <span class="tb-gap"></span>
     <div class="tb-stats">
       <div class="status is-off" data-status="sim" title="Simulator status"><i></i><span>Simulator offline</span></div>
@@ -96,6 +102,7 @@ function buildBar(bar) {
       </label>
     </div>
     <div class="tb-actions">
+      ${theme ? '<button class="tb-btn" id="shell-theme" type="button">Night mode</button>' : ''}
       <a class="tb-btn" href="pilot.html#settings" title="Settings" aria-label="Settings">${ICON.settings}</a>
       <a class="tb-btn" href="logbook.html#profile" title="Pilot profile" aria-label="Pilot profile"><span class="tb-avatar">PF</span></a>
     </div>`;
@@ -121,6 +128,10 @@ function buildBar(bar) {
       bar.querySelector('.tb-stats').append(note);
       setTimeout(() => note.remove(), 4000);
     }
+  });
+  bar.querySelectorAll('.tb-nav a').forEach(link => {
+    if (link.dataset.page === S.page) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
   });
   renderStatus();
 }
@@ -171,13 +182,22 @@ async function pollHealth() {
  * Mount the shared chrome. Pages provide an empty `<header id="appbar">` and,
  * for the home dashboard, an empty `<section id="homestats">`.
  */
-export function mountShell({ page = 'home', stats = false } = {}) {
+export function mountShell({ page = 'home', stats = false, theme = false } = {}) {
   S.page = page;
-  S.root = document.querySelector('.shell') || document.body;
+  S.root = document.querySelector('.app-shell') || document.body;
   S.statsEl = document.getElementById('homestats');
 
   const bar = document.getElementById('appbar');
-  if (bar) buildBar(bar);
+  if (bar) buildBar(bar, { theme });
+
+  // Pages that use the shared theme switch keep it available from the bar.
+  if (theme && bar) {
+    import('./ui.js').then(({ initTheme, bindThemeToggle }) => {
+      initTheme();
+      const button = bar.querySelector('#shell-theme');
+      if (button) bindThemeToggle(button);
+    }).catch(() => { /* theme stays as the page set it */ });
+  }
 
   S.root.querySelectorAll('[data-nav]').forEach(item => {
     const active = item.dataset.nav === page;
@@ -186,7 +206,7 @@ export function mountShell({ page = 'home', stats = false } = {}) {
   });
 
   const shell = S.root;
-  if (shell.classList.contains('shell')) {
+  if (shell.classList.contains('app-shell')) {
     try {
       if (localStorage.getItem('stratos.rail') === 'collapsed') shell.dataset.collapsed = '1';
     } catch (_) { /* private mode */ }

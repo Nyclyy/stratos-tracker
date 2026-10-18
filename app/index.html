@@ -137,12 +137,31 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 @media(max-width:420px){button{min-height:38px}}
 /* Application shell: a slim status bar and the career strip sit above the map.
    The map keeps its own overlays and rail; only the frame around it changes. */
-.shell{display:grid;grid-template-rows:auto minmax(0,1fr);height:100dvh;min-height:0;background:var(--bg)}
-.main{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;overflow:hidden}
+.app-shell{display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:100dvh;min-height:0;background:var(--bg)}
+.app-main{grid-row:2;display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;overflow:hidden}
 #app{height:100%;min-height:0}
-</style><link rel="stylesheet" href="shell.css"></head><body><div class="shell">
+/* Sidebar: a bottom tab bar on phones, a labelled rail on desktop. */
+#tabs{grid-row:3;position:static;left:auto;right:auto;top:auto;bottom:auto;border-top:1px solid var(--ui2);border-radius:20px 20px 0 0;padding-bottom:max(6px,env(safe-area-inset-bottom));z-index:2}
+#tabs .rail-toggle{margin-top:auto;color:var(--mut)}
+.app-shell[data-collapsed="1"]{--rail:62px}
+.app-shell[data-collapsed="1"] .tab span,.app-shell[data-collapsed="1"] #tabs .rail-toggle span{display:none}
+@media(max-width:767px){#tabs .rail-toggle{display:none}}
+@media(min-width:768px){
+.app-shell{--rail:84px;grid-template-columns:var(--rail) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+.app-shell .tb{grid-column:1/-1;grid-row:1}
+.app-main{grid-column:2;grid-row:2}
+#tabs{grid-column:1;grid-row:2;width:100%;height:100%;overflow-y:auto;overflow-x:hidden;flex-direction:column;flex-wrap:nowrap;justify-content:flex-start;gap:3px;padding:10px 6px 10px;border-radius:0;border-right:1px solid var(--ui2);border-bottom:0}
+.tab{flex:0 0 auto;width:100%;min-height:52px;padding:6px 2px;border-radius:10px}
+.tab span{font-size:10px;font-weight:600;letter-spacing:.02em;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tab.act{box-shadow:none;background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.tab.act::before{content:"";position:absolute;left:-6px;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--acc)}
+#tabs .tab{position:relative}
+#top{left:12px}#fc{left:12px}#res{left:12px}#lay{left:12px}#fab{left:12px;bottom:18px}#attr{left:10px}
+}
+</style><link rel="stylesheet" href="shell.css"></head><body><div class="app-shell">
 <header id="appbar" class="tb"></header>
-<div class="main">
+<nav id="tabs" aria-label="Sections"><button class="tab" id="bMap"><b>&#8982;</b><span>Home</span></button><button class="tab" id="bLive"><b>&#9673;</b><span>Live</span></button><button class="tab" id="bCh"><b>&#9707;</b><span>Charts</span></button><button class="tab" id="bRoute"><b>&#8599;</b><span>Route</span></button><button class="tab" id="bWx"><b>&#9729;</b><span>Weather</span></button><button class="tab" id="bData"><b>&#9636;</b><span>Data</span></button><a class="tab" href="logbook.html"><b>&#9776;</b><span>Logbook</span></a><a class="tab" href="pilot.html#airports"><b>&#9678;</b><span>Airports</span></a><a class="tab" href="pilot.html#career"><b>&#9733;</b><span>Stats</span></a><a class="tab" href="pilot.html#settings"><b>&#9881;</b><span>Settings</span></a><button class="tab rail-toggle" data-rail-toggle type="button" title="Collapse sidebar" aria-label="Collapse sidebar"><b>&#8249;</b><span>Hide</span></button></nav>
+<div class="app-main">
 <section id="homestats" class="stats" aria-label="Career totals"></section>
 <div id="app">
 <canvas id="map" aria-label="Aviation chart map"></canvas>
@@ -152,7 +171,7 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 <div id="fc" class="box"></div><div id="fab"><button id="bTheme" class="fab" title="Theme">Day</button>
 <button id="bLay" class="fab" title="Layers">&#9776;</button><button id="bPlan" class="fab" title="Add waypoints">&#9998;</button><button id="bFol" class="fab" title="Follow aircraft">&#9992;</button><button id="bZi" class="fab" title="Zoom in">+</button><button id="bZo" class="fab" title="Zoom out">−</button>
 </div><div id="lay"><b>Map layers</b><button data-l="apt" class="on">Airports</button><button data-l="nav" class="on">Navaids</button><button data-l="trf" class="on">Traffic</button><button data-l="trl">All trails</button><button data-l="grid">Grid</button><b>Map style</b><div id="ms"></div></div>
-<div id="tabs" class="box"><button class="tab" id="bMap"><b>&#8982;</b>Map</button><button class="tab" id="bCh"><b>&#9707;</b>Charts</button><button class="tab" id="bRoute"><b>&#8599;</b>Route</button><button class="tab" id="bWx"><b>&#9729;</b>METAR</button><button class="tab" id="bLive"><b>&#9673;</b>Live</button><button class="tab" id="bData"><b>&#9636;</b>Data</button><a class="tab" href="pilot.html" title="Career, landings, replay, briefing and routes"><b>&#9670;</b>Pilot</a></div>
+
 <div id="cv"><div class="cvh"><button id="cvx" aria-label="Back">&#8592;</button><div class="cvt"><b id="cvi"></b><span id="cvn"></span><span id="cvm"></span></div><button id="cvf">Fit</button></div><div class="seg" id="cvs"></div></div><div id="ci"></div>
 <div id="pdf"><div class="pdh"><button id="pdx" aria-label="Back">&#8592;</button><b id="pdt"></b><a id="pda" target="_blank" rel="noopener">Open outside app</a></div><div class="pdb"><iframe id="pdf2" title="Chart"></iframe></div></div>
 <div id="chart"></div>
