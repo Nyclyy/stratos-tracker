@@ -10,3 +10,11 @@ stratos_pack.json
 relay/data/
 .DS_Store
 Thumbs.db
+
+# Bridge runtime state written into the data dir on first launch
+bridge_token.txt
+airports_cache*.json
+relay.json
+aircraft.json
+osm_cache/
+tiles/

@@ -94,3 +94,14 @@ test('the shipped version is stamped the same in the app, the bridge and the pac
   // an unchanged version instead of failing the release.
   assert.match(read('.github/workflows/release-windows.yml'), /--allow-same-version/);
 });
+
+test('bridge runtime state cannot be committed again', () => {
+  const root = path.resolve(import.meta.dirname, '..');
+  const ignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8').split('\n').map(line => line.trim());
+  for (const pattern of ['bridge_token.txt', 'airports_cache*.json', 'relay.json', 'aircraft.json']) {
+    assert.ok(ignore.includes(pattern), `.gitignore covers ${pattern}`);
+  }
+  // The pairing token is a live secret: it must never sit in the working tree as
+  // a tracked file after a bridge run.
+  assert.ok(!fs.existsSync(path.join(root, 'bridge_token.txt')), 'no stray pairing token in the repository');
+});
