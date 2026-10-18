@@ -363,8 +363,9 @@ cv.onwheel=e=>{e.preventDefault();V.in=null;setFol(false);const base=V.tz==null?
 $('#bZi').onclick=()=>{V.in=null;setFol(false);V.anchor={sx:W/2,sy:H/2,geo:[V.lon,V.lat]};V.tz=Math.min(17.5,(V.tz==null?V.z:V.tz)+.7)};
 $('#bZo').onclick=()=>{V.in=null;setFol(false);V.anchor={sx:W/2,sy:H/2,geo:[V.lon,V.lat]};V.tz=Math.max(2.5,(V.tz==null?V.z:V.tz)-.7)};
 function setFol(v){V.fol=v;$('#bFol').classList.toggle('on',v)}
+function askSimbriefId(){return new Promise(res=>{const b=document.createElement('div');b.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999';b.innerHTML='<form style="background:#111a24;color:#e6edf4;padding:18px;border-radius:10px;min-width:280px;font:14px system-ui"><div style="margin-bottom:10px">Enter your SimBrief Username or Pilot ID</div><input name="v" autocomplete="off" style="width:100%;box-sizing:border-box;padding:6px"><div style="margin-top:12px;text-align:right"><button type="button" data-c>Cancel</button> <button type="submit">OK</button></div></form>';document.body.appendChild(b);const done=v=>{b.remove();res(v)};b.querySelector('form').onsubmit=e=>{e.preventDefault();done(b.querySelector('input').value.trim()||null)};b.querySelector('[data-c]').onclick=()=>done(null);b.querySelector('input').focus();});}
 $('#bSim').onclick=async()=>{
-  const id=prompt('Enter your SimBrief Username or Pilot ID:');
+  const id=await askSimbriefId();
   if(!id)return;
   const q=/^\d+$/.test(id.trim())?`userid=${encodeURIComponent(id.trim())}`:`username=${encodeURIComponent(id.trim())}`;
   try{

@@ -96,6 +96,33 @@ export function bindThemeToggle(button) {
 }
 
 let toastTimer = null;
+// Electron does not implement window.prompt(), so ask for text in an in-app dialog.
+export function askText(title, label, placeholder = '') {
+  return new Promise(resolve => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'dialog-backdrop';
+    backdrop.innerHTML = `<form class="dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+      <h2>${esc(title)}</h2>
+      <label class="field"><span>${esc(label)}</span>
+        <input name="value" type="text" autocomplete="off" placeholder="${esc(placeholder)}"></label>
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn primary" type="submit">OK</button>
+        <button class="btn" type="button" data-cancel>Cancel</button>
+      </div>
+    </form>`;
+    document.body.appendChild(backdrop);
+    const input = backdrop.querySelector('input');
+    const finish = value => { backdrop.remove(); resolve(value); };
+    backdrop.querySelector('form').addEventListener('submit', event => {
+      event.preventDefault();
+      finish(input.value.trim() || null);
+    });
+    backdrop.querySelector('[data-cancel]').addEventListener('click', () => finish(null));
+    backdrop.addEventListener('click', event => { if (event.target === backdrop) finish(null); });
+    input.focus();
+  });
+}
+
 export function toast(message, tone = '') {
   let el = document.getElementById('toast');
   if (!el) {

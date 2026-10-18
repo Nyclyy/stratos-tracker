@@ -379,9 +379,34 @@ async function fetchWeather(id) {
   }
 }
 
+// NOAA blocks direct browser requests (no CORS header), so use Stratos' own
+// weather endpoint: /api/weather on the web, /weather on the desktop bridge.
+const STATION_CACHE = {};
+async function fetchStationWx(id) {
+  const now = Date.now();
+  if (STATION_CACHE[id] && now - STATION_CACHE[id].at < 300000) return STATION_CACHE[id].data;
+  for (const path of ['/api/weather', '/weather']) {
+    try {
+      const r = await fetchWithTimeout(`${path}?icao=${encodeURIComponent(id)}`, 8000);
+      if (!r.ok) continue;
+      const data = await r.json();
+      if (data && (data.metar || data.taf)) {
+        STATION_CACHE[id] = { at: now, data };
+        return data;
+      }
+    } catch (_) {}
+  }
+  return null;
+}
+
 async function fetchMetar(id) {
   const now = Date.now();
   if (METAR_CACHE[id] && now - METAR_CACHE[id].at < 300000) return METAR_CACHE[id].data;
+  const wx = await fetchStationWx(id);
+  if (wx && wx.metar) {
+    METAR_CACHE[id] = { at: now, data: wx.metar };
+    return wx.metar;
+  }
   // Try primary NOAA endpoint
   const sources = [
     `https://aviationweather.gov/api/data/metar?format=raw&ids=${id}&hours=3`,
@@ -406,6 +431,11 @@ async function fetchMetar(id) {
 async function fetchTaf(id) {
   const now = Date.now();
   if (TAF_CACHE[id] && now - TAF_CACHE[id].at < 1800000) return TAF_CACHE[id].data;
+  const wx = await fetchStationWx(id);
+  if (wx && wx.taf) {
+    TAF_CACHE[id] = { at: now, data: wx.taf };
+    return wx.taf;
+  }
   try {
     const r = await fetchWithTimeout(
       `https://aviationweather.gov/api/data/taf?format=raw&ids=${id}`, 8000

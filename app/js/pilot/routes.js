@@ -6,7 +6,7 @@ import {
 } from '../lib/planner.js';
 import { BUNDLED_NAVAIDS } from '../data/airports.js';
 import { MiniMap } from '../minimap.js';
-import { esc, fmtDate, num, tag, toast, downloadText, pickFile } from '../ui.js';
+import { esc, fmtDate, num, tag, toast, downloadText, pickFile, askText } from '../ui.js';
 import { wireSearch } from './common.js';
 
 export async function mount(root, ctx) {
@@ -113,8 +113,9 @@ export async function mount(root, ctx) {
   }
 
   async function importSimbrief() {
-    const id = prompt('SimBrief username or Pilot ID:');
-    if (!id) return;
+    const entered = await askText('Import SimBrief', 'SimBrief username or Pilot ID', 'e.g. pilot123 or 123456');
+    if (!entered) return;
+    const id = entered;
     const query = /^\d+$/.test(id.trim()) ? `userid=${encodeURIComponent(id.trim())}` : `username=${encodeURIComponent(id.trim())}`;
     try {
       const response = await fetch(`https://www.simbrief.com/api/xml.fetcher.php?${query}&json=v2`);
