@@ -4,13 +4,13 @@ Date: 2026-10-18. Environment: Linux x64 cloud VM, Node v24.21.0, Python 3 (Free
 
 ## Passed
 
-The `npm test` total is 53: 23 data-path tests, 2 module-graph tests, 7 DOM tests, 13 Route Discovery tests and 2 relay tests (6 more DOM tests are reported in the same run).
+The `npm test` total is 54: 23 data-path tests, 4 module-graph tests, 12 DOM tests, 13 Route Discovery tests and 2 relay tests. All 54 pass.
 
 | Check | Command | Result |
 | --- | --- | --- |
 | Pure modules: geo, landing, career, replay, planner, telemetry | `npm test` | 23/23 pass |
 | Module graph: every local import exists and is exported | `npm test` | 2/2 pass |
-| DOM: career dashboard/customizer, settings render, dashboard layout helpers, customizer arrow reordering, weather center watchlist, weather center station naming | `npm test` | 6/6 pass |
+| DOM: career dashboard/customizer, settings render, dashboard layout helpers, customizer arrow reordering, weather center watchlist, weather center station naming, shell status/rail, shared grid rule, Discover page, planner handoff | `npm test` | 12/12 pass |
 | Route Discovery: all 10 categories × 5 durations return three distinct cards; distance equals the sum of great-circle legs; airports exist in the database with real coordinates; estimated hours match the chosen aircraft; seeds repeat and vary; departure and region constraints honoured; easier/harder change the offering; island legs stay short and island-only; long haul keeps ≥500 nm; cards declare when they fall outside the requested window; region claims follow the great circle across the antimeridian; bush requests either use real short fields or declare the limitation | `node --test tests/discover.test.mjs` | 13/13 pass |
 | Route Discovery DOM: ten moods render, three cards appear with a map panel, selecting a card updates the preview, Fly This Route writes the planner payload, alternatives return three cards | `npm test` | pass |
 | Discovery engine timing (bundled 152 airports) | in-process measurement | 17–67 ms per generation; 100–180 ms with a synthetic 900-airport pool |
