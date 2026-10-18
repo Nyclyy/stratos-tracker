@@ -130,3 +130,60 @@ test('customizer arrows reorder rows and renumber positions', async () => {
   rows()[0].querySelector('[data-up]').dispatchEvent(new window.Event('click', { bubbles: true }));
   assert.equal(rows()[0].dataset.key, topKey);
 });
+
+test('weather center boots and its watchlist adds, dedupes and removes stations', async () => {
+  const { parseHTML } = await import('linkedom');
+  const fs = await import('node:fs');
+  const html = fs.readFileSync(new URL('../app/weather.html', import.meta.url), 'utf8');
+  const { window } = parseHTML(html);
+  const define = (key, value) => Object.defineProperty(globalThis, key, { value, configurable: true });
+  define('window', window);
+  define('document', window.document);
+  define('navigator', window.navigator);
+  define('location', { protocol: 'http:', hostname: 'localhost', href: 'http://localhost/app/weather.html', search: '', hash: '' });
+  define('localStorage', {
+    store: new Map(),
+    getItem(key) { return this.store.get(key) ?? null; },
+    setItem(key, value) { this.store.set(key, String(value)); },
+    removeItem(key) { this.store.delete(key); },
+  });
+  // No network in tests: every station request fails cleanly.
+  define('fetch', async () => ({ ok: false, status: 503, json: async () => ({}), text: async () => '' }));
+  define('HTMLElement', window.HTMLElement);
+  define('Event', window.Event);
+  define('CustomEvent', window.CustomEvent);
+
+  const inline = [...window.document.querySelectorAll('script:not([src])')].map(node => node.textContent).join('\n');
+  assert.match(inline, /renderWatch/, 'watchlist code is present in the page');
+
+  // Running the page script is itself the test: it wires every element by id,
+  // so a renamed or missing id throws here instead of failing silently in a browser.
+  new Function(inline)();
+
+  const body = window.document.getElementById('watch-body');
+  assert.match(body.textContent, /No airports yet/);
+
+  const addButton = window.document.getElementById('watch-add-btn');
+  const input = window.document.getElementById('watch-input');
+  const click = element => element.dispatchEvent(new window.Event('click', { bubbles: true }));
+
+  input.value = 'kden';
+  click(addButton);
+  assert.deepEqual(JSON.parse(globalThis.localStorage.getItem('wx.watch')), ['KDEN'], 'lowercase input is stored as an ICAO');
+  assert.match(body.textContent, /KDEN/);
+
+  input.value = 'KDEN';
+  click(addButton);
+  assert.deepEqual(JSON.parse(globalThis.localStorage.getItem('wx.watch')), ['KDEN'], 'a duplicate is not added twice');
+  assert.equal(body.querySelectorAll('tr[data-watch]').length, 1);
+
+  click(window.document.getElementById('watch-auto'));
+  assert.equal(window.document.getElementById('watch-auto').getAttribute('aria-pressed'), 'true');
+  assert.equal(globalThis.localStorage.getItem('wx.watchAuto'), '1', 'auto refresh choice persists');
+  click(window.document.getElementById('watch-auto'));
+  assert.equal(globalThis.localStorage.getItem('wx.watchAuto'), '0');
+
+  click(body.querySelector('[data-remove="KDEN"]'));
+  assert.deepEqual(JSON.parse(globalThis.localStorage.getItem('wx.watch')), [], 'remove clears the stored station');
+  assert.match(body.textContent, /No airports yet/);
+});

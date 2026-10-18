@@ -242,6 +242,20 @@ a:hover { text-decoration: underline; }
   #dep-arr { grid-template-columns: 1fr; }
   .apt-id { font-size: 28px; }
 }
+/* Watchlist */
+#watch .watch-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 10px; }
+#watch .watch-head h2 { border-bottom:0; padding-bottom:0; margin:0; }
+#watch .watch-stamp { font-size:11px; color:var(--mut); font-variant-numeric:tabular-nums; }
+#watch .watch-add { display:flex; gap:8px; margin:0 0 12px; }
+#watch .watch-add .s-field { max-width:190px; min-height:32px; font-size:13px; }
+#watch .watch-scroll { overflow-x:auto; overscroll-behavior-x:contain; }
+#watch .watch-empty { color:var(--mut); font-size:13px; margin:0; line-height:1.55; }
+#watch .watch-row-actions { display:flex; gap:6px; justify-content:flex-end; }
+#watch table.s-table td { white-space:nowrap; }
+@media (max-width:560px) {
+  #watch .watch-add .s-field { max-width:none; flex:1 1 auto; }
+  #watch .watch-head { gap:6px; }
+}
 </style>
 <link rel="stylesheet" href="stratos-ui.css">
 </head>
@@ -265,6 +279,23 @@ a:hover { text-decoration: underline; }
 
 <!-- Departure / Arrival quick panels -->
 <div id="main">
+
+  <!-- Watchlist: many stations at once -->
+  <section id="watch" class="wx-section" aria-labelledby="watch-title">
+    <div class="watch-head">
+      <h2 id="watch-title">Watchlist</h2>
+      <span class="spacer"></span>
+      <span class="watch-stamp" id="watch-stamp"></span>
+      <button type="button" class="s-btn s-btn--sm" id="watch-refresh">Refresh</button>
+      <button type="button" class="s-btn s-btn--sm" id="watch-auto" aria-pressed="false">Auto 5 min</button>
+    </div>
+    <div class="watch-add">
+      <input id="watch-input" class="s-field" maxlength="5" placeholder="Add an ICAO, e.g. EGLL" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Add an airport to the watchlist">
+      <button type="button" class="s-btn s-btn--sm s-btn--primary" id="watch-add-btn">Add</button>
+    </div>
+    <div id="watch-body"></div>
+  </section>
+
   <div id="dep-arr">
     <div class="dep-arr-card">
       <h3>Departure</h3>
@@ -882,6 +913,140 @@ function ageStr(d) {
   const hr = Math.floor(diffMin / 60);
   return hr + 'h ' + (diffMin % 60) + 'm ago';
 }
+
+/* ── Watchlist ───────────────────────────────────────────────────── */
+const WATCH_MAX = 12;
+const WATCH_TTL = 300000; // matches the per-station METAR cache
+let watchList = [];
+try { watchList = JSON.parse(localStorage.getItem('wx.watch') || '[]'); } catch (_) { watchList = []; }
+watchList = (Array.isArray(watchList) ? watchList : []).filter(id => /^[A-Z0-9]{3,5}$/.test(id)).slice(0, WATCH_MAX);
+const WATCH_DATA = {};
+let watchAuto = false;
+try { watchAuto = localStorage.getItem('wx.watchAuto') === '1'; } catch (_) {}
+let watchTimer = null;
+
+function saveWatch() {
+  try { localStorage.setItem('wx.watch', JSON.stringify(watchList)); } catch (_) {}
+}
+
+function watchStamp() {
+  const el = document.getElementById('watch-stamp');
+  if (!el) return;
+  const times = Object.values(WATCH_DATA).map(d => d.at).filter(Boolean);
+  el.textContent = times.length ? 'Updated ' + ageStr(new Date(Math.max(...times))) : '';
+}
+
+function watchActions(id) {
+  return `<td class="watch-row-actions">
+      <button class="s-btn s-btn--sm" data-open="${id}" type="button">Open</button>
+      <button class="s-btn s-btn--sm s-btn--danger" data-remove="${id}" type="button">Remove</button>
+    </td>`;
+}
+
+function watchRowHtml(id) {
+  const entry = WATCH_DATA[id];
+  const head = `<tr data-watch="${id}"><td><b>${id}</b></td>`;
+  if (!entry) return `${head}<td colspan="5" class="muted">Loading…</td>${watchActions(id)}</tr>`;
+  if (entry.error) return `${head}<td colspan="5" class="muted">${entry.error}</td>${watchActions(id)}</tr>`;
+  const m = entry.m;
+  const vis = m.cavok ? '10+ km' : (m.vis ? m.vis + (m.visSM ? ' SM' : ' m') : '—');
+  const tempDew = m.temp === undefined ? '—'
+    : m.dew === undefined ? `${m.temp}°C`
+    : `${m.temp}° / ${m.dew}°C`;
+  const pressure = m.altim || m.qnh || '';
+  return `${head}
+    <td>${entry.cat ? `<span class="cat-badge cat-${entry.cat}">${entry.cat}</span>` : '<span class="muted">—</span>'}</td>
+    <td>${m.windDir === undefined ? '—' : fmtWind(m)}</td>
+    <td>${vis}</td>
+    <td>${m.ceiling ? m.ceiling.toLocaleString() + ' ft' : '<span class="muted">—</span>'}</td>
+    <td>${tempDew}${pressure ? ' · ' + pressure : ''}</td>
+    ${watchActions(id)}</tr>`;
+}
+
+function renderWatch() {
+  const body = document.getElementById('watch-body');
+  if (!body) return;
+  if (!watchList.length) {
+    body.innerHTML = '<p class="watch-empty">No airports yet. Add ICAO codes to watch several stations side by side. Each row is its own request, and the list is saved on this device.</p>';
+  } else {
+    body.innerHTML = `<div class="watch-scroll"><table class="s-table">
+      <thead><tr><th>Airport</th><th>Category</th><th>Wind</th><th>Visibility</th><th>Ceiling</th><th>Temp / Dew</th><th></th></tr></thead>
+      <tbody>${watchList.map(watchRowHtml).join('')}</tbody></table></div>`;
+  }
+  body.querySelectorAll('[data-remove]').forEach(button => button.addEventListener('click', () => removeWatch(button.dataset.remove)));
+  body.querySelectorAll('[data-open]').forEach(button => button.addEventListener('click', () => searchFor(button.dataset.open)));
+  watchStamp();
+}
+
+async function refreshWatch(force) {
+  const targets = watchList.filter(id => force || !WATCH_DATA[id] || Date.now() - (WATCH_DATA[id].at || 0) > WATCH_TTL);
+  // An explicit Refresh must ignore the caches, otherwise the button does nothing.
+  if (force) {
+    for (const id of targets) {
+      try { delete METAR_CACHE[id]; delete STATION_CACHE[id]; } catch (_) {}
+    }
+  }
+  // One station at a time: gentle on the upstream API and the rows fill in progressively.
+  for (const id of targets) {
+    if (!watchList.includes(id)) continue;
+    let raw = null;
+    try { raw = await fetchMetar(id); } catch (_) { raw = null; }
+    if (!watchList.includes(id)) continue;
+    if (!raw) WATCH_DATA[id] = { at: Date.now(), error: 'No METAR available' };
+    else {
+      const m = parseMETAR(raw);
+      WATCH_DATA[id] = { at: Date.now(), raw, m, cat: flightCat(m) };
+    }
+    renderWatch();
+  }
+  watchStamp();
+}
+
+function addWatch(value) {
+  const id = String(value || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{3,5}$/.test(id) || watchList.includes(id) || watchList.length >= WATCH_MAX) return false;
+  watchList.push(id);
+  saveWatch();
+  renderWatch();
+  refreshWatch(false);
+  return true;
+}
+
+function removeWatch(id) {
+  watchList = watchList.filter(x => x !== id);
+  delete WATCH_DATA[id];
+  saveWatch();
+  renderWatch();
+}
+
+function setWatchAuto(on) {
+  watchAuto = Boolean(on);
+  try { localStorage.setItem('wx.watchAuto', watchAuto ? '1' : '0'); } catch (_) {}
+  const button = document.getElementById('watch-auto');
+  if (button) {
+    button.setAttribute('aria-pressed', watchAuto ? 'true' : 'false');
+    button.classList.toggle('s-btn--primary', watchAuto);
+  }
+  if (watchTimer) { clearInterval(watchTimer); watchTimer = null; }
+  // Only while the tab is visible: a hidden page should not poll.
+  if (watchAuto) watchTimer = setInterval(() => { if (!document.hidden) refreshWatch(false); }, WATCH_TTL);
+}
+
+document.getElementById('watch-add-btn').addEventListener('click', () => {
+  const input = document.getElementById('watch-input');
+  if (addWatch(input.value)) input.value = '';
+});
+document.getElementById('watch-input').addEventListener('keydown', event => {
+  if (event.key === 'Enter') { event.preventDefault(); document.getElementById('watch-add-btn').click(); }
+});
+document.getElementById('watch-input').addEventListener('input', event => { event.target.value = event.target.value.toUpperCase(); });
+document.getElementById('watch-refresh').addEventListener('click', () => refreshWatch(true));
+document.getElementById('watch-auto').addEventListener('click', () => setWatchAuto(!watchAuto));
+document.addEventListener('visibilitychange', () => { if (!document.hidden && watchList.length) refreshWatch(false); });
+
+setWatchAuto(watchAuto);
+renderWatch();
+if (watchList.length) refreshWatch(false);
 
 // Check URL param on load
 const initId = new URLSearchParams(location.search).get('id');
