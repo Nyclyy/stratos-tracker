@@ -4,13 +4,13 @@ Date: 2026-10-18. Environment: Linux x64 cloud VM, Node v24.21.0, Python 3 (Free
 
 ## Passed
 
-The `npm test` total is 32: 23 data-path tests, 2 module-graph tests, 5 DOM tests and 2 relay tests.
+The `npm test` total is 33: 23 data-path tests, 2 module-graph tests, 6 DOM tests and 2 relay tests.
 
 | Check | Command | Result |
 | --- | --- | --- |
 | Pure modules: geo, landing, career, replay, planner, telemetry | `npm test` | 23/23 pass |
 | Module graph: every local import exists and is exported | `npm test` | 2/2 pass |
-| DOM: career dashboard/customizer, settings render, dashboard layout helpers, customizer arrow reordering, weather center watchlist | `npm test` | 5/5 pass |
+| DOM: career dashboard/customizer, settings render, dashboard layout helpers, customizer arrow reordering, weather center watchlist, weather center station naming | `npm test` | 6/6 pass |
 | Relay: pairing, ingest, state, revoke, origin and rate limits | `npm test` | 2/2 pass |
 | Bridge lifecycle, dedupe, recovery, landing analysis | `npm run test:py` | 10/10 pass |
 | Real bridge + relay: health, static shell, SSE, pair → claim → snapshot → revoke | `npm run test:integration` | 2/2 pass (~10.5 s) |

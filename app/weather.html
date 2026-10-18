@@ -122,6 +122,7 @@ a:hover { text-decoration: underline; }
 .apt-id { font-size: 38px; font-weight: 800; letter-spacing: .03em; line-height: 1; }
 .apt-meta { flex: 1; min-width: 160px; }
 .apt-name { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.apt-extra { font-size: 12px; color: var(--mut); margin-bottom: 4px; }
 .apt-sub { font-size: 12px; color: var(--mut); }
 .apt-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .obs-time { font-size: 11px; color: var(--mut); }
@@ -413,21 +414,33 @@ async function fetchWeather(id) {
 // NOAA blocks direct browser requests (no CORS header), so use Stratos' own
 // weather endpoint: /api/weather on the web, /weather on the desktop bridge.
 const STATION_CACHE = {};
+const STATION_INFLIGHT = {};
+
 async function fetchStationWx(id) {
   const now = Date.now();
   if (STATION_CACHE[id] && now - STATION_CACHE[id].at < 300000) return STATION_CACHE[id].data;
-  for (const path of ['/api/weather', '/weather']) {
-    try {
-      const r = await fetchWithTimeout(`${path}?icao=${encodeURIComponent(id)}`, 8000);
-      if (!r.ok) continue;
-      const data = await r.json();
-      if (data && (data.metar || data.taf)) {
-        STATION_CACHE[id] = { at: now, data };
-        return data;
-      }
-    } catch (_) {}
+  // METAR and TAF ask for the same station in the same tick, so share one request
+  // instead of sending two identical ones to the upstream API.
+  if (STATION_INFLIGHT[id]) return STATION_INFLIGHT[id];
+  STATION_INFLIGHT[id] = (async () => {
+    for (const path of ['/api/weather', '/weather']) {
+      try {
+        const r = await fetchWithTimeout(`${path}?icao=${encodeURIComponent(id)}`, 8000);
+        if (!r.ok) continue;
+        const data = await r.json();
+        if (data && (data.metar || data.taf)) {
+          STATION_CACHE[id] = { at: Date.now(), data };
+          return data;
+        }
+      } catch (_) {}
+    }
+    return null;
+  })();
+  try {
+    return await STATION_INFLIGHT[id];
+  } finally {
+    delete STATION_INFLIGHT[id];
   }
-  return null;
 }
 
 async function fetchMetar(id) {
@@ -485,6 +498,45 @@ function fetchWithTimeout(url, ms) {
   const ctrl = new AbortController();
   const id2 = setTimeout(() => ctrl.abort(), ms);
   return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(id2));
+}
+
+/* ── Airport name, city and elevation (OurAirports via our own API) ─ */
+const APT_META = {};
+let shownId = null;
+
+async function fetchAirportMeta(id) {
+  for (const path of ['/api/ourairports', '/ourairports']) {
+    try {
+      const response = await fetchWithTimeout(`${path}?q=${encodeURIComponent(id)}&limit=5`, 8000);
+      if (!response.ok) continue;
+      const data = await response.json();
+      const rows = Array.isArray(data.results) ? data.results : [];
+      const row = rows.find(item => String(item.ident || '').toUpperCase() === id);
+      if (row) return row;
+    } catch (_) {}
+  }
+  return null;
+}
+
+async function loadAirportMeta(id) {
+  let meta = APT_META[id];
+  if (!meta) {
+    meta = await fetchAirportMeta(id);
+    if (!meta) return; // no lookup available: the ICAO stays as the heading
+    APT_META[id] = meta;
+  }
+  // The reader may have searched another airport while this was in flight.
+  if (shownId !== id) return;
+  const nameEl = document.getElementById('apt-name');
+  const extraEl = document.getElementById('apt-extra');
+  if (!nameEl || !extraEl) return;
+  if (meta.name) nameEl.textContent = meta.name;
+  const bits = [];
+  if (meta.city) bits.push(meta.city);
+  if (meta.country) bits.push(meta.country);
+  if (typeof meta.elev === 'number') bits.push('elev ' + Math.round(meta.elev).toLocaleString() + ' ft');
+  extraEl.textContent = bits.join(' · ');
+  nameEl.classList.add('apt-name-loaded');
 }
 
 function showError(msg) {
@@ -583,8 +635,6 @@ function renderWeather(id, metarRaw, tafRaw) {
   const cat = flightCat(m);
   const age = m.obsTime ? ageStr(m.obsTime) : '—';
 
-  // Airport lookup from bundled Stratos data (if on the same origin as app/index.html)
-  const aptName = ''; // Will be populated if loaded together
 
   let html = '';
 
@@ -592,7 +642,8 @@ function renderWeather(id, metarRaw, tafRaw) {
   html += `<div id="apt-header">
     <div class="apt-id">${id}</div>
     <div class="apt-meta">
-      <div class="apt-name">${aptName || id}</div>
+      <div class="apt-name" id="apt-name">${id}</div>
+      <div class="apt-extra" id="apt-extra"></div>
       <div class="apt-sub">METAR · Updated ${age}</div>
     </div>
     <div class="apt-right">
@@ -643,6 +694,8 @@ function renderWeather(id, metarRaw, tafRaw) {
   }
 
   document.getElementById('wx-output').innerHTML = html;
+  shownId = id;
+  loadAirportMeta(id);
 }
 
 function decodeMETAR(m) {

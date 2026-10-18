@@ -187,3 +187,72 @@ test('weather center boots and its watchlist adds, dedupes and removes stations'
   assert.deepEqual(JSON.parse(globalThis.localStorage.getItem('wx.watch')), [], 'remove clears the stored station');
   assert.match(body.textContent, /No airports yet/);
 });
+
+test('weather center names the airport when the lookup answers and falls back to the code', async () => {
+  const { parseHTML } = await import('linkedom');
+  const fs = await import('node:fs');
+  const html = fs.readFileSync(new URL('../app/weather.html', import.meta.url), 'utf8');
+  const { window } = parseHTML(html);
+  const define = (key, value) => Object.defineProperty(globalThis, key, { value, configurable: true });
+  define('window', window);
+  define('document', window.document);
+  define('navigator', window.navigator);
+  define('location', { protocol: 'http:', hostname: 'localhost', href: 'http://localhost/app/weather.html', search: '', hash: '' });
+  define('localStorage', {
+    store: new Map(),
+    getItem(key) { return this.store.get(key) ?? null; },
+    setItem(key, value) { this.store.set(key, String(value)); },
+    removeItem(key) { this.store.delete(key); },
+  });
+  const json = body => ({ ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) });
+  const calls = [];
+  define('fetch', async url => {
+    const target = String(url);
+    calls.push(target);
+    if (target.includes('ourairports')) {
+      // Only MMMX resolves; anything else returns an empty result set.
+      return json(target.includes('MMMX')
+        ? { results: [{ ident: 'MMMX', name: 'Mexico City Benito Juárez International Airport', city: 'Mexico City', country: 'MX', elev: 7316 }] }
+        : { results: [] });
+    }
+    if (target.includes('weather')) {
+      return json({
+        icao: 'MMMX',
+        metar: 'METAR MMMX 181855Z 32004KT 10SM FEW020 SCT080 BKN220 22/09 A3035 NOSIG',
+        taf: 'TAF MMMX 181700Z 1818/1918 32004KT P6SM SKC',
+      });
+    }
+    return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
+  });
+  define('HTMLElement', window.HTMLElement);
+  define('Event', window.Event);
+  define('CustomEvent', window.CustomEvent);
+
+  const inline = [...window.document.querySelectorAll('script:not([src])')].map(node => node.textContent).join('\n');
+  new Function(inline)();
+  // The button's handler is an inline onclick attribute, which linkedom does not
+  // execute, so drive the search the way a keyboard user does.
+  const search = id => {
+    const input = window.document.getElementById('icao-input');
+    input.value = id;
+    const event = new window.Event('keydown', { bubbles: true });
+    event.key = 'Enter';
+    input.dispatchEvent(event);
+  };
+  const settle = () => new Promise(resolve => setTimeout(resolve, 60));
+
+  search('MMMX');
+  await settle();
+  const name = window.document.getElementById('apt-name');
+  assert.equal(name.textContent, 'Mexico City Benito Juárez International Airport', 'the real name replaces the bare code');
+  assert.match(window.document.getElementById('apt-extra').textContent, /Mexico City · MX · elev 7,316 ft/);
+
+  // METAR and TAF must share one station request rather than sending two.
+  assert.equal(calls.filter(url => url.includes('/api/weather')).length, 1, 'one station request per search');
+
+  // A station with no lookup available keeps the ICAO rather than showing nothing.
+  search('KJFK');
+  await settle();
+  assert.equal(window.document.getElementById('apt-name').textContent, 'KJFK', 'the code is the fallback');
+  assert.equal(window.document.getElementById('apt-extra').textContent, '', 'no stray location line');
+});
