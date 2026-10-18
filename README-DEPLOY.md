@@ -179,7 +179,8 @@ There is no browser automation in this environment (Chromium system libraries we
 - Bridge logbook: `stratos_logbook.json`, written atomically through a temp file. In-progress flights are snapshotted to `stratos_inprogress.json` and recovered after a crash; recovered flights are marked incomplete and excluded from career totals, not deleted.
 - Flight IDs are deduplicated on both sides. `mergeFlights` keeps a richer copy and never removes local records.
 - Settings, routes, dashboard layout and backups live in the same database. “Export backup” produces JSON containing flights and settings.
-- Uninstalling the Windows app does not delete `%APPDATA%/Stratos/bridge-data` (`deleteAppDataOnUninstall: false`).
+- Uninstalling the Windows app does not delete the bridge's data directory (`deleteAppDataOnUninstall: false`).
+- That directory lives at `%APPDATA%\stratos-desktop\bridge-data` on Windows: Electron derives the per-user folder from the package `name` field (`stratos-desktop`), not from electron-builder's `productName: 'Stratos'`, which only names the installer, Start Menu entry and shortcuts. So the folder is `stratos-desktop` even though the app is called Stratos. The bridge's pairing token is `bridge_token.txt` inside it.
 
 ## 8. Remaining limitations
 
