@@ -94,7 +94,6 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 <div id="res" class="box"></div>
 <div id="fc" class="box"></div><div id="fab"><button id="bTheme" class="fab" title="Theme">Day</button>
 <button id="bLay" class="fab" title="Layers">&#9776;</button><button id="bPlan" class="fab" title="Add waypoints">&#9998;</button><button id="bFol" class="fab" title="Follow aircraft">&#9992;</button><button id="bZi" class="fab" title="Zoom in">+</button><button id="bZo" class="fab" title="Zoom out">−</button>
-<button id="bSim" class="fab" title="Import SimBrief">SB</button>
 </div><div id="lay"><b>Map layers</b><button data-l="apt" class="on">Airports</button><button data-l="nav" class="on">Navaids</button><button data-l="trf" class="on">Traffic</button><button data-l="trl">All trails</button><button data-l="grid">Grid</button><b>Map style</b><div id="ms"></div></div>
 <div id="tabs" class="box"><button class="tab" id="bMap"><b>&#8982;</b>Map</button><button class="tab" id="bCh"><b>&#9707;</b>Charts</button><button class="tab" id="bRoute"><b>&#8599;</b>Route</button><button class="tab" id="bWx"><b>&#9729;</b>METAR</button><button class="tab" id="bLive"><b>&#9673;</b>Live</button><button class="tab" id="bData"><b>&#9636;</b>Data</button><a class="tab" href="pilot.html" title="Career, landings, replay, briefing and routes"><b>&#9670;</b>Pilot</a></div>
 <div id="cv"><div class="cvh"><button id="cvx" aria-label="Back">&#8592;</button><div class="cvt"><b id="cvi"></b><span id="cvn"></span><span id="cvm"></span></div><button id="cvf">Fit</button></div><div class="seg" id="cvs"></div></div><div id="ci"></div>
@@ -336,7 +335,7 @@ if(V.z>8.5)drawReal(a,x,y);else a.det=false;if(0)pairs(a).forEach(pr=>{const n=p
 cx.beginPath();cx.arc(x,y,a.det?0:V.z>8.5?3:5,0,7);cx.fillStyle=C.land;cx.fill();cx.strokeStyle=C.ap;cx.lineWidth=2.2;cx.stroke();
 if(V.z>(a.x?7:4.8)){cx.font='bold 12px sans-serif';if(SAT()){cx.lineWidth=3;cx.strokeStyle=DKM()?'rgba(0,0,0,.7)':'rgba(255,255,255,.85)';cx.strokeText(a.id,x+9,y-6)}cx.fillStyle=SAT()?(DKM()?'#fff':'#111'):C.txt;cx.fillText(a.id,x+9,y-6)}});
 if(route.length&&!CH.on){cx.strokeStyle=C.route;cx.lineWidth=3;cx.setLineDash([9,5]);cx.beginPath();route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke();cx.setLineDash([]);if(liveOk()&&route.length>1){const pr=routeProg(),pts=[route[0]];let acc=0;for(let i=0;i<route.length-1;i++){acc+=dist(route[i],route[i+1]);if(acc<pr)pts.push(route[i+1])}pts.push(pos(pr));cx.strokeStyle=C.route;cx.lineWidth=5;cx.beginPath();pts.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke()}
-route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);cx.fillStyle=C.route;cx.fillRect(x-4,y-4,8,8);cx.fillStyle=C.txt;cx.font='11px sans-serif';cx.fillText(i+1,x+7,y+14)})}
+route.forEach(p=>{const[x,y]=sc(p.lon,p.lat),big=/^(TOC|TOD)$/.test(p.id),s=big?16:8;cx.fillStyle=C.route;cx.fillRect(x-s/2,y-s/2,s,s);if(big){cx.font='bold 14px sans-serif';cx.lineWidth=3;cx.strokeStyle='rgba(0,0,0,.75)';cx.strokeText(p.id,x+11,y+18);cx.fillStyle='#fff';cx.fillText(p.id,x+11,y+18)}else{cx.fillStyle=C.txt;cx.font='11px sans-serif';cx.fillText(p.id,x+7,y+14)}})}
 trails();if(L.trf&&!CH.on)T.forEach(a=>{const[x,y]=sc(a.lon,a.lat);cx.save();cx.translate(x,y);cx.rotate(a.hdg*R);cx.strokeStyle=C.trf;cx.lineWidth=2;cx.beginPath();PL.forEach((p,i)=>i?cx.lineTo(p[0]*.7,p[1]*.7):cx.moveTo(p[0]*.7,p[1]*.7));cx.closePath();cx.fillStyle=C.trf;cx.fill();cx.restore();if(V.z>6){cx.fillStyle=C.trf;cx.font='10px sans-serif';cx.fillText(a.id+' '+Math.round(a.alt/100),x+9,y+3)}});
 if(liveOk()){const[x,y]=sc(own.lon,own.lat);cx.save();cx.translate(x,y);cx.rotate(own.hdg*R);cx.beginPath();cx.arc(0,0,15,0,7);cx.strokeStyle=C.own;cx.globalAlpha=.4;cx.lineWidth=1.5;cx.stroke();cx.globalAlpha=1;cx.beginPath();PL.forEach((p,i)=>i?cx.lineTo(p[0]*1.15,p[1]*1.15):cx.moveTo(p[0]*1.15,p[1]*1.15));cx.closePath();cx.fillStyle=C.own;cx.fill();cx.strokeStyle=C.land;cx.lineWidth=1.5;cx.stroke();cx.restore()}
 if(CH.on)chartFx();if(sel&&!CH.on){const q=sel.k=='own'?own:sel,[x,y]=sc(q.lon,q.lat);cx.strokeStyle=C.txt;cx.lineWidth=2;cx.beginPath();cx.arc(x,y,16+(tk?3*Math.sin(performance.now()/260):0),0,7);cx.stroke()}}
@@ -364,7 +363,7 @@ $('#bZi').onclick=()=>{V.in=null;setFol(false);V.anchor={sx:W/2,sy:H/2,geo:[V.lo
 $('#bZo').onclick=()=>{V.in=null;setFol(false);V.anchor={sx:W/2,sy:H/2,geo:[V.lon,V.lat]};V.tz=Math.max(2.5,(V.tz==null?V.z:V.tz)-.7)};
 function setFol(v){V.fol=v;$('#bFol').classList.toggle('on',v)}
 function askSimbriefId(){return new Promise(res=>{const b=document.createElement('div');b.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999';b.innerHTML='<form style="background:#111a24;color:#e6edf4;padding:18px;border-radius:10px;min-width:280px;font:14px system-ui"><div style="margin-bottom:10px">Enter your SimBrief Username or Pilot ID</div><input name="v" autocomplete="off" style="width:100%;box-sizing:border-box;padding:6px"><div style="margin-top:12px;text-align:right"><button type="button" data-c>Cancel</button> <button type="submit">OK</button></div></form>';document.body.appendChild(b);const done=v=>{b.remove();res(v)};b.querySelector('form').onsubmit=e=>{e.preventDefault();done(b.querySelector('input').value.trim()||null)};b.querySelector('[data-c]').onclick=()=>done(null);b.querySelector('input').focus();});}
-$('#bSim').onclick=async()=>{
+async function importSB(){
   const id=await askSimbriefId();
   if(!id)return;
   try{
@@ -391,7 +390,7 @@ $('#bSim').onclick=async()=>{
   }catch(e){
     alert('SimBrief import error: '+(e.message||e));
   }
-};
+}
 $('#bPlan').onclick=()=>{plan=!plan;$('#bPlan').classList.toggle('on',plan);if(plan){panel='route';render()}};
 $('#bRoute').onclick=()=>{panel=panel=='route'?null:'route';render()};
 document.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{L[b.dataset.l]^=1;b.classList.toggle('on')});
@@ -417,7 +416,7 @@ else s.innerHTML=`<h3>${o.id}</h3><div class="m">Alt ${Math.round(o.alt/10)*10} 
 const t=total();s.innerHTML=`<h3>Flight plan</h3><div class="m">${route.length?route.map(p=>p.id).join(' → '):'Empty'} · ${t.toFixed(0)} nm · ${hm(t/CRUISE)} @ ${CRUISE} kt</div>
 <table>${route.map((p,i)=>`<tr><td>${i+1}</td><td>${p.id}</td><td class="m">${p.name}</td><td>${i?Math.round(dist(route[i-1],p))+' nm':''}</td><td><button onclick="rm(${i})" aria-label="Remove">✕</button></td></tr>`).join('')}</table>
 <div class="m">${plan?'Plan mode on: tap map, airports or navaids to add waypoints.':'Turn on Plan, then tap the map to add waypoints.'}</div>
-<div class="row"><button onclick="defRoute();save();render()">Reset</button><button onclick="route=[];save();trav=0;render()">Clear</button><button onclick="exp('pln')">MSFS .PLN</button><button onclick="exp('fms')">X-Plane .FMS</button></div><div id="ex"></div>`}
+<div class="row"><button onclick="importSB()">Import SimBrief</button><button onclick="defRoute();save();render()">Reset</button><button onclick="route=[];save();trav=0;render()">Clear</button><button onclick="exp('pln')">MSFS .PLN</button><button onclick="exp('fms')">X-Plane .FMS</button></div><div id="ex"></div>`}
 const pad=n=>String(n).padStart(2,'0');
 function openChart(a){sel=a;getMetar(a);getFaa(a);const pr=pairs(a),ln=RL[a.id]||[],mx=Math.max(...pr.map((p,i)=>ln[i]||8000)),k=230/mx,w=wind(a.metar);
 let s=`<svg viewBox="0 0 600 600" role="img" aria-label="${a.id} airport diagram"><rect width="600" height="600" rx="12" fill="${C.land}" stroke="${C.coast}"/>`;
