@@ -501,7 +501,7 @@ def _complete_flight(flight, airports_list=None):
         if airports_list:
             flight["depAirport"] = nearest_airport(first["lat"], first["lon"], airports_list)
     saved = lb_add(flight)
-    print("[Logbook] %s flight %s → %s (%d nm)%s" % (
+    print("[Logbook] %s flight %s -> %s (%d nm)%s" % (
         "saved" if saved else "duplicate ignored",
         flight.get("depAirport") or "?", flight.get("arrAirport") or "?",
         int(flight.get("distanceNm") or 0),
@@ -547,7 +547,7 @@ def recover_inprogress():
     flight["recovered"] = True
     flight["recoveryNote"] = "Recovered after Stratos closed before the flight was finalised."
     if lb_add(flight):
-        print("[Logbook] recovered interrupted flight %s → %s" % (
+        print("[Logbook] recovered interrupted flight %s -> %s" % (
             flight.get("depAirport") or "?", flight.get("arrAirport") or "?"))
     _remove_inprogress()
     return flight
