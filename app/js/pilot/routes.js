@@ -119,6 +119,7 @@ export async function mount(root, ctx) {
     const query = /^\d+$/.test(id.trim()) ? `userid=${encodeURIComponent(id.trim())}` : `username=${encodeURIComponent(id.trim())}`;
     try {
       const response = await fetch(`https://www.simbrief.com/api/xml.fetcher.php?${query}&json=v2`);
+      if (response.status === 400) throw new Error('SimBrief did not recognise that username or Pilot ID. Check it in SimBrief account settings (numbers are Pilot IDs, letters are Navigraph usernames).');
       if (!response.ok) throw new Error(`SimBrief returned HTTP ${response.status}.`);
       const data = await response.json();
       const fixes = data.navlog && data.navlog.fix;

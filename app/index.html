@@ -370,7 +370,7 @@ $('#bSim').onclick=async()=>{
   const q=/^\d+$/.test(id.trim())?`userid=${encodeURIComponent(id.trim())}`:`username=${encodeURIComponent(id.trim())}`;
   try{
     const r=await fetch(`https://www.simbrief.com/api/xml.fetcher.php?${q}&json=v2`);
-    if(!r.ok)throw new Error('SimBrief returned HTTP '+r.status);
+    if(r.status===400)throw new Error('SimBrief did not recognise that username or Pilot ID. Check it in SimBrief account settings.');if(!r.ok)throw new Error('SimBrief returned HTTP '+r.status);
     const d=await r.json();
     const fp=d.navlog&&d.navlog.fix;
     if(!Array.isArray(fp)||!fp.length)throw new Error('No waypoints found in flight plan');
