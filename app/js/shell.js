@@ -199,12 +199,6 @@ export function mountShell({ page = 'home', stats = false, theme = false } = {})
     }).catch(() => { /* theme stays as the page set it */ });
   }
 
-  S.root.querySelectorAll('[data-nav]').forEach(item => {
-    const active = item.dataset.nav === page;
-    if (active) item.setAttribute('aria-current', 'page');
-    else item.removeAttribute('aria-current');
-  });
-
   const shell = S.root;
   if (shell.classList.contains('app-shell')) {
     try {

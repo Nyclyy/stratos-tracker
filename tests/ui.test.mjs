@@ -371,5 +371,6 @@ test('the shared stylesheet never imposes a page layout grid', async () => {
   const css = fs.readFileSync(new URL('../app/shell.css', import.meta.url), 'utf8');
   const rules = [...css.matchAll(/\.app-shell\s*\{([^}]*)\}/g)].map(match => match[1]).join('\n');
   assert.ok(!/grid-template|display:\s*grid/.test(rules), 'shell.css must stay out of the page grid');
-  assert.match(css, /--shell-rail:\s*\d+px/, 'the rail keeps a concrete width token');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  assert.match(page, /grid-template-columns:var\(--rail\) minmax\(0,1fr\)/, 'the page owns the two-column grid');
 });

@@ -7,7 +7,6 @@
    shell (logbook, pilot), and they need the same measurements there. */
 :root {
   --shell-bar: 52px;
-  --shell-rail: 76px;
   --shell-line: rgba(126, 176, 220, .13);
   --shell-panel: #070e17;
   --shell-soft: rgba(255, 255, 255, .045);
@@ -99,47 +98,6 @@
   color: var(--shell-accent); font-size: 11px; font-weight: 700; letter-spacing: .04em;
 }
 
-/* ── Navigation rail ─────────────────────────────────────────────── */
-.app-shell .rail {
-  grid-row: 2;
-  width: var(--shell-rail);
-  display: flex; flex-direction: column; gap: 2px;
-  padding: 8px 6px 10px;
-  background: var(--shell-panel);
-  border-right: 1px solid var(--shell-line);
-  overflow-y: auto; overflow-x: hidden;
-  scrollbar-width: thin;
-  z-index: 30;
-}
-.app-shell .rail-item {
-  position: relative;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  min-height: 52px; padding: 5px 2px; border-radius: 10px;
-  color: var(--shell-mute); text-decoration: none; cursor: pointer;
-  background: none; border: 0; font: inherit;
-  transition: background-color .14s ease, color .14s ease;
-}
-.app-shell .rail-item:hover { color: var(--shell-ink); background: var(--shell-soft); text-decoration: none; }
-.app-shell .rail-item svg { width: 19px; height: 19px; }
-.app-shell .rail-item span {
-  font-size: 10px; font-weight: 600; letter-spacing: .02em;
-  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.app-shell .rail-item[aria-current="page"] {
-  color: var(--shell-accent);
-  background: color-mix(in srgb, var(--shell-accent) 11%, transparent);
-}
-.app-shell .rail-item[aria-current="page"]::before {
-  content: ""; position: absolute; left: -6px; top: 10px; bottom: 10px;
-  width: 3px; border-radius: 0 3px 3px 0; background: var(--shell-accent);
-}
-.app-shell .rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: 2px; padding-top: 6px; }
-.app-shell .rail-toggle { color: var(--shell-mute); }
-.app-shell[data-collapsed="1"] { --shell-rail: 62px; }
-.app-shell[data-collapsed="1"] .rail-item span { display: none; }
-.app-shell[data-collapsed="1"] .rail-item { min-height: 44px; }
-.app-shell[data-collapsed="1"] .tb-brand small { display: none; }
-
 /* ── Content column ──────────────────────────────────────────────── */
 .app-shell .app-main {
   grid-row: 2; display: grid; grid-template-rows: auto minmax(0, 1fr);
@@ -173,7 +131,6 @@
 @media (max-width: 767px) {
   .app-shell { --shell-bar: 48px; }
   .tb-nav { display: none; }
-  .app-shell .rail { display: none; }
   .app-shell .app-main { grid-row: 2; }
   .tb-brand small { display: none; }
   .tb-stats .status span { display: none; }
