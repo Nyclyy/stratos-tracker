@@ -112,6 +112,11 @@ npm run test:py
 npm run test:integration
 node scripts/benchmark.mjs
 npx playwright install chromium && node scripts/world-bench.mjs
+
+# Charts in a real browser (needs the bridge on 127.0.0.1:8765)
+python stratos_bridge.py --no-sim &
+npm install --no-save playwright && npx playwright install chromium
+node scripts/chart-check.mjs
 ```
 
 For a Windows installer, run the “Build Windows installer” workflow and check the “Verify installer and write checksum” step. Do not treat a started workflow as a built installer.

@@ -1,9 +1,13 @@
 // Browser check for the native Charts workspace.
-// Requires: the bridge on 127.0.0.1:8765 (it serves the app too) and a
-// Premium-capable stub injected before the page loads.
-// Usage: node scripts/chart-check.mjs
+// Requires: the bridge on 127.0.0.1:8765 (it serves the app too), and
+// `npm install --no-save playwright` plus `npx playwright install chromium`.
+// Usage: python stratos_bridge.py --no-sim &  &&  node scripts/chart-check.mjs
 
+import fs from 'node:fs';
 import { chromium } from 'playwright';
+
+// Screenshots are written here; the folder is not tracked.
+fs.mkdirSync('artifacts', { recursive: true });
 
 // Served by the bridge itself, so the page and its data share an origin.
 const URL_BASE = 'http://127.0.0.1:8765/pilot.html';
