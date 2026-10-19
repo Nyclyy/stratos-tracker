@@ -779,7 +779,10 @@ test('dashboard: an empty logbook and no route produce a designed empty state', 
 });
 
 // ── World layer: bundled country outlines, names and water names ─────
-const worldData = await readTrackerFile(new URL('../app/js/data/world.js', import.meta.url), 'utf8');
+// The release workflow runs these tests on a Windows checkout, which writes
+// CRLF. The wrapper is split on a line break, so read the payload line-ending
+// agnostic instead of failing the build on the runner's Git settings.
+const worldData = (await readTrackerFile(new URL('../app/js/data/world.js', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
 const TRACKER_HTML = trackerSource;
 
 test('world layer: the bundled data is complete and its labels sit on land', () => {
