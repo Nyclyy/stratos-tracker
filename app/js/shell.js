@@ -237,6 +237,61 @@ function decorateRail(rail) {
   }
 }
 
+/**
+ * The icon rail hides its labels, so the name has to follow the pointer and the
+ * keyboard focus. A native title never appears for keyboard users, so this is
+ * one small tooltip that serves both and stays out of the layout.
+ */
+function bindRailTips(shell, rail) {
+  if (!rail) return null;
+  const tip = document.createElement('div');
+  tip.className = 'rail-tip';
+  tip.setAttribute('aria-hidden', 'true');
+  tip.hidden = true;
+  document.body.appendChild(tip);
+
+  const collapsed = () => shell.dataset.collapsed === '1';
+  const hide = () => { tip.hidden = true; };
+  const itemAt = event => event.target?.closest?.('.tab') || null;
+  const show = item => {
+    if (!collapsed() || !item) return hide();
+    const name = item.dataset.label || item.getAttribute('aria-label') || '';
+    if (!name) return hide();
+    tip.textContent = name;
+    tip.hidden = false;
+    const box = item.getBoundingClientRect();
+    const railBox = rail.getBoundingClientRect();
+    tip.style.left = `${Math.round(railBox.right + 8)}px`;
+    tip.style.top = `${Math.round(box.top + box.height / 2)}px`;
+  };
+  const onOver = event => show(itemAt(event));
+  const onFocus = event => show(itemAt(event));
+  const onKey = event => { if (event.key === 'Escape') hide(); };
+
+  rail.addEventListener('pointerover', onOver);
+  rail.addEventListener('pointerleave', hide);
+  rail.addEventListener('focusin', onFocus);
+  rail.addEventListener('focusout', hide);
+  window.addEventListener('scroll', hide, true);
+  window.addEventListener('resize', hide);
+  document.addEventListener('keydown', onKey);
+
+  return {
+    hide,
+    tip,
+    destroy: () => {
+      rail.removeEventListener('pointerover', onOver);
+      rail.removeEventListener('pointerleave', hide);
+      rail.removeEventListener('focusin', onFocus);
+      rail.removeEventListener('focusout', hide);
+      window.removeEventListener('scroll', hide, true);
+      window.removeEventListener('resize', hide);
+      document.removeEventListener('keydown', onKey);
+      tip.remove();
+    },
+  };
+}
+
 function buildBar(bar, { theme = false, rail = false, search = null, status = null } = {}) {
   const mode = readMode();
   const title = bar.dataset.title || PAGE_TITLE[S.page] || 'Stratos';
@@ -367,6 +422,7 @@ export function mountShell({ page = 'home', theme = false } = {}) {
     }).catch(() => { /* theme stays as the page set it */ });
   }
 
+  let railTips = null;
   if (shell.classList.contains('app-shell')) {
     try {
       const saved = localStorage.getItem('stratos.rail');
@@ -377,12 +433,22 @@ export function mountShell({ page = 'home', theme = false } = {}) {
       shell.dataset.collapsed = '1';
     }
     const toggle = shell.querySelector('[data-rail-toggle]');
+    const tips = railTips = bindRailTips(shell, rail);
     const label = () => {
-      if (!toggle) return;
       const collapsed = shell.dataset.collapsed === '1';
+      tips?.hide();
+      // Expanded rows show their own label, so the native title is their tip;
+      // icon rows use the focus-aware tooltip instead of a duplicate title.
+      for (const item of rail ? rail.querySelectorAll('.tab') : []) {
+        if (collapsed) item.removeAttribute('title');
+        else if (item.dataset.label) item.setAttribute('title', item.dataset.label);
+      }
+      if (!toggle) return;
       const text = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
-      toggle.title = text;
+      if (collapsed) toggle.removeAttribute('title');
+      else toggle.title = text;
       toggle.setAttribute('aria-label', text);
+      toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
       const span = toggle.querySelector('span');
       if (span) span.textContent = collapsed ? 'Expand' : 'Collapse';
       const glyph = toggle.querySelector('b');
@@ -421,6 +487,8 @@ export function mountShell({ page = 'home', theme = false } = {}) {
       if (S.clock) clearInterval(S.clock);
       S.timer = null;
       S.clock = null;
+      railTips?.destroy();
+      railTips = null;
     },
   };
   return window.StratosShell;

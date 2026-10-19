@@ -389,8 +389,13 @@
   transition: border-color .11s ease, background-color .11s ease;
 }
 #appbar #sb:focus-within {
-  border-color: color-mix(in srgb, var(--shell-accent) 46%, transparent);
+  border-color: var(--shell-accent);
   background: rgba(255, 255, 255, .06);
+}
+/* The field has no outline of its own, so keyboard focus draws the ring around
+   the whole pill. Clicking still gets the accent border, without the ring. */
+#appbar #sb:has(#q:focus-visible) {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--shell-accent) 45%, transparent);
 }
 #appbar #sb span { font-size: 14px; color: var(--shell-faint); }
 #appbar #q {
@@ -446,23 +451,101 @@
   background: var(--shell-soft); border: 1px solid var(--shell-line); color: var(--shell-ink);
 }
 
-/* ═══ Icon rail ═════════════════════════════════════════════════════
-   The Flight Deck opens as an icon rail; the tooltip carries the name and the
-   toggle expands it. 60 px keeps a 40 px hit target either side of the icon. */
-.app-shell[data-collapsed="1"] { --rail: 60px; }
-/* The rail is a grid column: border-box keeps its padding inside the column. */
-.app-shell #tabs { box-sizing: border-box; }
-.app-shell[data-collapsed="1"] #tabs { padding: 10px 9px; align-items: center; }
-.app-shell[data-collapsed="1"] #tabs .tab {
-  justify-content: center; padding: 0; width: 100%; height: 42px; flex: 0 0 42px;
-  min-height: 42px; border-radius: 10px;
+/* ═══ Navigation rail: labelled sidebar ↔ icon rail ═════════════════
+   One rail, two widths. The expanded list is the readable form; the icon rail
+   keeps the same 42 px row rhythm so toggling never makes the page jump. The
+   page's own stylesheet still draws the last tab as a phone bottom bar, so all
+   of this is scoped to desktop. */
+@media (min-width: 768px) {
+  .app-shell { --rail: 244px; }
+  /* 60 px keeps a 40 px hit target either side of the icon. */
+  .app-shell[data-collapsed="1"] { --rail: 60px; }
+  /* The rail is a grid column: border-box keeps its padding inside the column. */
+  .app-shell #tabs { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: var(--shell-line-strong) transparent; }
+  .app-shell #tabs::-webkit-scrollbar { width: 8px; }
+  .app-shell #tabs::-webkit-scrollbar-thumb { background: var(--shell-line-strong); border-radius: 99px; }
+
+  /* Expanded: an icon and a sentence-case label on one row. */
+  #tabs .tab {
+    flex: 0 0 42px; height: 42px; min-height: 42px;
+    flex-direction: row; align-items: center; justify-content: flex-start;
+    gap: 10px; padding: 0 10px;
+  }
+  #tabs .tab span {
+    display: block; flex: 1 1 auto; min-width: 0;
+    font-size: 12.5px; font-weight: 620; letter-spacing: .01em; line-height: 1.2;
+    text-align: left; text-transform: none;
+  }
+  #tabs .tab b, #tabs .tab b svg { width: 18px; height: 18px; }
+  #tabs .tab[aria-current="page"] span, #tabs .tab.act span { font-weight: 650; }
+  #tabs .rail-group { margin: 16px 0 5px; padding: 0 10px; }
+  #tabs .rail-group:first-child { margin-top: 6px; }
+
+  /* The live feed marks its own tab so its icon can carry the state. That is a
+     status hint, never a second "you are here" beside the current page. */
+  #tabs .tab.on:not(.act):not([aria-current="page"]) { background: none; color: var(--shell-mute); }
+  #tabs .tab.on b { color: var(--shell-good); }
+
+  /* The collapse control is a full row when expanded, an icon when collapsed. */
+  #tabs .rail-toggle {
+    position: sticky; bottom: 0; z-index: 1;
+    background: var(--shell-rail-bg);
+    /* The same colour extends over the divider band, so rows scrolling under a
+       pinned control never show through. */
+    box-shadow: 0 -10px 0 var(--shell-rail-bg);
+    justify-content: flex-start; gap: 9px;
+    margin-top: auto; padding: 0 10px; color: var(--shell-mute);
+  }
+  #tabs .rail-toggle span { font-size: 12px; font-weight: 600; }
+  #tabs .rail-toggle::before {
+    content: ""; position: absolute; left: 0; right: 0; top: -10px;
+    height: 1px; background: var(--shell-line);
+  }
+
+  .app-shell[data-collapsed="1"] #tabs { padding: 10px 9px; align-items: center; }
+  /* The icon rail is nameless by design; the tooltip carries the name. */
+  .app-shell[data-collapsed="1"] #tabs .tab span { display: none; }
+  .app-shell[data-collapsed="1"] #tabs .tab {
+    justify-content: center; padding: 0; width: 100%; height: 42px; flex: 0 0 42px;
+    min-height: 42px; gap: 0; border-radius: 10px;
+  }
+  .app-shell[data-collapsed="1"] #tabs .tab b,
+  .app-shell[data-collapsed="1"] #tabs .tab b svg { width: 19px; height: 19px; }
+  .app-shell[data-collapsed="1"] #tabs .tab.act,
+  .app-shell[data-collapsed="1"] #tabs .tab[aria-current="page"] { background: var(--shell-accent-soft); }
+  .app-shell[data-collapsed="1"] #tabs .rail-toggle { justify-content: center; padding: 0; }
+  .app-shell[data-collapsed="1"] #tabs .rail-toggle::before { display: none; }
+  .app-shell[data-collapsed="1"] #tabs .tab.act::before { left: -9px; }
 }
-.app-shell[data-collapsed="1"] #tabs .tab b,
-.app-shell[data-collapsed="1"] #tabs .tab b svg { width: 19px; height: 19px; }
-.app-shell[data-collapsed="1"] #tabs .tab.act,
-.app-shell[data-collapsed="1"] #tabs .tab[aria-current="page"] { background: var(--shell-accent-soft); }
-.app-shell[data-collapsed="1"] #tabs .rail-toggle { justify-content: center; }
-.app-shell[data-collapsed="1"] #tabs .tab.act::before { left: -9px; }
+
+/* The icon rail's only label: a tooltip that follows hover and keyboard focus.
+   A native title never appears for keyboard users, which left the icons nameless. */
+.rail-tip {
+  position: fixed; z-index: 60; transform: translateY(-50%);
+  padding: 6px 10px; border-radius: 8px;
+  background: var(--shell-panel); color: var(--shell-ink);
+  border: 1px solid var(--shell-line-strong);
+  font-family: var(--shell-font); font-size: 11.5px; font-weight: 600; letter-spacing: .01em;
+  white-space: nowrap; pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .42);
+}
+.rail-tip[hidden] { display: none; }
+
+/* ── Keyboard focus ─────────────────────────────────────────────────
+   One ring for the whole chrome, in the shell accent. Rail rows draw it inside
+   the pill so the rail's own scroll box can never clip it. */
+#appbar a:focus-visible,
+#appbar button:focus-visible,
+#appbar input:focus-visible,
+#appbar select:focus-visible,
+#tabs a:focus-visible,
+#tabs button:focus-visible,
+.shell-dialog a:focus-visible,
+.shell-dialog button:focus-visible {
+  outline: 2px solid var(--shell-accent);
+  outline-offset: 2px;
+}
+#tabs .tab:focus-visible { outline-offset: -2px; }
 
 /* ── Phone ─────────────────────────────────────────────────────────
    The bar keeps the brand, the search and the pilot; Support, the clock, the
@@ -471,6 +554,8 @@
    the base rules above, which a media query alone would not. */
 @media (max-width: 767px) {
   .tb-support, .tb-clock, .tb-perf-wrap { display: none; }
+  /* The phone rail runs along the bottom; a side tooltip has nowhere to go. */
+  .rail-tip { display: none; }
   .tb-actions a[href*="settings"] { display: none; }
   #appbar #sb { width: 100%; padding: 0 10px; }
   /* The bottom rail scrolls inside its own strip instead of widening the page. */

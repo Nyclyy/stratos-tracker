@@ -368,8 +368,10 @@ test('the home sidebar is a real rail that collapses and remembers the choice', 
 
     const toggle = rail.querySelector('.rail-toggle');
     assert.equal(document.querySelector('.app-shell').dataset.collapsed, '1', 'the rail opens icon-only');
+    assert.equal(toggle.getAttribute('aria-expanded'), 'false', 'the toggle reports the rail is collapsed');
     toggle.dispatchEvent(new window.Event('click', { bubbles: true }));
     assert.equal(document.querySelector('.app-shell').dataset.collapsed, undefined, 'one click expands it');
+    assert.equal(toggle.getAttribute('aria-expanded'), 'true', 'and reports the expanded rail');
     assert.equal(localStorage.getItem('stratos.rail'), 'open');
     toggle.dispatchEvent(new window.Event('click', { bubbles: true }));
     assert.equal(document.querySelector('.app-shell').dataset.collapsed, '1', 'the next click collapses it again');
@@ -377,6 +379,70 @@ test('the home sidebar is a real rail that collapses and remembers the choice', 
   } finally {
     shell.destroy();
   }
+});
+
+test('the icon rail names itself on hover and keyboard focus', async () => {
+  installDom();
+  const fs = await import('node:fs');
+  const { parseHTML } = await import('linkedom');
+  const html = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  const { window } = parseHTML(html);
+  for (const [key, value] of [
+    ['window', window],
+    ['document', window.document],
+    ['navigator', window.navigator],
+    ['HTMLElement', window.HTMLElement],
+    ['Event', window.Event],
+    ['location', { protocol: 'http:', hostname: 'localhost', href: 'http://localhost/app/index.html', hash: '' }],
+  ]) {
+    Object.defineProperty(globalThis, key, { value, configurable: true });
+  }
+  globalThis.fetch = async () => { throw new Error('no bridge'); };
+
+  const { mountShell } = await import('../app/js/shell.js');
+  const shell = mountShell({ page: 'home', stats: false });
+  try {
+    const rail = document.querySelector('#tabs');
+    const toggle = rail.querySelector('.rail-toggle');
+    const item = rail.querySelector('.tab[data-label="Flight Logbook"]');
+    const tip = document.body.querySelector('.rail-tip');
+    assert.ok(tip, 'one tooltip serves the icon rail');
+    assert.equal(item.getAttribute('aria-label'), 'Flight Logbook', 'the hidden label stays in the accessible name');
+    assert.equal(item.hasAttribute('title'), false, 'no native title competes with the focus tooltip while collapsed');
+
+    // The tooltip follows keyboard focus, not just the mouse.
+    item.dispatchEvent(new window.Event('focusin', { bubbles: true }));
+    assert.equal(tip.hidden, false, 'focus shows the tooltip');
+    assert.equal(tip.textContent, 'Flight Logbook', 'the tooltip carries the destination name');
+    item.dispatchEvent(new window.Event('focusout', { bubbles: true }));
+    assert.equal(tip.hidden, true, 'leaving hides it again');
+
+    // Expanded rows print their labels, so the native title is enough there.
+    toggle.dispatchEvent(new window.Event('click', { bubbles: true }));
+    assert.equal(item.getAttribute('title'), 'Flight Logbook', 'the expanded row keeps a native title');
+    assert.equal(tip.hidden, true, 'the tooltip stays out of the labelled sidebar');
+    item.dispatchEvent(new window.Event('focusin', { bubbles: true }));
+    assert.equal(tip.hidden, true, 'focusing an expanded row never opens it');
+  } finally {
+    shell.destroy();
+    assert.equal(document.body.querySelector('.rail-tip'), null, 'the tooltip is removed with the shell');
+  }
+});
+
+test('the expanded rail is a labelled sidebar and the focus ring stays inside it', async () => {
+  const fs = await import('node:fs');
+  const css = fs.readFileSync(new URL('../app/shell.css', import.meta.url), 'utf8');
+  const desktop = css.match(/@media \(min-width: 768px\) \{([\s\S]*?)\n\}/);
+  assert.ok(desktop, 'the rail has a desktop block');
+  const rules = desktop[1];
+  assert.match(rules, /--rail: 244px/, 'the expanded rail fits the longest destination');
+  assert.match(rules, /#tabs \.tab \{[^}]*flex-direction: row/, 'expanded rows put the icon beside the label');
+  assert.match(rules, /#tabs \.tab span \{[^}]*text-transform: none/, 'labels are sentence case, not stacked captions');
+  assert.match(rules, /\.app-shell\[data-collapsed="1"\] #tabs \.tab span \{ display: none; \}/, 'the icon rail hides its labels');
+  assert.match(rules, /#tabs \.tab\.on:not\(\.act\)[^{]*\{ background: none;/, 'a live feed hint is not a second current page');
+  assert.match(css, /#tabs \.tab:focus-visible \{ outline-offset: -2px; \}/, 'the rail draws its ring inside the pill');
+  assert.match(css, /#appbar #sb:has\(#q:focus-visible\) \{[^}]*box-shadow:/, 'the search field shows a keyboard-focus ring, not only a border');
+  assert.match(css, /\.rail-tip \{[^}]*position: fixed;/, 'the icon tooltip escapes the rail clip');
 });
 
 test('the flight card states an arrival time and the corner badge stays short', async () => {
