@@ -301,8 +301,8 @@ test('the shell reports simulator state honestly and never invents a connection'
   assert.ok(!sim.className.includes('is-live'), 'an unreachable bridge is never shown as connected');
   assert.match(document.querySelector('[data-status="live"]').textContent, /no live data/i);
   assert.ok(document.querySelector('.tb-perf').options.length >= 3, 'the resource profile selector keeps every mode');
-  assert.equal(document.querySelectorAll('.stat-card').length, 4, 'four home totals');
-  assert.match(document.querySelector('#homestats').textContent, /0\.0 h/, 'no logbook means honest zeros');
+  // The Flight Deck is a full-bleed map now: no stat strip is injected into it.
+  assert.equal(document.querySelectorAll('.stat-card').length, 0, 'the map page has no stat band');
   offline.destroy();
 
   globalThis.fetch = async () => ({
@@ -312,7 +312,7 @@ test('the shell reports simulator state honestly and never invents a connection'
   const live = mountShell({ page: 'home', stats: false });
   await new Promise(resolve => setTimeout(resolve, 40));
   const sim2 = document.querySelector('[data-status="sim"]');
-  assert.match(sim2.textContent, /simulator live/i);
+  assert.match(sim2.textContent, /live from xplane/i, 'the chip names the simulator it is reading');
   assert.ok(sim2.className.includes('is-live'));
   assert.match(document.querySelector('[data-status="live"]').textContent, /live tracking/i);
   live.destroy();
@@ -350,18 +350,51 @@ test('the home sidebar is a real rail that collapses and remembers the choice', 
     for (const id of ['bMap', 'bLive', 'bCh', 'bRoute', 'bWx', 'bData']) {
       assert.ok(document.getElementById(id), `${id} still drives its map panel`);
     }
-    assert.equal(document.querySelectorAll('[data-status]').length, 2, 'the bar still reports status');
+    // The Flight Deck bar carries the page's own state line rather than two
+    // duplicate pills: one honest sentence about the feed it is actually reading.
+    assert.equal(document.querySelectorAll('[data-status]').length, 0, 'no duplicate status pills beside the state line');
+    const state = document.querySelector('#appbar [data-shell-status]');
+    assert.ok(state, 'the connection state moves into the bar');
+    assert.ok(state.closest('.tb-brand'), 'the state line sits under the wordmark');
+    assert.ok(document.querySelector('#appbar #sb'), 'the search field sits in the bar');
+    const support = document.querySelector('[data-support]');
+    assert.ok(support, 'Support Us / Go Premium is in the bar');
+    assert.match(support.textContent, /support us/i);
+    assert.match(support.textContent, /go premium/i);
+    const clock = document.querySelector('[data-clock]');
+    assert.ok(clock, 'the UTC clock is in the bar');
+    assert.match(clock.querySelector('b').textContent, /^\d{4}Z$/, 'the clock reads HHMMZ');
+    assert.ok(document.querySelector('#appbar').classList.contains('tb--rail'), 'the rail pages centre the search on the bar');
 
     const toggle = rail.querySelector('.rail-toggle');
+    assert.equal(document.querySelector('.app-shell').dataset.collapsed, '1', 'the rail opens icon-only');
     toggle.dispatchEvent(new window.Event('click', { bubbles: true }));
-    assert.equal(document.querySelector('.app-shell').dataset.collapsed, '1');
-    assert.equal(localStorage.getItem('stratos.rail'), 'collapsed');
-    toggle.dispatchEvent(new window.Event('click', { bubbles: true }));
-    assert.equal(document.querySelector('.app-shell').dataset.collapsed, undefined);
+    assert.equal(document.querySelector('.app-shell').dataset.collapsed, undefined, 'one click expands it');
     assert.equal(localStorage.getItem('stratos.rail'), 'open');
+    toggle.dispatchEvent(new window.Event('click', { bubbles: true }));
+    assert.equal(document.querySelector('.app-shell').dataset.collapsed, '1', 'the next click collapses it again');
+    assert.equal(localStorage.getItem('stratos.rail'), 'collapsed');
   } finally {
     shell.destroy();
   }
+});
+
+test('the flight card states an arrival time and the corner badge stays short', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  assert.match(page, /function etaZ\(duration\)/, 'remaining time becomes a clock time in the card');
+  assert.match(page, /eta <b>'\+etaZ\(g\('tEt'\)\)/, 'the card prints the arrival, not the countdown');
+  assert.match(page, /'Simulator online'/, 'the corner badge names the simulator when it is live');
+  assert.ok(!/aircraft online'\):wtTxt\(\)/.test(page), 'the badge no longer prints the long feed sentence');
+});
+
+test('the rebuilt bar centres its search and the phone row stays inside the viewport', async () => {
+  const fs = await import('node:fs');
+  const css = fs.readFileSync(new URL('../app/shell.css', import.meta.url), 'utf8');
+  assert.match(css, /\.tb--rail \.tb-search \{[^}]*position:\s*absolute;[^}]*left:\s*50%/, 'the rail pages centre the search on the bar');
+  assert.match(css, /@media \(max-width: 767px\) \{[^}]*\.tb-support,[^{]*\.tb-clock,[^{]*\.tb-perf-wrap \{ display: none; \}/, 'the phone bar drops the wide controls');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  assert.match(page, /grid-template-columns:minmax\(0,1fr\);grid-template-rows:auto minmax\(0,1fr\) auto/, 'the shell column cannot be widened by its content');
 });
 
 test('the shared stylesheet never imposes a page layout grid', async () => {

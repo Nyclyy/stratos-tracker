@@ -16,7 +16,7 @@ Stratos runs as a static website/PWA, an Electron desktop app, and an optional l
 | Landing analytics with per-aircraft thresholds | Working; runway/touchdown values are estimates |
 | Career dashboard, records, milestones, drill-down | Working, with customizable tiles |
 | Route planner, PLN/FMS/GPX import/export, SimBrief import | Working; estimates are labelled |
-| Flight Deck shell | One grouped sidebar (Flight Operations / Flight Intelligence / Application), a compact top bar with the page identity and simulator state, and an icon-only rail mode |
+| Flight Deck shell | An icon-only rail (grouped Flight Operations / Flight Intelligence / Application destinations, tooltips, expandable), a top bar with the wordmark and its live state line, one centred search, Support Us / Go Premium and the UTC clock, and a full-bleed map: the flight card floats over it with real telemetry and a corner badge names the place and the live aircraft count |
 | Flight overview dashboard | Reports the simulator link, the live flight, the saved route pair, planned cruise level, distance, ETE and airborne progress, and admits a value it does not have instead of inventing one |
 | Top of descent from your own descents | Working; the bridge measures the real gradient of each completed flight and the tracker uses it, falling back to 200 ft/nm until one exists |
 | Route Discovery (mood → three route ideas → planner) | Working; airports, distances and runway claims come from the airport database, and stretched durations are labelled |

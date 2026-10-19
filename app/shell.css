@@ -59,7 +59,6 @@
 .tb-nav a[aria-current="page"] { color: var(--shell-ink); background: var(--shell-soft); border-color: var(--shell-line); }
 .tb-gap { flex: 1 1 auto; }
 
-.tb-stats { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
 .tb .status {
   display: inline-flex; align-items: center; gap: 7px;
   height: 28px; padding: 0 11px; border-radius: 999px;
@@ -100,44 +99,23 @@
 
 /* ── Content column ──────────────────────────────────────────────── */
 .app-shell .app-main {
-  grid-row: 2; display: grid; grid-template-rows: auto minmax(0, 1fr);
+  grid-row: 2; display: grid; grid-template-rows: minmax(0, 1fr);
   min-width: 0; min-height: 0;
 }
 .app-shell .app-main > #app { height: 100%; min-height: 0; }
 
-/* ── Home statistics strip ───────────────────────────────────────── */
-.app-shell .stats {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px;
-  background: var(--shell-line); border-bottom: 1px solid var(--shell-line);
-  /* Reserved even while the totals load: the map sizes its canvas once from
-     its own box, so a strip that appears late would leave it stale. */
-  min-height: 52px;
-}
-.app-shell .stat-card {
-  background: var(--shell-panel); padding: 9px 14px; min-width: 0;
-  display: flex; flex-direction: column; gap: 1px;
-}
-.app-shell .stat-card b {
-  font-size: 17px; font-weight: 750; letter-spacing: -.01em; color: var(--shell-ink);
-  font-variant-numeric: tabular-nums; line-height: 1.2;
-}
-.app-shell .stat-card span {
-  font-size: 10px; font-weight: 650; letter-spacing: .09em; text-transform: uppercase;
-  color: var(--shell-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.app-shell .stat-card.is-empty b { color: var(--shell-mute); }
+/* ── Content column ────────────────────────────────────────────────
+   The Flight Deck's map is full bleed: the content cell is one row, and every
+   panel floats over it. The career totals live on the Pilot dashboard. */
 
 /* ── Compact screens ─────────────────────────────────────────────── */
 @media (max-width: 767px) {
   .app-shell { --shell-bar: 48px; }
+  .tb { gap: 8px; padding: 0 10px; }
   .tb-nav { display: none; }
-  .app-shell .app-main { grid-row: 2; }
-  .tb-brand small { display: none; }
-  .tb-stats .status span { display: none; }
-  .tb-stats .status { padding: 0 9px; }
-  .app-shell .stat-card { padding: 7px 10px; }
-  .app-shell .stat-card b { font-size: 15px; }
-  .app-shell .stat-card span { font-size: 9px; letter-spacing: .06em; }
+  .tb-brand small { font-size: 9.5px; letter-spacing: .04em; max-width: 16ch; }
+  .tb-status .status span { display: none; }
+  .tb-status .status { padding: 0 9px; }
 }
 @media (max-width: 420px) {
   .tb-perf { display: none; }
@@ -187,14 +165,8 @@
   background: color-mix(in srgb, var(--shell-accent) 14%, transparent);
   border-color: color-mix(in srgb, var(--shell-accent) 30%, transparent);
 }
-.app-main .stats { background: var(--shell-line); border-bottom: 1px solid var(--shell-line); }
-.shell .stats { background: var(--shell-line); }
 
 /* Stat strip: quiet labels, crisp numbers. */
-.stats .stat-card { background: var(--shell-panel); padding: 10px 16px; min-height: 56px; justify-content: center; }
-.stats .stat-card b { font-size: 18px; letter-spacing: -.015em; }
-.stats .stat-card span { font-size: 9.5px; letter-spacing: .12em; color: #6f879c; }
-.stats .stat-card.is-empty b { color: #55708a; }
 
 /* ═══ Stratos Flight Deck: sidebar and bar finish ═══════════════════
    Navy and charcoal surfaces, one blue accent, hairline dividers and no
@@ -263,7 +235,7 @@
 .tb-btn { height: 28px; min-width: 28px; border-radius: 7px; }
 .tb-btn:hover { background: var(--shell-soft); border-color: transparent; }
 .tb-avatar {
-  width: 26px; height: 26px; border-radius: 7px;
+  width: 26px; height: 26px; border-radius: 50%;
   background: var(--shell-accent-soft);
   border: 1px solid color-mix(in srgb, var(--shell-accent) 30%, transparent);
   color: var(--shell-accent); font-size: 10.5px; letter-spacing: .06em;
@@ -292,7 +264,7 @@
 #tabs .rail-group:first-child { margin-top: 2px; }
 
 #tabs .tab {
-  position: relative;
+  position: relative; box-sizing: border-box;
   display: flex; align-items: center; gap: 10px;
   min-height: 34px; padding: 0 10px;
   border: 1px solid transparent; border-radius: 7px;
@@ -326,8 +298,8 @@
 
 #tabs .rail-toggle {
   margin-top: auto; color: var(--shell-faint);
-  border-top: 1px solid var(--shell-line); border-radius: 0;
-  padding-top: 10px; margin-top: 14px;
+  border-top: 0; border-radius: 10px; padding-top: 0;
+  flex: 0 0 auto;
 }
 #tabs .rail-toggle:hover { color: var(--shell-ink); background: none; }
 
@@ -339,14 +311,6 @@
 .app-shell[data-collapsed="1"] #tabs .rail-toggle { justify-content: center; }
 
 /* ── Home stat strip: quiet labels, crisp tabular numbers ────────── */
-.shell .stats, .app-main .stats { background: var(--shell-line); }
-.stats .stat-card {
-  background: var(--shell-panel); padding: 10px 16px;
-  min-height: 56px; justify-content: center;
-}
-.stats .stat-card b { font-size: 18px; letter-spacing: -.015em; color: var(--shell-ink); }
-.stats .stat-card span { font-size: 9.5px; letter-spacing: .12em; color: var(--shell-faint); }
-.stats .stat-card.is-empty b { color: var(--shell-faint); }
 
 /* ── Compact screens ─────────────────────────────────────────────── */
 @media (max-width: 767px) {
@@ -376,4 +340,147 @@
     left: 10px; right: 10px; top: auto; bottom: 0; height: 2px; width: auto;
     border-radius: 2px 2px 0 0;
   }
+}
+
+/* ═══ Flight Deck chrome: the bar reference ═════════════════════════
+   Brand with a live state line, one centred search, Support Us / Go Premium
+   and the UTC clock on the right, one circular rail on the left. Static colour
+   plus a 110 ms hover fade; nothing here paints per frame. */
+
+.tb { display: flex; align-items: center; gap: 12px; }
+.tb-brand { flex: 0 0 auto; }
+.tb-name { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+
+/* The state line under the wordmark. The map page's own node is moved in here,
+   so the wording matches the feed the page is actually reading. */
+.tb-brand .tb-state {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: none;
+  color: var(--shell-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 30ch;
+}
+.tb-state[data-state="live"] { color: var(--shell-good); }
+.tb-state[data-state="wait"] { color: var(--shell-warn); }
+#appbar [data-shell-status] {
+  background: none; border: 0; box-shadow: none; padding: 0; min-height: 0;
+  font: inherit; font-size: 10px; font-weight: 600; letter-spacing: .05em;
+  color: inherit; cursor: pointer; text-align: left;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#appbar [data-shell-status]:hover { color: var(--shell-ink); }
+
+/* One search. On the rail pages it is centred on the bar itself, not on the
+   space the brand and the right-hand cluster leave over: it floats out of the
+   flow so unequal sides cannot drag it off centre. Pages that carry a nav keep
+   the flex row, and below 1350 px there is no room left to float in anyway. */
+.tb-search { flex: 1 1 auto; display: flex; justify-content: center; min-width: 0; }
+.tb--rail .tb-search {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(520px, 42vw);
+}
+@media (max-width: 1350px) {
+  .tb--rail .tb-search { position: static; transform: none; width: auto; flex: 1 1 auto; }
+}
+#appbar #sb {
+  display: flex; align-items: center; gap: 9px;
+  width: min(520px, 100%); height: 34px; padding: 0 14px;
+  border-radius: 10px; background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--shell-line); box-shadow: none;
+  transition: border-color .11s ease, background-color .11s ease;
+}
+#appbar #sb:focus-within {
+  border-color: color-mix(in srgb, var(--shell-accent) 46%, transparent);
+  background: rgba(255, 255, 255, .06);
+}
+#appbar #sb span { font-size: 14px; color: var(--shell-faint); }
+#appbar #q {
+  flex: 1; min-width: 0; padding: 0; border: 0; background: none;
+  color: var(--shell-ink); font: inherit; font-size: 12.5px; outline: none;
+}
+#appbar #q::placeholder { color: var(--shell-faint); }
+
+.tb-status { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
+
+/* Support Us / Go Premium: an invitation, not a paywall. */
+.tb-support {
+  display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
+  gap: 0; height: 34px; padding: 0 10px; border-radius: 9px;
+  background: none; border: 1px solid transparent; min-height: 0; cursor: pointer;
+  transition: background-color .11s ease, border-color .11s ease;
+}
+.tb-support span { font-size: 9.5px; font-weight: 600; letter-spacing: .06em; color: var(--shell-mute); }
+.tb-support b { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 750; color: #f0b45e; letter-spacing: .01em; }
+.tb-support b svg { width: 12px; height: 12px; }
+.tb-support:hover { background: var(--shell-soft); border-color: var(--shell-line); }
+
+/* UTC clock: HHMMZ over the date, local time on click. */
+.tb-clock {
+  display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
+  gap: 0; height: 34px; padding: 0 10px; border-radius: 9px;
+  background: none; border: 1px solid transparent; min-height: 0; cursor: pointer;
+  transition: background-color .11s ease, border-color .11s ease;
+}
+.tb-clock b { font-size: 12.5px; font-weight: 700; letter-spacing: .04em; color: var(--shell-ink); font-variant-numeric: tabular-nums; }
+.tb-clock small { font-size: 9px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--shell-faint); }
+.tb-clock:hover { background: var(--shell-soft); border-color: var(--shell-line); }
+
+/* Support dialog: what the button means, and where it goes when configured. */
+.shell-dialog {
+  max-width: 460px; width: calc(100vw - 40px); padding: 20px 22px;
+  border-radius: 16px; border: 1px solid var(--shell-line-strong);
+  background: var(--shell-panel); color: var(--shell-ink);
+  font-family: var(--shell-font); box-shadow: 0 24px 60px rgba(0, 0, 0, .5);
+}
+.shell-dialog::backdrop { background: rgba(3, 7, 12, .62); }
+.shell-dialog h2 { margin: 0 0 8px; font-size: 18px; letter-spacing: .01em; }
+.shell-dialog p { margin: 0 0 12px; font-size: 13px; line-height: 1.55; color: var(--shell-mute); }
+.shell-dialog-note { border-left: 2px solid var(--shell-warn); padding-left: 11px; }
+.shell-dialog-cta {
+  display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 650;
+  color: var(--shell-accent); text-decoration: none;
+}
+.shell-dialog-cta svg { width: 15px; height: 15px; }
+.shell-dialog-row { display: flex; justify-content: flex-end; margin-top: 4px; }
+.shell-dialog-close {
+  padding: 7px 14px; border-radius: 8px; font: inherit; font-size: 12.5px; cursor: pointer;
+  background: var(--shell-soft); border: 1px solid var(--shell-line); color: var(--shell-ink);
+}
+
+/* ═══ Icon rail ═════════════════════════════════════════════════════
+   The Flight Deck opens as an icon rail; the tooltip carries the name and the
+   toggle expands it. 60 px keeps a 40 px hit target either side of the icon. */
+.app-shell[data-collapsed="1"] { --rail: 60px; }
+/* The rail is a grid column: border-box keeps its padding inside the column. */
+.app-shell #tabs { box-sizing: border-box; }
+.app-shell[data-collapsed="1"] #tabs { padding: 10px 9px; align-items: center; }
+.app-shell[data-collapsed="1"] #tabs .tab {
+  justify-content: center; padding: 0; width: 100%; height: 42px; flex: 0 0 42px;
+  min-height: 42px; border-radius: 10px;
+}
+.app-shell[data-collapsed="1"] #tabs .tab b,
+.app-shell[data-collapsed="1"] #tabs .tab b svg { width: 19px; height: 19px; }
+.app-shell[data-collapsed="1"] #tabs .tab.act,
+.app-shell[data-collapsed="1"] #tabs .tab[aria-current="page"] { background: var(--shell-accent-soft); }
+.app-shell[data-collapsed="1"] #tabs .rail-toggle { justify-content: center; }
+.app-shell[data-collapsed="1"] #tabs .tab.act::before { left: -9px; }
+
+/* ── Phone ─────────────────────────────────────────────────────────
+   The bar keeps the brand, the search and the pilot; Support, the clock, the
+   resource profile and the settings shortcut live in the panels there, so the
+   row never has to scroll sideways. These rules sit last so they win against
+   the base rules above, which a media query alone would not. */
+@media (max-width: 767px) {
+  .tb-support, .tb-clock, .tb-perf-wrap { display: none; }
+  .tb-actions a[href*="settings"] { display: none; }
+  #appbar #sb { width: 100%; padding: 0 10px; }
+  /* The bottom rail scrolls inside its own strip instead of widening the page. */
+  #tabs { overflow-x: auto; overflow-y: hidden; }
+  /* Map controls clear of the card and the bottom rail, not behind either. */
+  #fab { top: auto; bottom: calc(74px + env(safe-area-inset-bottom, 0px)); right: 8px; }
+}
+@media (max-width: 560px) {
+  /* The floating card fills the phone instead of hanging over its edge. */
+  #fc { left: 10px; right: 10px; width: auto; }
+  .fr { font-size: 22px; }
+  .fg b { font-size: 13px; }
 }

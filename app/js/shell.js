@@ -1,16 +1,15 @@
-// Stratos application shell: the sidebar, the top bar and the home stat strip.
+// Stratos application shell: the sidebar rail, the top bar and the UTC clock.
 //
 // The chrome is deliberately thin and reports real state only. The bridge's
 // /health endpoint decides whether the simulator is live, so a disconnected
-// simulator can never be shown as connected. The home totals come from the same
-// logbook store and career maths the rest of the app uses, so a new pilot sees
-// honest zeros rather than placeholder figures. The resource selector writes the
-// existing preference (localStorage + the settings store) instead of introducing
-// a second, competing setting.
+// simulator can never be shown as connected. On the Flight Deck the page owns
+// the connection line and the search box (it knows about the traffic feed and
+// the airport database), so the shell moves those nodes into the bar instead of
+// duplicating them: one search, one status line, one place to look.
 //
-// The sidebar's destinations belong to the page (the map page owns its own
-// panel buttons), so the shell groups and iconises whatever `.tab` items the
-// page declares rather than shipping a second navigation that could drift.
+// The rail is the page's own navigation, group-and-iconised here so every page
+// keeps one language. The Flight Deck opens as an icon rail; the choice to
+// expand it is remembered per browser, and the tooltips carry the names.
 
 import { RESOURCE_MODES, detectResourceMode } from './lib/telemetry.js';
 
@@ -24,6 +23,8 @@ const ICON = {
   plane: SVG('<path d="M21 15.5v-1.8l-7.6-4.4V4.6a1.4 1.4 0 0 0-2.8 0v4.7L3 13.7v1.8l7.6-2.3v4.2l-2.2 1.5v1.4l3.6-1 3.6 1v-1.4l-2.2-1.5v-4.2z"/>', true),
   settings: SVG('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 2.6 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9.5 4a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9 2 2 0 1 1 0 4z"/>'),
   collapse: SVG('<path d="M14 6l-6 6 6 6"/>'),
+  expand: SVG('<path d="M10 6l6 6-6 6"/>'),
+  heart: SVG('<path d="M12 20.5l-1.2-1.1C6.4 15.6 3.5 13 3.5 9.8A4.3 4.3 0 0 1 8 5.5c1.5 0 2.9.7 4 1.9a5.3 5.3 0 0 1 4-1.9 4.3 4.3 0 0 1 4.5 4.3c0 3.2-2.9 5.8-7.3 9.6z"/>', true),
   // Sidebar destinations
   home: SVG('<path d="M4 20v-7M10 20V5M16 20v-9M22 20H2"/>'),
   discover: SVG('<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>'),
@@ -64,13 +65,17 @@ const PAGE_TITLE = {
   stats: 'Pilot Dashboard',
 };
 
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
 const S = {
   root: null,
   page: 'home',
   health: null,
   timer: null,
-  statsEl: null,
+  clock: null,
   live: null,
+  pageStatus: null,
+  utc: true,
 };
 
 function esc(value) {
@@ -93,7 +98,7 @@ function simulatorState() {
   if (!health) return { cls: 'is-off', text: 'Simulator offline', title: 'No bridge answered on this address' };
   const sim = health.simulator || {};
   if (sim.connected) {
-    return { cls: 'is-live', text: 'Simulator live', title: `Receiving telemetry${sim.source ? ` from ${sim.source}` : ''}` };
+    return { cls: 'is-live', text: sim.source ? `Live from ${sim.source}` : 'Simulator live', title: `Receiving telemetry${sim.source ? ` from ${sim.source}` : ''}` };
   }
   return {
     cls: 'is-wait',
@@ -110,21 +115,95 @@ function liveState() {
     : { cls: 'is-off', text: 'No live data', title: 'Open Stratos from the bridge or start the simulator for live tracking' };
 }
 
+/**
+ * Paint the status: the pills on pages that show them, and the line under the
+ * brand either way. The page's own status node wins when it has one — the map
+ * knows about the traffic feed, which /health cannot see.
+ */
 function renderStatus() {
   const sim = S.root?.querySelector('[data-status="sim"]');
   const live = S.root?.querySelector('[data-status="live"]');
+  const state = simulatorState();
+  const liveS = liveState();
   if (sim) {
-    const state = simulatorState();
     sim.className = `status ${state.cls}`;
     sim.title = state.title;
     sim.innerHTML = `<i></i><span>${esc(state.text)}</span>`;
   }
   if (live) {
-    const state = liveState();
-    live.className = `status ${state.cls}`;
-    live.title = state.title;
-    live.innerHTML = `<i></i><span>${esc(state.text)}</span>`;
+    live.className = `status ${liveS.cls}`;
+    live.title = liveS.title;
+    live.innerHTML = `<i></i><span>${esc(liveS.text)}</span>`;
   }
+  const brand = S.root?.querySelector('[data-brand-state]');
+  if (!brand) return;
+  brand.title = `${state.title}. ${liveS.title}`;
+  brand.dataset.state = state.cls.replace(/^is-/, '');
+  const page = S.pageStatus;
+  if (!page) {
+    brand.textContent = state.text;
+    return;
+  }
+  // The page writes its own text every frame; only fill an empty line so the
+  // bar never shows a blank state before the first frame lands.
+  if (!page.textContent.trim()) page.textContent = state.text;
+}
+
+/** HHMMZ over the date, in UTC or in the pilot's own zone. Text only. */
+function stamp(utc) {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const hh = utc ? d.getUTCHours() : d.getHours();
+  const mm = utc ? d.getUTCMinutes() : d.getMinutes();
+  const day = utc ? d.getUTCDate() : d.getDate();
+  const mon = MONTHS[(utc ? d.getUTCMonth() : d.getMonth())] || '';
+  return { time: `${pad(hh)}${pad(mm)}${utc ? 'Z' : ''}`, date: `${day} ${mon}` };
+}
+
+function paintClock() {
+  const el = S.root?.querySelector('[data-clock]');
+  if (!el) return;
+  const now = stamp(S.utc);
+  const time = el.querySelector('b');
+  const date = el.querySelector('small');
+  if (time && time.textContent !== now.time) time.textContent = now.time;
+  if (date && date.textContent !== now.date) date.textContent = now.date;
+  el.title = S.utc ? 'UTC — click for local time' : 'Local time — click for UTC';
+}
+
+/** The support page is the project's own link; nothing is sold from the app. */
+function supportUrl() {
+  try {
+    return String(window.STRATOS_SUPPORT_URL || localStorage.getItem('stratos.supportUrl') || '').trim();
+  } catch (_) {
+    try { return String(window.STRATOS_SUPPORT_URL || '').trim(); } catch (_) { return ''; }
+  }
+}
+
+function openSupport() {
+  const url = supportUrl();
+  const dialog = document.createElement('dialog');
+  dialog.className = 'shell-dialog';
+  dialog.setAttribute('aria-label', 'Support Stratos');
+  dialog.innerHTML = `
+    <h2>Support Stratos</h2>
+    <p>Stratos is free and complete: every map layer, chart link, logbook and phone feature in this build is unlocked. The name on this button is a promise, not a product.</p>
+    ${url
+      ? `<p><a class="shell-dialog-cta" href="${esc(url)}" target="_blank" rel="noopener">${ICON.heart}<span>Open the support page</span></a></p>`
+      : '<p class="shell-dialog-note">No support page is configured in this build yet, so there is nowhere for this button to send you. Set one and it opens here.</p>'}
+    <div class="shell-dialog-row"><button type="button" data-close class="shell-dialog-close">Close</button></div>`;
+  document.body.appendChild(dialog);
+
+  const close = () => {
+    try { dialog.close?.(); } catch (_) { /* already closed */ }
+    dialog.remove();
+  };
+  dialog.addEventListener('click', event => { if (event.target === dialog) close(); });
+  dialog.addEventListener('keydown', event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } });
+  for (const button of dialog.querySelectorAll('[data-close]')) button.addEventListener('click', close);
+  if (typeof dialog.showModal === 'function') dialog.showModal();
+  else dialog.setAttribute('open', '');
+  dialog.querySelector('[data-close]')?.focus?.();
 }
 
 /**
@@ -158,20 +237,16 @@ function decorateRail(rail) {
   }
 }
 
-function buildBar(bar, { theme = false, rail = false } = {}) {
+function buildBar(bar, { theme = false, rail = false, search = null, status = null } = {}) {
   const mode = readMode();
   const title = bar.dataset.title || PAGE_TITLE[S.page] || 'Stratos';
   const context = bar.dataset.context || '';
   bar.innerHTML = `
     <a class="tb-brand" href="index.html" title="Stratos home">
       <span class="tb-mark">${ICON.plane}</span>
-      <span>STRATOS<small>FLIGHT DECK</small></span>
+      <span class="tb-name">STRATOS<small class="tb-state" data-brand-state>${status ? '' : esc(context ? `${title} · ${context}` : title)}</small></span>
     </a>
-    <div class="tb-title">
-      <b id="tb-page-title">${esc(title)}</b>
-      ${context ? `<span class="tb-crumb">${esc(context)}</span>` : ''}
-    </div>
-    <span class="tb-gap"></span>
+    <div class="tb-search" data-search-slot></div>
     ${rail ? "" : `<nav class="tb-nav" aria-label="Pages">
       <a href="index.html" data-page="home">Flight Deck</a>
       <a href="discover.html" data-page="discover">Discover</a>
@@ -179,25 +254,51 @@ function buildBar(bar, { theme = false, rail = false } = {}) {
       <a href="weather.html" data-page="weather">Weather</a>
       <a href="live.html" data-page="live">Live</a>
     </nav>`}
-    <div class="tb-stats">
-      <div class="status is-off" data-status="sim" title="Simulator status"><i></i><span>Simulator offline</span></div>
+    <span class="tb-gap"></span>
+    ${status ? '' : `<div class="tb-status" data-status-host>
+      <div class="status is-off" data-status="sim" title="Simulator status"><i></i><span>No connection</span></div>
       <div class="status is-off" data-status="live" title="Live tracking status"><i></i><span>No live data</span></div>
+    </div>`}
+    <button class="tb-support" data-support type="button" title="Support Stratos — the app is complete without it">
+      <span>Support Us</span><b>${ICON.heart}Go Premium</b>
+    </button>
+    <button class="tb-clock" data-clock type="button" title="UTC">
+      <b>--:--Z</b><small>--</small>
+    </button>
+    <div class="tb-actions">
+      ${theme ? '<button class="tb-btn" id="shell-theme" type="button">Night mode</button>' : ''}
       <label class="tb-perf-wrap" title="Resource profile: ${esc((RESOURCE_MODES[mode] || {}).description || '')}">
         <select class="tb-perf" aria-label="Resource profile">
           ${Object.values(RESOURCE_MODES).map(profile => `<option value="${esc(profile.key)}"${profile.key === mode ? ' selected' : ''}>${esc(profile.name)}</option>`).join('')}
         </select>
       </label>
-    </div>
-    <div class="tb-actions">
-      ${theme ? '<button class="tb-btn" id="shell-theme" type="button">Night mode</button>' : ''}
       <a class="tb-btn" href="pilot.html#settings" title="Settings" aria-label="Settings">${ICON.settings}</a>
       <a class="tb-btn" href="logbook.html#profile" title="Pilot profile" aria-label="Pilot profile"><span class="tb-avatar">PF</span></a>
     </div>`;
+
+  // Only the rail pages have room to centre the search on the bar itself;
+  // the others carry a nav next to the brand and keep the flex layout.
+  bar.classList.toggle('tb--rail', Boolean(rail));
+
+  // The Flight Deck's own search box and connection line move into the bar, so
+  // there is one of each and their listeners come along with the nodes.
+  const slot = bar.querySelector('[data-search-slot]');
+  if (slot && search) slot.appendChild(search);
+  const state = bar.querySelector('[data-brand-state]');
+  if (state && status) state.appendChild(status);
 
   bar.querySelectorAll('.tb-nav a').forEach(link => {
     if (link.dataset.page === S.page) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
+
+  bar.querySelector('[data-support]')?.addEventListener('click', openSupport);
+  bar.querySelector('[data-clock]')?.addEventListener('click', () => {
+    S.utc = !S.utc;
+    try { localStorage.setItem('stratos.clock', S.utc ? 'utc' : 'local'); } catch (_) { /* private mode */ }
+    paintClock();
+  });
+
   bar.querySelector('.tb-perf')?.addEventListener('change', async event => {
     const next = event.target.value;
     if (!RESOURCE_MODES[next]) return;
@@ -211,47 +312,19 @@ function buildBar(bar, { theme = false, rail = false } = {}) {
     // The map page reads its profile once at start-up; tell the user when the
     // change takes effect there instead of silently doing nothing.
     if (S.page === 'home' && !window.StratosPilot) {
-      const note = bar.querySelector('[data-perf-note]') || document.createElement('span');
-      note.dataset.perfNote = '1';
-      note.className = 'status is-wait';
-      note.textContent = `${RESOURCE_MODES[next].name} applies on reload`;
-      note.style.marginLeft = '6px';
-      bar.querySelector('.tb-stats').append(note);
-      setTimeout(() => note.remove(), 4000);
+      const host = bar.querySelector('[data-status-host]') || bar.querySelector('.tb-actions');
+      if (host) {
+        const note = bar.querySelector('[data-perf-note]') || document.createElement('span');
+        note.dataset.perfNote = '1';
+        note.className = 'status is-wait';
+        note.textContent = `${RESOURCE_MODES[next].name} applies on reload`;
+        host.appendChild(note);
+        setTimeout(() => note.remove(), 4000);
+      }
     }
   });
+  paintClock();
   renderStatus();
-}
-
-async function loadStats() {
-  if (!S.statsEl) return;
-  let career = null;
-  try {
-    const [{ getFlights }, { computeCareer }] = await Promise.all([
-      import('./lib/store.js'),
-      import('./lib/stats.js'),
-    ]);
-    career = computeCareer(await getFlights());
-  } catch (_) { /* no logbook on this origin yet: zeros are the honest answer */ }
-
-  const hours = career ? career.hours : 0;
-  const distance = career ? career.distanceNm : 0;
-  const flights = career ? career.flights : 0;
-  const airports = career ? career.airportsVisited : 0;
-  const cards = [
-    { label: 'Total flight time', value: hours ? `${hours.toFixed(1)} h` : '0.0 h', empty: !hours },
-    { label: 'Total distance', value: distance ? `${Math.round(distance).toLocaleString()} nm` : '0 nm', empty: !distance },
-    { label: 'Flights completed', value: String(flights), empty: !flights },
-    { label: 'Airports visited', value: String(airports), empty: !airports },
-  ];
-  S.statsEl.innerHTML = cards.map(card => `
-    <div class="stat-card${card.empty ? ' is-empty' : ''}">
-      <b>${esc(card.value)}</b>
-      <span>${esc(card.label)}</span>
-    </div>`).join('');
-  // Pages under the shell (the map especially) measure their own box once at
-  // start-up. Re-measure now that the strip has real content.
-  try { window.dispatchEvent(new Event('resize')); } catch (_) { /* not a browser */ }
 }
 
 async function pollHealth() {
@@ -266,16 +339,20 @@ async function pollHealth() {
 }
 
 /**
- * Mount the shared chrome. Pages provide an empty `<header id="appbar">` and,
- * for the home dashboard, an empty `<section id="homestats">`.
+ * Mount the shared chrome. Pages provide an empty `<header id="appbar">` and
+ * may mark the nodes the shell should adopt: `[data-shell-search]` moves into
+ * the centred search slot and `[data-shell-status]` becomes the line under the
+ * brand. The shell owns neither of them, so the page keeps writing to them.
  */
-export function mountShell({ page = 'home', stats = false, theme = false } = {}) {
+export function mountShell({ page = 'home', theme = false } = {}) {
   S.page = page;
   S.root = document.querySelector('.app-shell') || document.body;
-  S.statsEl = document.getElementById('homestats');
 
   const bar = document.getElementById('appbar');
-  if (bar) buildBar(bar, { theme, rail: Boolean(S.root.querySelector('#tabs')) });
+  const search = document.querySelector('[data-shell-search]');
+  const status = document.querySelector('[data-shell-status]');
+  S.pageStatus = status;
+  if (bar) buildBar(bar, { theme, rail: Boolean(S.root.querySelector('#tabs')), search, status });
 
   const shell = S.root;
   const rail = shell.querySelector('#tabs');
@@ -292,30 +369,59 @@ export function mountShell({ page = 'home', stats = false, theme = false } = {})
 
   if (shell.classList.contains('app-shell')) {
     try {
-      if (localStorage.getItem('stratos.rail') === 'collapsed') shell.dataset.collapsed = '1';
-      else if (localStorage.getItem('stratos.rail') === 'rail') shell.dataset.mode = 'rail';
-    } catch (_) { /* private mode */ }
+      const saved = localStorage.getItem('stratos.rail');
+      // The Flight Deck opens as an icon rail; only an explicit choice expands it.
+      if (saved === 'open') delete shell.dataset.collapsed;
+      else shell.dataset.collapsed = '1';
+    } catch (_) {
+      shell.dataset.collapsed = '1';
+    }
     const toggle = shell.querySelector('[data-rail-toggle]');
+    const label = () => {
+      if (!toggle) return;
+      const collapsed = shell.dataset.collapsed === '1';
+      const text = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+      toggle.title = text;
+      toggle.setAttribute('aria-label', text);
+      const span = toggle.querySelector('span');
+      if (span) span.textContent = collapsed ? 'Expand' : 'Collapse';
+      const glyph = toggle.querySelector('b');
+      if (glyph) glyph.innerHTML = collapsed ? ICON.expand : ICON.collapse;
+    };
+    label();
     toggle?.addEventListener('click', () => {
       const collapsed = shell.dataset.collapsed === '1';
       if (collapsed) delete shell.dataset.collapsed;
       else shell.dataset.collapsed = '1';
       try { localStorage.setItem('stratos.rail', collapsed ? 'open' : 'collapsed'); } catch (_) { /* private mode */ }
+      label();
     });
   }
+
+  try {
+    if (localStorage.getItem('stratos.clock') === 'local') S.utc = false;
+  } catch (_) { /* private mode */ }
 
   pollHealth();
   if (S.timer) clearInterval(S.timer);
   S.timer = setInterval(() => { if (!document.hidden) pollHealth(); }, 15000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) pollHealth(); });
-
-  if (stats) loadStats();
+  // A minute-resolution clock: the timer only writes when the text changes.
+  if (S.clock) clearInterval(S.clock);
+  S.clock = setInterval(paintClock, 1000);
+  paintClock();
 
   window.StratosShell = {
-    refresh: () => { pollHealth(); if (stats) loadStats(); },
+    refresh: () => pollHealth(),
     setLive: value => { S.live = Boolean(value); renderStatus(); },
     health: () => S.health,
-    destroy: () => { if (S.timer) clearInterval(S.timer); S.timer = null; },
+    clock: () => stamp(S.utc),
+    destroy: () => {
+      if (S.timer) clearInterval(S.timer);
+      if (S.clock) clearInterval(S.clock);
+      S.timer = null;
+      S.clock = null;
+    },
   };
   return window.StratosShell;
 }

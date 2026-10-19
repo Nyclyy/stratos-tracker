@@ -11,12 +11,11 @@ html,body{height:100%;min-height:100%;margin:0;background:var(--bg);color:var(--
 #app{position:relative;height:100vh;height:100dvh;min-height:320px;overflow:hidden;isolation:isolate}
 canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
 .box{background:var(--ui);border:1px solid var(--ui2);border-radius:10px;position:absolute;box-shadow:0 2px 10px rgba(0,0,0,.25)}
-#top{top:8px;left:8px;right:8px;display:flex;gap:6px;background:none;border:0;box-shadow:none;max-width:560px}
 #q{flex:1;min-width:0;padding:10px 12px;border-radius:10px;border:1px solid var(--ui2);background:var(--ui);color:var(--txt);font:inherit;font-size:16px}
 button{font:inherit;color:var(--txt);background:var(--ui);border:1px solid var(--ui2);border-radius:8px;padding:7px 10px;cursor:pointer}
 button.on{background:var(--route);color:#fff;border-color:var(--route)}
 button:focus-visible,input:focus-visible{outline:2px solid var(--route);outline-offset:1px}
-#res{top:54px;left:8px;width:min(340px,calc(100% - 16px));max-height:40%;overflow:auto;display:none}
+#res{top:10px;left:0;right:0;margin:0 auto;width:min(560px,calc(100% - 24px));max-height:52%;overflow:auto;display:none}
 #res div{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--ui2)}
 #chips{top:54px;right:8px;display:flex;flex-direction:column;gap:5px;background:none;border:0;box-shadow:none}
 #sheet{left:8px;bottom:84px;width:min(440px,calc(100% - 16px));max-height:46%;overflow:auto;padding:12px;display:none}
@@ -29,7 +28,7 @@ code,pre{font:12px ui-monospace,Consolas,monospace;background:var(--ui2);padding
 textarea{width:100%;height:150px;box-sizing:border-box;background:var(--ui2);color:var(--txt);border:0;border-radius:6px;font:12px ui-monospace,monospace}
 html{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}textarea,input{-webkit-user-select:text;user-select:text}button{min-height:36px}
 #chart{position:absolute;inset:0;background:var(--bg);z-index:5;display:none;overflow:auto;padding:10px}#chart svg{width:100%;max-height:60vh;display:block}
-@media(max-width:420px){#tel b{font-size:13px}#tel span{font-size:10px}#top{left:8px;right:62px;top:8px}#sb{padding:0 12px}#q{padding:12px 0;font-size:16px}#fab{right:8px;top:8px;gap:7px}.fab{width:42px;height:42px}#res{left:8px;right:58px;top:62px}#sheet{left:8px;right:8px;bottom:72px;max-height:min(48dvh,420px);padding:12px;border-radius:16px}#tabs{padding-bottom:max(7px,env(safe-area-inset-bottom));}button{padding:8px 10px}}
+@media(max-width:420px){#tel b{font-size:13px}#tel span{font-size:10px}#sb{padding:0 12px}#q{padding:12px 0;font-size:16px}#fab{right:8px;top:8px;gap:7px}.fab{width:42px;height:42px}#res{left:8px;right:8px}#sheet{left:8px;right:8px;bottom:72px;max-height:min(48dvh,420px);padding:12px;border-radius:16px}#tabs{padding-bottom:max(7px,env(safe-area-inset-bottom));}button{padding:8px 10px}}
 :root{--acc:#2563eb}:root[data-theme=contrast]{--acc:#fde047}
 html,body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,system-ui,sans-serif}
 /* Instrument surfaces. Opaque instead of a per-frame backdrop blur: the map
@@ -42,7 +41,6 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",
 #res div,#tabs{border-color:var(--ui2)}
 button{border-radius:12px;padding:9px 14px;font-weight:600;border-color:transparent;background:var(--ui2)}
 button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-theme=contrast] button.on{color:#000}
-#top{position:absolute;top:10px;left:12px;right:72px;display:flex;flex-direction:column;gap:8px;max-width:520px;background:none;border:0;box-shadow:none;z-index:2}
 #sb{display:flex;align-items:center;gap:10px;background:var(--ui);border:1px solid var(--ui2);border-radius:999px;padding:0 16px;box-shadow:0 6px 24px rgba(0,0,0,.22)}
 #sb span{font-size:20px;color:var(--mut)}#q{flex:1;border:0;background:none;padding:14px 0;outline:none;border-radius:0}
 #st{align-self:flex-start;border-radius:999px;font-size:12px;padding:6px 12px;background:var(--ui);border:1px solid var(--ui2);box-shadow:0 2px 10px rgba(0,0,0,.18)}
@@ -51,7 +49,7 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 #bTheme.fab{font-size:11px}
 #lay{position:absolute;right:72px;top:66px;display:none;flex-direction:column;gap:6px;padding:10px;background:var(--ui);border:1px solid var(--ui2);border-radius:16px;box-shadow:0 8px 28px rgba(0,0,0,.28);z-index:3}
 #lay b{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
-#res{top:70px;left:12px;right:72px;width:auto;max-width:520px;border-radius:16px;z-index:4}
+#res{border-radius:14px;z-index:4}
 #tabs{position:absolute;left:0;right:0;bottom:0;display:flex;gap:2px;padding:6px 8px 8px;border-radius:20px 20px 0 0;z-index:4}
 .tab{flex:1;background:none;border:0;display:flex;text-decoration:none;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:600;color:var(--mut);padding:6px 0;min-height:48px}
 .tab b{font-size:20px;line-height:1}.tab.act{color:var(--acc)}.tab.on b{color:#22c55e}
@@ -63,21 +61,32 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 
 :root[data-theme=night]{--bg:#060c14;--land:#0d1721;--coast:#28425a;--grid:rgba(140,180,220,.08);--ap:#f6c453;--nav:#5eead4;--route:#22d3ee;--own:#f8b84e;--txt:#e8f1fa;--ui:rgba(9,16,25,.96);--ui2:#152230;--mut:#8299ae;--trf:#8fb8ff;--acc:#38bdf8}
 #tel{display:none!important}.live #sheet{bottom:76px}
-#fc{display:none;top:68px;left:12px;right:72px;max-width:520px;padding:12px 14px;border-radius:18px;z-index:2}
-.fh{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut);font-weight:700;letter-spacing:.05em}.fh i{font-style:normal;color:#34d399}
-.dot{width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 8px #34d399}.sp{flex:1}
-.fr{display:flex;align-items:center;gap:12px;margin:10px 0 2px;font-size:20px;font-weight:800;letter-spacing:.02em}
+#fc{display:none;top:12px;left:12px;width:358px;max-width:calc(100% - 24px);z-index:3;padding:14px 16px;border-radius:16px;background:color-mix(in srgb,var(--surface) 93%,transparent);border:1px solid color-mix(in srgb,var(--coast) 42%,transparent);box-shadow:var(--sh-2)}
+.fh{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--mut);font-weight:700;letter-spacing:.08em}.fh b{font-size:15px;color:var(--txt);letter-spacing:.01em}
+.fh i{font-style:normal;color:#34d399}.fh em{font-style:normal;text-transform:uppercase;letter-spacing:.1em;font-size:9.5px;color:var(--mut);border:1px solid color-mix(in srgb,var(--coast) 40%,transparent);border-radius:999px;padding:2px 7px}
+.fcd{font-size:11.5px;color:var(--mut);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 8px #34d399;flex:0 0 auto}.sp{flex:1}
+.fr{display:flex;align-items:center;gap:10px;margin:13px 0 4px;font-size:28px;font-weight:800;letter-spacing:.04em;line-height:1}
+.fr .arw{flex:1;height:1px;background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--txt) 30%,transparent) 0 6px,transparent 6px 12px)}
+.ft{display:flex;justify-content:space-between;gap:8px;font-size:10.5px;color:var(--mut);letter-spacing:.06em;text-transform:uppercase}
+.ft b{color:var(--txt);font-size:12.5px;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.fbm{display:flex;align-items:center;gap:10px;margin-top:12px}.fbm .fm{white-space:nowrap}
 .pb{flex:1;height:4px;background:var(--ui2);border-radius:2px;position:relative}.pb u{position:absolute;left:0;top:0;bottom:0;background:var(--acc);border-radius:2px}
 .pb s{position:absolute;top:-10px;transform:translateX(-50%);text-decoration:none;font-size:17px;color:var(--acc)}
-.fm{font-size:12px;color:var(--mut)}
-.fg{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:10px;text-align:center}.fg b{display:block;font-size:22px;font-variant-numeric:tabular-nums}.fg span{font-size:10px;color:var(--mut);letter-spacing:.05em}
+.fm{font-size:11px;color:var(--mut)}
+.fg{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--coast) 30%,transparent);text-align:center}
+.fg b{display:block;font-size:15px;font-variant-numeric:tabular-nums}.fg span{font-size:9px;color:var(--mut);letter-spacing:.1em}
+/* Location and live-aircraft badge, bottom right over the map. */
+#online{position:absolute;right:12px;bottom:12px;z-index:2;padding:7px 12px;border-radius:12px;text-align:right;background:color-mix(in srgb,var(--surface) 84%,transparent);border:1px solid color-mix(in srgb,var(--coast) 34%,transparent);box-shadow:var(--sh-1)}
+#online b{display:block;font-size:12px;font-weight:700;letter-spacing:.02em}
+#online span{font-size:10.5px;color:var(--mut);letter-spacing:.04em}
+@media(max-width:767px){#online{display:none}}
 .seg{display:flex;gap:4px;background:var(--ui2);padding:3px;border-radius:12px;margin:10px 0}.seg button{flex:1;background:none;padding:8px 0;border-radius:9px;color:var(--mut)}.seg button.on{background:var(--acc);color:#04212b}
 .ah{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.ic{font-size:28px;letter-spacing:.03em}.chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.chips span{background:var(--ui2);border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700}
 @media(max-height:520px) and (orientation:landscape){#top{max-width:360px}#sheet{max-height:calc(100dvh - 90px);bottom:66px}#tabs{padding-top:4px;padding-bottom:4px}.tab{min-height:40px}}
 @media(min-width:768px){
 #tabs{left:0;right:auto;top:0;bottom:0;width:78px;flex-direction:column;justify-content:flex-start;padding:76px 6px 10px;border-radius:0 20px 20px 0;gap:6px;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
-#top{left:94px;right:auto;width:440px}#fc{left:94px;right:auto;width:440px}#res{left:94px;right:auto;width:440px}
-#fab{right:auto;left:94px;top:auto;bottom:18px;flex-direction:row}
+#fc{left:12px;right:auto;width:358px}
 #sheet{left:auto;right:12px;top:12px;bottom:12px;width:390px;max-width:none;max-height:none}.live #sheet{bottom:12px}
 #lay{right:auto;left:94px;top:auto;bottom:76px}
 }
@@ -88,7 +97,7 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 #cv{display:none;position:absolute;top:0;left:0;right:0;z-index:6;padding:10px 12px 8px;background:var(--surface);border-bottom:1px solid var(--ui2)}
 .chartmode #cv{display:block}.cvh{display:flex;align-items:center;gap:10px}.cvt{flex:1;min-width:0;display:flex;flex-direction:column}.cvt b{font-size:22px}.cvt span{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #ci{display:none;position:absolute;left:0;right:0;bottom:0;top:124px;background:var(--bg);color:var(--txt);z-index:5;overflow:auto;padding:14px 16px 30px}.chartinfo #ci{display:block}
-.chartmode #top,.chartmode #fab,.chartmode #tabs,.chartmode #sheet,.chartmode #fc,.chartmode #lay,.chartmode #res{display:none!important}
+.chartmode #fab,.chartmode #tabs,.chartmode #sheet,.chartmode #fc,.chartmode #lay,.chartmode #res{display:none!important}
 #attr{position:absolute;left:10px;bottom:62px;z-index:1;padding:2px 6px;border-radius:6px;background:color-mix(in srgb,var(--ui) 76%,transparent);color:var(--mut);font-size:10px;pointer-events:none}
 @media(min-width:768px){#attr{left:92px;bottom:8px}}
 #pdf{display:none;position:absolute;inset:0;z-index:9;background:var(--bg)}.pdh{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--ui);border-bottom:1px solid var(--ui2)}.pdh b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pdh a{font-size:12px;color:var(--mut)}
@@ -137,8 +146,8 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 @media(max-width:420px){button{min-height:38px}}
 /* Application shell: a slim status bar and the career strip sit above the map.
    The map keeps its own overlays and rail; only the frame around it changes. */
-.app-shell{display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:100dvh;min-height:0;background:var(--bg)}
-.app-main{grid-row:2;display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;overflow:hidden}
+.app-shell{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;height:100dvh;min-height:0;background:var(--bg)}
+.app-main{grid-row:2;display:grid;grid-template-rows:minmax(0,1fr);min-height:0;overflow:hidden}
 #app{height:100%;min-height:0}
 /* Sidebar: a bottom tab bar on phones, a labelled rail on desktop. */
 #tabs{grid-row:3;position:static;left:auto;right:auto;top:auto;bottom:auto;border-top:1px solid var(--ui2);border-radius:20px 20px 0 0;padding-bottom:max(6px,env(safe-area-inset-bottom));z-index:2}
@@ -160,7 +169,7 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 .tab.act{box-shadow:none;background:color-mix(in srgb,var(--acc) 12%,transparent)}
 .tab.act::before{content:"";position:absolute;left:-6px;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--acc)}
 #tabs .tab{position:relative}
-#top{left:12px}#fc{left:12px}#res{left:12px}#lay{left:12px}#fab{left:12px;bottom:18px}#attr{left:10px}
+#fc{left:12px}#lay{left:12px;bottom:76px}#fab{right:12px;left:auto;top:50%;bottom:auto;transform:translateY(-50%)}#attr{left:10px}
 }
 
 /* ── Midnight rail ────────────────────────────────────────────────
@@ -185,13 +194,18 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 <header id="appbar" class="tb" data-title="Flight Deck" data-context="Live Map"></header>
 <nav id="tabs" aria-label="Sections"><button class="tab" id="bMap" data-group="Flight Operations" data-label="Flight Deck"><b>&#8982;</b><span>Flight Deck</span></button><a class="tab" href="discover.html" data-group="Flight Operations" data-label="Route Discovery"><b>&#10022;</b><span>Route Discovery</span></a><button class="tab" id="bLive" data-group="Flight Operations" data-label="Live Tracking"><b>&#9673;</b><span>Live Tracking</span></button><button class="tab" id="bRoute" data-group="Flight Operations" data-label="Flight Planning"><b>&#8599;</b><span>Flight Planning</span></button><button class="tab" id="bCh" data-group="Flight Operations" data-label="Charts"><b>&#9707;</b><span>Charts</span></button><a class="tab" href="logbook.html" data-group="Flight Operations" data-label="Flight Logbook"><b>&#9776;</b><span>Flight Logbook</span></a><button class="tab" id="bWx" data-group="Flight Intelligence" data-label="Weather"><b>&#9729;</b><span>Weather</span></button><a class="tab" href="pilot.html#airports" data-group="Flight Intelligence" data-label="Airports"><b>&#9678;</b><span>Airports</span></a><a class="tab" href="pilot.html#career" data-group="Flight Intelligence" data-label="Flight Statistics"><b>&#9733;</b><span>Flight Statistics</span></a><button class="tab" id="bData" data-group="Application" data-label="Data &amp; Performance"><b>&#9636;</b><span>Data &amp; Performance</span></button><a class="tab" href="pilot.html#settings" data-group="Application" data-label="Settings"><b>&#9881;</b><span>Settings</span></a><button class="tab rail-toggle" data-rail-toggle type="button" title="Collapse sidebar" aria-label="Collapse sidebar"><b>&#8249;</b><span>Collapse</span></button></nav>
 <div class="app-main">
-<section id="homestats" class="stats" aria-label="Career totals"></section>
 <div id="app">
 <canvas id="map" aria-label="Aviation chart map"></canvas>
 <div id="attr">© OpenStreetMap contributors · Esri imagery</div>
-<div id="top"><div id="sb"><span>&#8981;</span><input id="q" placeholder="Search airports and navaids" autocomplete="off" aria-label="Search"></div><button id="st">No live data</button></div>
+<!-- The shell adopts these two: the search moves into the centred slot in the
+     bar, and this button becomes the connection line under the brand. One of
+     each, and the listeners and ids come along with the nodes. -->
+<div id="sb" data-shell-search><span>&#8981;</span><input id="q" placeholder="Search airports and navaids" autocomplete="off" aria-label="Search"></div>
+<button id="st" data-shell-status>No connection</button>
 <div id="res" class="box"></div>
-<div id="fc" class="box"></div><div id="fab"><button id="bTheme" class="fab" title="Theme">Day</button>
+<div id="fc" class="box"></div>
+<div id="online" class="box"><b id="olPlace">–</b><span id="olCount">–</span></div>
+<div id="fab"><button id="bTheme" class="fab" title="Theme">Day</button>
 <button id="bLay" class="fab" title="Layers">&#9776;</button><button id="bPlan" class="fab" title="Add waypoints">&#9998;</button><button id="bFol" class="fab" title="Follow aircraft">&#9992;</button><button id="bZi" class="fab" title="Zoom in">+</button><button id="bZo" class="fab" title="Zoom out">−</button>
 </div><div id="lay"><b>Map layers</b><button data-l="apt" class="on">Airports</button><button data-l="nav" class="on">Navaids</button><button data-l="trf" class="on">Traffic</button><button data-l="trl">All trails</button><button data-l="grid">Grid</button><b>Map style</b><div id="ms"></div></div>
 
@@ -419,7 +433,7 @@ function addWp(o){route.push(wp(o));save();panel='route';trav=Math.min(trav,tota
 /* own-ship sim */
 function pos(d){const l=legs();let i=0;while(i<l.length-1&&d>l[i]){d-=l[i];i++}if(!route[i+1])return{lat:V.lat,lon:V.lon,hdg:0};const a=route[i],b=route[i+1],h=brg(a,b);return{...fwd(a,h,Math.min(d,l[i])),hdg:h}}
 function alt(d){const t=total();return Math.max(route[0]?.elev||0,Math.min(6500,route[0].elev+d*180,(route.at(-1).elev||0)+(t-d)*260))}
-function step(dt){if(V.tz!=null){const diff=V.tz-V.z;if(Math.abs(diff)>0.001){const dz=diff*Math.min(1,dt*14);const newZ=Math.abs(diff)<0.002?V.tz:V.z+dz;if(V.anchor){const pNew=wpx(V.anchor.geo[0],V.anchor.geo[1],newZ);const dx=V.anchor.sx-W/2,dy=V.anchor.sy-H/2;const cNew=[pNew[0]-dx,pNew[1]-dy];const p=wun(cNew[0],cNew[1],newZ);V.lon=p[0];V.lat=p[1];V.z=newZ}else{V.z=newZ}if(V.z===V.tz){V.tz=null;V.anchor=null}}else{V.z=V.tz;V.tz=null;V.anchor=null}}if(V.in){const c=wpx(V.lon,V.lat,V.z),p=wun(c[0]-V.in[0]*dt,c[1]-V.in[1]*dt,V.z),f=Math.exp(-4*dt);V.lon=p[0];V.lat=p[1];V.in=[V.in[0]*f,V.in[1]*f];if(Math.hypot(V.in[0],V.in[1])<8)V.in=null}const ok=!!liveOk();$('#app').classList.toggle('live',ok);const tx=ok?'● Live from '+(live.d.src||'simulator'):(deskStatus&&deskStatus.state==='error'?'Bridge: '+(deskStatus.detail||'error — see Pilot → Settings'):deskStatus&&deskStatus.state!=='connected'&&deskStatus.state!=='stopped'?'Bridge: '+(deskStatus.detail||deskStatus.state):wtTxt());if($('#st').textContent!=tx)$('#st').textContent=tx;if(deskStatus)$('#st').title=deskStatus.detail||deskStatus.state;if(ok)liveStep(dt);else wtStep(dt);fcRender(ok);$('#st').style.display=$('#fc').style.display=='block'?'none':'';return;trav+=CRUISE/3600*dt*WARP;if(trav>=t)trav=0;const p=pos(trav);own.lat=p.lat;own.lon=p.lon;own.hdg=p.hdg;own.alt=alt(trav);own.vs=(alt(trav+.1)-own.alt)*CRUISE/6;
+function step(dt){if(V.tz!=null){const diff=V.tz-V.z;if(Math.abs(diff)>0.001){const dz=diff*Math.min(1,dt*14);const newZ=Math.abs(diff)<0.002?V.tz:V.z+dz;if(V.anchor){const pNew=wpx(V.anchor.geo[0],V.anchor.geo[1],newZ);const dx=V.anchor.sx-W/2,dy=V.anchor.sy-H/2;const cNew=[pNew[0]-dx,pNew[1]-dy];const p=wun(cNew[0],cNew[1],newZ);V.lon=p[0];V.lat=p[1];V.z=newZ}else{V.z=newZ}if(V.z===V.tz){V.tz=null;V.anchor=null}}else{V.z=V.tz;V.tz=null;V.anchor=null}}if(V.in){const c=wpx(V.lon,V.lat,V.z),p=wun(c[0]-V.in[0]*dt,c[1]-V.in[1]*dt,V.z),f=Math.exp(-4*dt);V.lon=p[0];V.lat=p[1];V.in=[V.in[0]*f,V.in[1]*f];if(Math.hypot(V.in[0],V.in[1])<8)V.in=null}const ok=!!liveOk();$('#app').classList.toggle('live',ok);const tx=ok?'● Live from '+(live.d.src||'simulator'):(deskStatus&&deskStatus.state==='error'?'Bridge: '+(deskStatus.detail||'error — see Pilot → Settings'):deskStatus&&deskStatus.state!=='connected'&&deskStatus.state!=='stopped'?'Bridge: '+(deskStatus.detail||deskStatus.state):wtTxt());if($('#st').textContent!=tx)$('#st').textContent=tx;if(deskStatus)$('#st').title=deskStatus.detail||deskStatus.state;if(ok)liveStep(dt);else wtStep(dt);fcRender(ok);olTick();return;trav+=CRUISE/3600*dt*WARP;if(trav>=t)trav=0;const p=pos(trav);own.lat=p.lat;own.lon=p.lon;own.hdg=p.hdg;own.alt=alt(trav);own.vs=(alt(trav+.1)-own.alt)*CRUISE/6;
 T.forEach(a=>{const p=fwd(a,a.hdg,a.gs/3600*dt*WARP);a.lat=p.lat;a.lon=p.lon});
 const el=route.length>1?t-trav:0;$('#tGS').textContent=CRUISE;$('#tAL').textContent=Math.round(own.alt/10)*10;$('#tHD').textContent=String(Math.round(own.hdg)%360).padStart(3,'0');$('#tVS').textContent=Math.round(own.vs/50)*50;$('#tDS').textContent=el.toFixed(1);$('#tEt').textContent=hm(el/CRUISE);
 if(V.fol){V.lon=own.lon;V.lat=own.lat}}
@@ -757,11 +771,7 @@ if(t.ok){cx.globalAlpha=Math.min(1,(now-t.t)/220);cx.drawImage(t.i,dx,dy,s+.5,s+
 const tx='Imagery © Esri, Maxar, Earthstar Geographics';cx.font='10px sans-serif';cx.strokeStyle='rgba(0,0,0,.65)';cx.lineWidth=3;cx.strokeText(tx,8,H-84);cx.fillStyle='#fff';cx.fillText(tx,8,H-84)}
 var fcS='',aTab='info';
 function routeProg(){let best=1e9,acc=0,at=0;for(let i=0;i<route.length-1;i++){const a=route[i],b=route[i+1],L2=dist(a,b),k=Math.cos(a.lat*R),bx=(b.lon-a.lon)*k*60,by=(b.lat-a.lat)*60,px=(own.lon-a.lon)*k*60,py=(own.lat-a.lat)*60,d2=bx*bx+by*by||1e-9,t=Math.max(0,Math.min(1,(px*bx+py*by)/d2)),dd=Math.hypot(px-bx*t,py-by*t);if(dd<best){best=dd;at=acc+t*L2}acc+=L2}return at}
-function fcRender(ok){const e=$('#fc');if(!ok){if(fcS){fcS='';e.style.display='none'}return}
-const g=i=>$('#'+i).textContent,rt=route.length>1,tot=rt?total():0,pr=rt?routeProg():0,pct=tot?Math.min(100,pr/tot*100):0,
-s='<div class="fh"><span class="dot"></span>'+(live.d.src||'SIM')+' <i>LIVE</i><span class="sp"></span>'+(rt?'ETA '+g('tEt'):'')+'</div>'+(rt?'<div class="fr"><span>'+route[0].id+'</span><div class="pb"><u style="width:'+pct.toFixed(1)+'%"></u><s style="left:'+pct.toFixed(1)+'%">&#9992;</s></div><span>'+route[route.length-1].id+'</span></div><div class="fm">'+Math.round(Math.max(0,tot-pr))+' nm remaining</div>':'')+
-'<div class="fg"><div><b>'+g('tAL')+'</b><span>ALT FT</span></div><div><b>'+g('tGS')+'</b><span>GS KT</span></div><div><b>'+g('tHD')+'</b><span>HDG</span></div><div><b>'+g('tVS')+'</b><span>VS FPM</span></div></div>';
-if(s!==fcS){fcS=s;e.innerHTML=s;e.style.display='block'}}
+
 function aptHtml(o){const tb=[['info','Info'],['wx','Weather'],['ch','Charts']];
 let h='<div class="ah"><div><b class="ic">'+o.id+'</b><div class="m">'+o.name+'</div></div><div class="chips"><span>'+o.elev+' ft</span>'+(liveOk()?'<span>'+Math.round(dist(own,o))+' nm</span>':'')+'</div></div><div class="seg">'+tb.map(t=>'<button class="'+(aTab==t[0]?'on':'')+'" data-t="'+t[0]+'" onclick="aTab=this.dataset.t;render()">'+t[1]+'</button>').join('')+'</div>';
 if(aTab=='wx')return h+'<code>'+o.metar+'</code><div class="m">'+dec(o.metar)+'</div><div class="m">'+mAge(o)+'</div>'+rwTable(o);
@@ -912,6 +922,20 @@ loadOA();
 if(location.protocol=='http:')connect(location.origin);
 else if(location.protocol=='file:')connect('http://127.0.0.1:8765');
 
+/* Location and live-aircraft badge, bottom right over the map. The place name
+   is the nearest labelled feature to the view centre (country, continent or
+   ocean) from the bundled world layer; the count is real traffic only. */
+let olAt=0,olKey='';
+function olPlace(){const wd=WD;if(!wd||!wd.countries)return'';const c=wpx(V.lon,V.lat,V.z);let best='',bd=Infinity;
+const scan=list=>{for(const it of list){const q=wpx(it.x,it.y,V.z),dx=q[0]-c[0],dy=q[1]-c[1],d=dx*dx+dy*dy;if(d<bd){bd=d;best=it.n}}};
+scan(wd.countries);scan(wd.continents);scan(wd.oceans);return best}
+function olTick(){const now=performance.now();if(now-olAt<900)return;olAt=now;
+const place=olPlace(),n=T.length,count=n?(n===1?'1 aircraft online':n+' aircraft online'):liveOk()?'Simulator online':WT.fail>=2?'Traffic offline':WT.n?'No aircraft in view':'Connecting…';
+const key=place+'|'+count;if(key===olKey)return;olKey=key;
+$('#olPlace').textContent=place;$('#olPlace').style.display=place?'':'none';
+$('#olCount').textContent=count;
+$('#online').title=n?(n+' live aircraft in view'+(WT.src?' via '+WT.src:'')):wtTxt()}
+
 /* ===== Stratos additions: trails, tracking panel, built-in charts, in-app PDF viewer ===== */
 function trlAdd(k,lat,lon,alt,mx){if(RP.trail<=0)return;const cap=Math.min(mx||400,RP.trail);let a=TRL.get(k);if(!a){a=[];TRL.set(k,a)}const l=a[a.length-1];if(!l||Math.abs(l[0]-lat)+Math.abs(l[1]-lon)>1e-4){a.push([lat,lon,alt||0,Date.now()]);if(a.length>cap)a.shift()}}
 function trlGC(){const now=Date.now();TRL.forEach((a,k)=>{if(k!='own'&&now-a[a.length-1][3]>1200000)TRL.delete(k)})}
@@ -933,14 +957,40 @@ function planeHtml(o){const io=o.k=='own';return '<div class="ah"><div><b class=
 function updPl(){const e=$('#pv');if(!e||!sel)return;const io=sel.k=='own',o=io?{...own,gs:live.d?live.d.gs:0}:sel,alt=Math.round((o.alt||0)/10)*10,fl=alt>=18000?'FL'+String(Math.round(alt/100)).padStart(3,'0'):alt.toLocaleString()+' ft',vs=Math.round((o.vs||0)/10)*10,ar=vs>200?'&#9650;':vs<-200?'&#9660;':'&#9644;',hd=String(Math.round((o.hdg+360)%360)%360).padStart(3,'0'),tr=TRL.get(io?'own':(sel.hx||sel.id))||[],lost=!io&&Date.now()-(sel.seen||0)>45000;
 let nm=0;for(let i=1;i<tr.length;i++)nm+=dist({lat:tr[i-1][0],lon:tr[i-1][1]},{lat:tr[i][0],lon:tr[i][1]});const mins=tr.length>1?Math.round((tr[tr.length-1][3]-tr[0][3])/60000):0;
 e.innerHTML=(lost?'<div class="m" style="color:#fbbf24">Signal lost '+Math.round((Date.now()-sel.seen)/1000)+'s ago. Showing the last known position.</div>':'')+'<div class="mg"><div class="big"><span>ALTITUDE</span><b>'+fl+' <small style="font-size:15px">'+ar+' '+Math.abs(vs)+' fpm</small></b></div><div><span>GROUND SPEED</span><b>'+Math.round(o.gs||0)+' kt</b></div><div><span>HEADING</span><b>'+hd+'&deg;</b></div>'+(!io&&liveOk()?'<div><span>FROM YOU</span><b>'+Math.round(dist(own,o))+' nm</b></div>':'')+'<div><span>TRAIL</span><b>'+nm.toFixed(0)+' nm</b><span>'+mins+' min recorded</span></div></div>'+spark(tr)}
-function fcRender(ok){const e=$('#fc'),tr=tk&&sel&&sel.k=='trf';if(!ok&&!tr){if(fcS){fcS='';e.style.display='none'}return}
-let s;
-if(tr){const o=sel,alt=Math.round((o.alt||0)/10)*10,fl=alt>=18000?'FL'+String(Math.round(alt/100)).padStart(3,'0'):alt.toLocaleString(),vs=Math.round((o.vs||0)/10)*10,lost=Date.now()-(o.seen||0)>45000;
-s='<div class="fh"><span class="dot'+(lost?' lost':'')+'"></span>'+(lost?'SIGNAL LOST':'TRACKING')+'<span class="sp"></span><span>'+(o.cc||'ADS-B')+'</span></div><div class="fr"><span>'+o.id+'</span></div><div class="fg"><div><b>'+fl+'</b><span>ALT'+(alt>=18000?'':' FT')+'</span></div><div><b>'+Math.round(o.gs||0)+'</b><span>GS KT</span></div><div><b>'+String(Math.round((o.hdg+360)%360)%360).padStart(3,'0')+'</b><span>HDG</span></div><div><b>'+(vs>0?'+':'')+vs+'</b><span>VS FPM</span></div></div>'}
-else{const g=i=>$('#'+i).textContent,rt=route.length>1,tot=rt?total():0,pr=rt?routeProg():0,pct=tot?Math.min(100,pr/tot*100):0;
-s='<div class="fh"><span class="dot"></span>'+(live.d.src||'SIM')+' <i>LIVE</i><span class="sp"></span>'+(rt?'ETA '+g('tEt'):'')+'</div>'+(rt?'<div class="fr"><span>'+route[0].id+'</span><div class="pb"><u style="width:'+pct.toFixed(1)+'%"></u><s style="left:'+pct.toFixed(1)+'%">&#9992;</s></div><span>'+route[route.length-1].id+'</span></div><div class="fm">'+Math.round(Math.max(0,tot-pr))+' nm remaining</div>':'')+
-'<div class="fg"><div><b>'+g('tAL')+'</b><span>ALT FT</span></div><div><b>'+g('tGS')+'</b><span>GS KT</span></div><div><b>'+g('tHD')+'</b><span>HDG</span></div><div><b>'+g('tVS')+'</b><span>VS FPM</span></div></div>'}
-if(s!==fcS){fcS=s;e.innerHTML=s;e.style.display='block'}}
+/* The flight card: who is flying, the route, the real times and the live
+   readouts. Every field comes from the simulator snapshot, the traffic feed or
+   the planned route, and a field the source does not provide says so rather
+   than showing a plausible number. */
+function zTime(value){const n=Number(value);if(!Number.isFinite(n)||n<=0)return'–';const d=new Date(n<1e12?n*1000:n);return String(d.getUTCHours()).padStart(2,'0')+String(d.getUTCMinutes()).padStart(2,'0')+'Z'}
+function etaZ(duration){ // 'h:mm' remaining -> the clock time it lands, in UTC
+  const m=/^(\d+):(\d{2})$/.exec(String(duration||'').trim());if(!m)return '–';
+  return zTime(Date.now()/1000+(Number(m[1])*60+Number(m[2]))*60)}
+function fcField(value,label){return '<div><b>'+value+'</b><span>'+label+'</span></div>'}
+function fcRender(ok){
+  const e=$('#fc'),tr=tk&&sel&&sel.k=='trf';
+  if(!ok&&!tr){if(fcS){fcS='';e.style.display='none'}return}
+  const g=i=>$('#'+i).textContent;
+  let s;
+  if(tr){
+    const o=sel,alt=Math.round((o.alt||0)/10)*10,vs=Math.round((o.vs||0)/10)*10,lost=Date.now()-(o.seen||0)>45000;
+    s='<div class="fh"><span class="dot'+(lost?' lost':'')+'"></span><b>'+esc(o.id||o.hx||'Unknown')+'</b><span class="sp"></span><i>'+esc((String(o.cc||'').split(' · ')[0])||'ADS-B')+'</i><em>'+(lost?'Signal lost':'Tracked')+'</em></div>'
+     +'<div class="fcd">'+esc(o.cc||'Live ADS-B traffic')+'</div>'
+     +'<div class="fg">'+fcField(alt>=18000?'FL'+String(Math.round(alt/100)).padStart(3,'0'):alt.toLocaleString(),alt>=18000?'LEVEL':'ALT FT')
+     +fcField(Math.round(o.gs||0),'GS KT')+fcField(String(Math.round((o.hdg+360)%360)%360).padStart(3,'0'),'HDG°')
+     +fcField((vs>0?'+':'')+vs,'VS FPM')+fcField('–','DEST NM')+'</div>';
+  }else{
+    const d=live.d||{},cf=d.currentFlight||{},rt=route.length>1,tot=rt?total():0,pr=rt?routeProg():0,pct=tot?Math.min(100,pr/tot*100):0;
+    const org=cf.depAirport||(rt?route[0].id:''),dst=cf.arrAirport||(rt?route[route.length-1].id:'');
+    const sub=[d.aircraft,d.src?'Live from '+d.src:'Live from the simulator'].filter(Boolean).join(' · ');
+    s='<div class="fh"><span class="dot"></span><b>'+esc(d.callsign||d.registration||'Your aircraft')+'</b><span class="sp"></span><i>'+esc(d.src||'SIM')+'</i><em>Live</em></div>'
+     +'<div class="fcd">'+esc(sub)+(d.registration&&d.callsign?' · '+esc(d.registration):'')+'</div>'
+     +(org||dst?'<div class="fr"><span>'+esc(org||'—')+'</span><span class="arw"></span><span>'+esc(dst||'—')+'</span></div>'
+       +'<div class="ft"><span>off <b>'+zTime(cf.takeoffTime||cf.startTime)+'</b></span><span>eta <b>'+etaZ(g('tEt'))+'</b></span></div>':'')
+     +(rt?'<div class="fbm"><div class="pb"><u style="width:'+pct.toFixed(1)+'%"></u><s style="left:'+pct.toFixed(1)+'%">&#9992;</s></div><span class="fm">'+Math.round(Math.max(0,tot-pr))+' nm remaining</span></div>':'')
+     +'<div class="fg">'+fcField(g('tAL'),'ALT FT')+fcField(g('tGS'),'GS KT')+fcField(g('tHD')+'°','HDG')+fcField(g('tVS'),'VS FPM')
+     +fcField(isFinite(parseFloat(g('tDS')))?g('tDS'):'–','DEST NM')+'</div>';
+  }
+  if(s!==fcS){fcS=s;e.innerHTML=s;e.style.display='block'}}
 /* in-app PDF viewer (official FAA charts stay inside the app) */
 function PB(u,t){return '<button data-u="'+u+'" data-t="'+String(t).replace(/"/g,'')+'" onclick="openPdf(this.dataset.u,this.dataset.t)">'+t+'</button>'}
 function openPdf(u,t){$('#pdt').textContent=t||'Chart';$('#pda').href=u;$('#pdf2').src=u;$('#pdf').style.display='block'}
@@ -994,6 +1044,6 @@ try{if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').t
 </script>
 <script type="module">
   import { mountShell } from './js/shell.js';
-  mountShell({ page: 'home', stats: true });
+  mountShell({ page: 'home' });
 </script>
 </body></html>

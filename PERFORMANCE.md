@@ -8,7 +8,7 @@ These are measurements from the development container, not simulator FPS claims.
 - **Traffic polling:** 6 s normal, 12 s low, 20 s minimal. Traffic positions still interpolate between polls.
 - **Trails:** per-aircraft cap of 900 normal / 350 low / 0 minimal. Minimal stops allocating trail arrays entirely.
 - **Map:** minimal profile uses the vector base map instead of raster tiles, so no tile decode/upload. Tile cache is bounded at 500 entries.
-- **DOM:** the map is a single canvas; telemetry updates update text nodes, not full-page HTML. Pilot sections are dynamically imported only when opened.
+- **DOM:** the map is a single canvas; telemetry updates update text nodes, not full-page HTML. The floating flight card rebuilds only when one of its rendered values changes, which is at most once a minute (the UTC arrival time) plus the traffic refresh. Pilot sections are dynamically imported only when opened.
 - **Replay:** recorded tracks are Douglas–Peucker simplified in a local nautical-mile projection and capped for rendering; the full track is kept for statistics. A 12,000-point track renders as ~566 points (95% reduction) in the benchmark.
 - **Service worker:** shell-only cache. Live/private endpoints are bypassed, so the browser does not repeatedly store and evict JSON.
 - **Bridge:** no busy loop on telemetry; `relay_loop` sends snapshots only when paired and scales its sleep to 2 s while telemetry is fresh, 5 s otherwise. Telemetry is processed once per UDP position sample. Logbook writes are atomic but not per-packet.
