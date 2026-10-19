@@ -417,6 +417,15 @@ test('the icon rail names itself on hover and keyboard focus', async () => {
     item.dispatchEvent(new window.Event('focusout', { bubbles: true }));
     assert.equal(tip.hidden, true, 'leaving hides it again');
 
+    // A pointer crossing the rail waits before it names an icon, so a sweep
+    // does not flash every label on the way past.
+    item.dispatchEvent(new window.Event('pointerover', { bubbles: true }));
+    assert.equal(tip.hidden, true, 'a passing pointer does not flash the name');
+    await new Promise(resolve => setTimeout(resolve, 220));
+    assert.equal(tip.hidden, false, 'a resting pointer gets the name');
+    rail.dispatchEvent(new window.Event('pointerleave'));
+    assert.equal(tip.hidden, true, 'leaving the rail hides it at once');
+
     // Expanded rows print their labels, so the native title is enough there.
     toggle.dispatchEvent(new window.Event('click', { bubbles: true }));
     assert.equal(item.getAttribute('title'), 'Flight Logbook', 'the expanded row keeps a native title');

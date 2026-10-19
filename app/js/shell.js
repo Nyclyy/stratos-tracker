@@ -251,9 +251,12 @@ function bindRailTips(shell, rail) {
   document.body.appendChild(tip);
 
   const collapsed = () => shell.dataset.collapsed === '1';
-  const hide = () => { tip.hidden = true; };
+  let timer = null;
+  const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  const hide = () => { clear(); tip.hidden = true; };
   const itemAt = event => event.target?.closest?.('.tab') || null;
   const show = item => {
+    clear();
     if (!collapsed() || !item) return hide();
     const name = item.dataset.label || item.getAttribute('aria-label') || '';
     if (!name) return hide();
@@ -264,7 +267,15 @@ function bindRailTips(shell, rail) {
     tip.style.left = `${Math.round(railBox.right + 8)}px`;
     tip.style.top = `${Math.round(box.top + box.height / 2)}px`;
   };
-  const onOver = event => show(itemAt(event));
+  // A pointer crossing the rail shows only the icon it settles on; a name that
+  // is already up moves straight to the next row instead of flashing off.
+  const showSoon = item => {
+    clear();
+    if (!collapsed() || !item) return hide();
+    if (!tip.hidden) return show(item);
+    timer = setTimeout(() => { timer = null; show(item); }, 140);
+  };
+  const onOver = event => showSoon(itemAt(event));
   const onFocus = event => show(itemAt(event));
   const onKey = event => { if (event.key === 'Escape') hide(); };
 
@@ -280,6 +291,7 @@ function bindRailTips(shell, rail) {
     hide,
     tip,
     destroy: () => {
+      clear();
       rail.removeEventListener('pointerover', onOver);
       rail.removeEventListener('pointerleave', hide);
       rail.removeEventListener('focusin', onFocus);
