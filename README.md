@@ -9,12 +9,16 @@ Stratos runs as a static website/PWA, an Electron desktop app, and an optional l
 | Area | Status |
 | --- | --- |
 | Map, airports, navaids, public ADS-B traffic, charts, METAR/TAF | Working; data-provider dependent |
+| Offline vector world map | Working; the **World** style draws bundled Natural Earth country outlines with muted country names, letter-spaced continent names and italic ocean names, adds seas only when zoomed past a whole-world view, and needs no tiles, key or network |
 | X-Plane UDP bridge, MSFS SimConnect (optional package) | Implemented; not tested against a live simulator here |
 | Flight recording, crash recovery, duplicate prevention | Working, tested |
 | Flight replay with recorded/interpolated distinction | Working for flights with a recorded track |
 | Landing analytics with per-aircraft thresholds | Working; runway/touchdown values are estimates |
 | Career dashboard, records, milestones, drill-down | Working, with customizable tiles |
 | Route planner, PLN/FMS/GPX import/export, SimBrief import | Working; estimates are labelled |
+| Flight Deck shell | One grouped sidebar (Flight Operations / Flight Intelligence / Application), a compact top bar with the page identity and simulator state, and an icon-only rail mode |
+| Flight overview dashboard | Reports the simulator link, the live flight, the saved route pair, planned cruise level, distance, ETE and airborne progress, and admits a value it does not have instead of inventing one |
+| Top of descent from your own descents | Working; the bridge measures the real gradient of each completed flight and the tracker uses it, falling back to 200 ft/nm until one exists |
 | Route Discovery (mood → three route ideas → planner) | Working; airports, distances and runway claims come from the airport database, and stretched durations are labelled |
 | Airport explorer and briefing | Working; NOTAMs are not implemented |
 | PWA / iPhone Home Screen | Implemented; HTTPS deployment and pairing required |

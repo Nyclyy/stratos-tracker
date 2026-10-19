@@ -3,8 +3,13 @@
 ## Airport and navigation data
 
 - **OurAirports** — public domain (CC0). CSV data is downloaded at runtime from `ourairports.com` / the maintained GitHub mirror and cached. Attribution is included in the UI even though CC0 does not require it.
-- **OpenStreetMap** — Open Database License (ODbL). Airport layout/taxiway geometry is queried from the Overpass API (or the bridge cache). Main map tiles come from OpenStreetMap and Esri World Imagery; replay/route preview tiles come from CARTO. Attribution is shown on both map surfaces: “© OpenStreetMap contributors · Esri imagery” and “© OpenStreetMap contributors · © CARTO”. See https://openstreetmap.org/copyright and the respective provider terms.
+- **OpenStreetMap** — Open Database License (ODbL). Airport layout/taxiway geometry is queried from the Overpass API (or the bridge cache). Main map tiles come from OpenStreetMap and Esri World Imagery (the World and Basic styles request no tiles at all); replay/route preview tiles come from CARTO. Attribution is shown on both map surfaces: “© OpenStreetMap contributors · Esri imagery” and “© OpenStreetMap contributors · © CARTO”. See https://openstreetmap.org/copyright and the respective provider terms.
 - The bridge can build an offline data pack from these sources. The pack is user-generated and is not redistributed by the project.
+
+## World map layer
+
+- **Natural Earth** — public domain (no restrictions, no attribution required; credited anyway). The bundled file `app/js/data/world.js` is generated from the 1:110m `admin_0_countries`, `geography_regions_polys` and `geography_marine_polys` vectors by `scripts/build-world.mjs`, which rounds coordinates to two decimals and simplifies them. It contains country outlines and label points, continent label points and ocean/sea label points. No political boundary claim is intended: the outlines are the Natural Earth dataset as published, and borders are drawn as thin lines rather than as colours.
+- The World style draws only this file. It makes no network request, so it works offline and needs no key. Rerun the build script with `--download` to regenerate it.
 
 ## Route Discovery
 

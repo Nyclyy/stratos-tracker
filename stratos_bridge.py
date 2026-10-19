@@ -43,6 +43,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from bridge_logbook_addon import (
     VERSION,
+    _handle_descent,
     _handle_logbook,
     finalize_active_flight,
     get_current_flight,
@@ -785,6 +786,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/logbook.json":
             _handle_logbook(self)
             return
+        if path == "/descent.json":
+            _handle_descent(self)
+            return
         if path == "/config":
             data, error = self.read_json(64 * 1024)
             if error:
@@ -946,6 +950,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/logbook.json":
             _handle_logbook(self)
+            return
+        if path == "/descent.json":
+            _handle_descent(self)
             return
         if path == "/stream":
             self.handle_stream(parsed)

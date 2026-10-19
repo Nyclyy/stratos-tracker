@@ -22,3 +22,6 @@ tiles/
 # Local preview server state
 preview.log
 preview.pid
+
+# Natural Earth source vectors: rebuild with scripts/build-world.mjs --download
+tmp-natural-earth/

@@ -445,3 +445,351 @@ test('the existing route planner opens a Discover route without a rebuild', asyn
   const stored = JSON.parse(localStorage.getItem('stratos.activeRoute'));
   assert.deepEqual(stored.points.map(p => p.id), ['LSZH', 'LOWI'], 'the planner keeps the handed-over waypoints');
 });
+
+// ── Tracker: the learned descent rate drives top-of-descent placement ──
+import { readFile as readTrackerFile } from 'node:fs/promises';
+
+const trackerSource = await readTrackerFile(new URL('../app/index.html', import.meta.url), 'utf8');
+
+function trackerPiece(startText, endText) {
+  const start = trackerSource.indexOf(startText);
+  const end = trackerSource.indexOf(endText, start);
+  assert.ok(start >= 0 && end > start, 'tracker source contains: ' + startText);
+  return trackerSource.slice(start, end);
+}
+
+// The page's own distance helper, copied so the real placement code runs on real numbers.
+function trackerDist(a, b) {
+  const R = Math.PI / 180;
+  const dl = (b.lat - a.lat) * R, dn = (b.lon - a.lon) * R;
+  const h = Math.sin(dl / 2) ** 2 + Math.cos(a.lat * R) * Math.cos(b.lat * R) * Math.sin(dn / 2) ** 2;
+  return 6880.13 * Math.asin(Math.sqrt(h));
+}
+
+// The MMMX arrival as the app draws it: NOSIT, SLM, then the descent through TOD
+// to UKTEN and MMMX. Distances from MMMX follow the plan (SLM 29 nm, NOSIT 43.4 nm).
+const MMMX_ARRIVAL = [
+  { id: 'NOSIT', name: 'NOSIT', lat: 20.143496, lon: -99.232869, elev: 18000 },
+  { id: 'SLM', name: 'SANTA LUCIA', lat: 19.890154, lon: -99.248691, elev: 18000 },
+  { id: 'TOD', name: 'TOP OF DESCENT', lat: 19.688, lon: -99.330, elev: 18000 },
+  { id: 'UKTEN', name: 'UKTEN', lat: 19.565, lon: -99.167, elev: 11000 },
+  { id: 'MMMX', name: 'BENITO JUAREZ INTL', lat: 19.435969, lon: -99.073392, elev: 9800 },
+];
+
+function placeTodWith(rate) {
+  const route = MMMX_ARRIVAL.map(p => ({ ...p }));
+  const desc = trackerPiece('const DESC_DEFAULT', 'function descActive()').replace('=DESC_DEFAULT', '=descRate');
+  return new Function('route', 'dist', 'descRate',
+    desc + trackerPiece('function placeTod()', 'async function importSB') + '; placeTod(); return route;'
+  )(route, trackerDist, rate);
+}
+
+async function loadRateFrom(payload, stored) {
+  const storedMap = new Map(Object.entries(stored || {}));
+  const storage = {
+    getItem: key => storedMap.get(key) ?? null,
+    setItem: (key, value) => storedMap.set(key, String(value)),
+  };
+  const calls = [];
+  const fetchStub = async url => {
+    calls.push(url);
+    if (payload instanceof Error) throw payload;
+    if (payload === null) return { ok: false, json: async () => ({}) };
+    return { ok: true, json: async () => payload };
+  };
+  const placed = [];
+  const run = new Function('localStorage', 'fetch', 'location', 'panel', 'route', 'placeTod', 'save', 'render',
+    trackerPiece('const DESC_DEFAULT', 'function loadDescentRate()') +
+    trackerPiece('function loadDescentRate()', '\nloadDescentRate();') +
+    'loadDescentRate();' +
+    'return { get rate(){ return DESC_FT_PER_NM }, get source(){ return DESC_SRC } };'
+  );
+  const result = run(
+    storage, fetchStub, { origin: 'http://127.0.0.1:8765', protocol: 'http:' }, 'route',
+    [{ id: 'TOD', lat: 19.6, lon: -99.1, elev: 18000 }, { id: 'MMMX', lat: 19.4, lon: -99.0, elev: 9800 }],
+    () => placed.push(1), () => {}, () => {}
+  );
+  await new Promise(resolve => setTimeout(resolve, 0));
+  return { result, calls, placed, storedMap };
+}
+
+test('tracker: a descent measured by the bridge replaces the default rate', async () => {
+  const { result, calls, placed, storedMap } = await loadRateFrom({ available: true, ftPerNm: 205.5, flights: 3 });
+  assert.deepEqual(calls, ['http://127.0.0.1:8765/descent.json']);
+  assert.equal(result.rate, 205.5);
+  assert.equal(result.source, 'sim');
+  assert.equal(placed.length, 1, 'an imported plan is re-placed when the measurement arrives');
+  assert.equal(JSON.parse(storedMap.get('dl.desc')).v, 205.5);
+});
+
+test('tracker: without a bridge the default rate stays in use', async () => {
+  const { result, placed } = await loadRateFrom(new Error('offline'));
+  assert.equal(result.rate, 200);
+  assert.equal(result.source, 'default');
+  assert.equal(placed.length, 0);
+});
+
+test('tracker: an implausible measured rate is refused', async () => {
+  const { result } = await loadRateFrom({ available: true, ftPerNm: 9000 });
+  assert.equal(result.rate, 200);
+  assert.equal(result.source, 'default');
+});
+
+test('tracker: a cached measurement is used before the bridge answers', async () => {
+  const { result } = await loadRateFrom(null, { 'dl.desc': JSON.stringify({ v: 231, src: 'sim' }) });
+  assert.equal(result.rate, 231);
+});
+
+test('tracker: TOD is placed just past NOSIT at the measured 200 ft/nm', () => {
+  const placed = placeTodWith(200);
+  assert.deepEqual(placed.map(p => p.id), ['NOSIT', 'TOD', 'SLM', 'UKTEN', 'MMMX']);
+  const tod = placed.find(p => p.id === 'TOD');
+  const mmmx = placed[placed.length - 1];
+  const along = trackerDist(tod, mmmx);
+  assert.ok(along > 35 && along < 45, 'TOD is ' + along.toFixed(1) + ' nm from MMMX');
+  assert.ok(along < trackerDist(placed[0], mmmx), 'TOD is short of NOSIT');
+});
+
+test('tracker: the old 3 degree rate would have put TOD past SLM', () => {
+  const placed = placeTodWith(318);
+  const tod = placed.find(p => p.id === 'TOD');
+  const along = trackerDist(tod, placed[placed.length - 1]);
+  assert.ok(along < 30, 'the 3 degree rate gives ' + along.toFixed(1) + ' nm, which is the reported bug');
+});
+
+// ── Dashboard: the flight overview band reports only what exists ─────
+function flightFixture(now) {
+  return [{
+    id: 'f1', complete: true, startTime: now - 86400000,
+    takeoffTime: now - 86400000, landingTime: now - 86400000 + 5400000,
+    depAirport: 'MMPB', arrAirport: 'MMMX', aircraft: 'B738', registration: 'XA-ABC',
+    distanceNm: 118, maxAlt: 18000,
+    landing: { vsFpm: -140, gsKt: 130, runway: { id: '05R' } }, track: [],
+  }];
+}
+
+function planDistanceNm(points) {
+  const R = Math.PI / 180;
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i];
+    const dl = (b.lat - a.lat) * R, dn = (b.lon - a.lon) * R;
+    const h = Math.sin(dl / 2) ** 2 + Math.cos(a.lat * R) * Math.cos(b.lat * R) * Math.sin(dn / 2) ** 2;
+    total += 6880.13 * Math.asin(Math.sqrt(h));
+  }
+  return total;
+}
+
+function dashboardCtx(flights, extra = {}) {
+  return {
+    flights,
+    career: null,
+    health: null, live: null, thresholds: {}, directory: [], mode: 'normal',
+    params: new URLSearchParams(),
+    toast() {}, openFlight() {}, async reload() {}, async refresh() {},
+    async setThresholds() {}, go() {},
+    ...extra,
+  };
+}
+
+test('dashboard: the flight overview band shows the saved route and stays honest', async () => {
+  installDom();
+  const { computeCareer } = await import('../app/js/lib/stats.js');
+  const { mount } = await import('../app/js/pilot/career.js');
+  const points = [
+    { id: 'MMPB', lat: 19.15, lon: -98.37 },
+    { id: 'NOSIT', lat: 19.69, lon: -98.75 },
+    { id: 'MMMX', lat: 19.43, lon: -99.07 },
+  ];
+  localStorage.setItem('stratos.activeRoute', JSON.stringify({ id: null, name: 'MMPB to MMMX', points }));
+  const flights = flightFixture(Date.now());
+  const ctx = dashboardCtx(flights);
+  ctx.career = computeCareer(flights);
+
+  const root = document.getElementById('view');
+  await mount(root, ctx);
+  await new Promise(resolve => setTimeout(resolve, 20));
+
+  const ops = root.querySelector('.ops');
+  assert.ok(ops, 'the flight overview band renders');
+  assert.equal(root.querySelectorAll('.ops-cell').length, 7);
+  assert.equal(root.querySelectorAll('.dashboard-cards .stat').length, 4, 'the coordinated stats stay at four tiles');
+  assert.match(ops.textContent, /Bridge offline/, 'no bridge is reported as no bridge');
+  assert.match(ops.textContent, /MMPB → MMMX/, 'the pair comes from the saved route');
+  assert.match(ops.textContent, /planned track/, 'distance is labelled as planned, not flown');
+  assert.match(ops.textContent, /set it in Briefing/, 'an unknown cruise level is admitted, not invented');
+  assert.equal(root.querySelector('.ops-track'), null, 'no progress bar until something is airborne');
+});
+
+test('dashboard: an airborne flight drives real progress against the planned route', async () => {
+  installDom();
+  const { computeCareer } = await import('../app/js/lib/stats.js');
+  const { mount } = await import('../app/js/pilot/career.js');
+  const points = [
+    { id: 'MMPB', lat: 19.15, lon: -98.37 },
+    { id: 'NOSIT', lat: 19.69, lon: -98.75 },
+    { id: 'MMMX', lat: 19.43, lon: -99.07 },
+  ];
+  localStorage.setItem('stratos.activeRoute', JSON.stringify({ id: null, name: 'MMPB to MMMX', points }));
+  const flownNm = 30;
+  const expected = Math.round(Math.min(1, flownNm / planDistanceNm(points)) * 100);
+
+  const flights = flightFixture(Date.now());
+  const ctx = dashboardCtx(flights);
+  ctx.career = computeCareer(flights);
+  const root = document.getElementById('view');
+  await mount(root, ctx);
+
+  window.dispatchEvent(new window.CustomEvent('stratos:telemetry', { detail: {
+    phase: 'AIRBORNE',
+    currentFlight: { phase: 'AIRBORNE', aircraft: 'B738', registration: 'XA-ABC', depAirport: 'MMPB', arrAirport: 'MMMX', distanceNm: flownNm },
+    health: { version: '2.1.6', simulator: { connected: true, source: 'xplane' } },
+  } }));
+  await new Promise(resolve => setTimeout(resolve, 20));
+
+  const ops = root.querySelector('.ops');
+  assert.match(ops.textContent, /Simulator live/, 'a live bridge is reported as live');
+  assert.match(ops.textContent, /60|30 nm/, 'the flown distance is shown');
+  const bar = root.querySelector('.ops-track');
+  assert.ok(bar, 'progress appears once airborne');
+  assert.equal(bar.getAttribute('aria-valuenow'), String(expected), 'progress is flown over planned');
+});
+
+test('dashboard: an empty logbook and no route produce a designed empty state', async () => {
+  installDom();
+  const { computeCareer } = await import('../app/js/lib/stats.js');
+  const { mount } = await import('../app/js/pilot/career.js');
+  const ctx = dashboardCtx([]);
+  ctx.career = computeCareer([]);
+  const root = document.getElementById('view');
+  await mount(root, ctx);
+  await new Promise(resolve => setTimeout(resolve, 20));
+  const empty = root.querySelector('.ops-empty');
+  assert.ok(empty, 'the empty state renders');
+  assert.match(empty.textContent, /nothing is flying and no route is saved/i);
+  assert.equal(root.querySelectorAll('.dashboard-cards .stat').length, 4, 'honest zeros still fill the tiles');
+});
+
+// ── World layer: bundled country outlines, names and water names ─────
+const worldData = await readTrackerFile(new URL('../app/js/data/world.js', import.meta.url), 'utf8');
+const TRACKER_HTML = trackerSource;
+
+test('world layer: the bundled data is complete and its labels sit on land', () => {
+  const marker = 'root.STRATOS_WORLD = ';
+  const from = worldData.indexOf(marker) + marker.length;
+  const to = worldData.indexOf(';\n})(', from);
+  assert.ok(from > marker.length && to > from, 'the payload is delimited by the wrapper');
+  const world = JSON.parse(worldData.slice(from, to));
+
+  assert.ok(world.countries.length >= 170, `country count is ${world.countries.length}`);
+  assert.ok(world.continents.length === 7, 'seven continent labels');
+  assert.ok(world.oceans.length >= 20, 'oceans and seas are included');
+
+  const names = world.countries.map(c => c.n);
+  for (const expected of ['Mexico', 'France', 'Japan', 'Brazil', 'Australia']) {
+    assert.ok(names.includes(expected), `${expected} is in the layer`);
+  }
+  assert.ok(world.continents.some(c => c.n === 'Europe'), 'Europe is labelled');
+
+  let points = 0;
+  for (const country of world.countries) {
+    assert.ok(typeof country.n === 'string' && country.n.length, 'every entry has a name');
+    assert.ok(Array.isArray(country.p) && country.p.length, `${country.n} has at least one ring`);
+    let minx = Infinity, maxx = -Infinity, miny = Infinity, maxy = -Infinity;
+    for (const ring of country.p) {
+      assert.equal(ring.length % 2, 0, `${country.n} ring is a flat coordinate list`);
+      assert.ok(ring.length >= 8, `${country.n} ring has at least four points`);
+      for (let i = 0; i < ring.length; i += 2) {
+        points++;
+        minx = Math.min(minx, ring[i]); maxx = Math.max(maxx, ring[i]);
+        miny = Math.min(miny, ring[i + 1]); maxy = Math.max(maxy, ring[i + 1]);
+        assert.ok(ring[i] >= -180 && ring[i] <= 180, `${country.n} longitude in range`);
+        assert.ok(ring[i + 1] >= -90 && ring[i + 1] <= 90, `${country.n} latitude in range`);
+      }
+      assert.ok(ring.every(v => Math.abs(v * 100 - Math.round(v * 100)) < 1e-9), `${country.n} coordinates are rounded`);
+    }
+    // A label outside its own outline would print the country name in the sea.
+    assert.ok(country.x >= minx - 1 && country.x <= maxx + 1, `${country.n} label longitude on land`);
+    assert.ok(country.y >= miny - 1 && country.y <= maxy + 1, `${country.n} label latitude on land`);
+  }
+  assert.ok(points > 5000 && points < 20000, `payload is simplified: ${points} points`);
+});
+
+test('world layer: the tracker offers the style, ships the data and draws names', () => {
+  assert.match(TRACKER_HTML, /<script src="js\/data\/world\.js"><\/script>/, 'the data is loaded as a plain script');
+  assert.ok(TRACKER_HTML.indexOf('js/data/world.js') < TRACKER_HTML.indexOf('const A='), 'the data loads before the map script');
+  assert.match(TRACKER_HTML, /world:\{n:'World'/, 'a World style is offered');
+  assert.match(TRACKER_HTML, /L\.style!='world'/, 'World is drawn, not tiled');
+  assert.match(TRACKER_HTML, /world:\{n:'World',m:18,a:'Natural Earth \(public domain\)'\}/, 'the source is credited in the style');
+
+  const projection = trackerPiece('const wpx=', 'const dist=');
+  const layer = trackerPiece('var WD=null', 'function drawTiles()');
+  const counts = { labels: [], ink: {}, fonts: [], fills: [], rebuilds: 0, blits: 0, offsets: [] };
+  const stub = kind => ({
+    fillStyle: '', strokeStyle: '', lineWidth: 0, globalAlpha: 1, font: '', textAlign: '', textBaseline: '',
+    setTransform() {}, beginPath() {}, closePath() {}, moveTo() {}, lineTo() {}, translate() {},
+    fillRect() {}, clearRect() { if (kind === 'off') counts.rebuilds++; },
+    fill() { if (kind === 'off') counts.fills.push(this.fillStyle); }, stroke() {},
+    measureText(t) { return { width: String(t).length * 6 }; },
+    fillText(t) { counts.labels.push(String(t)); counts.ink[String(t)] = this.fillStyle; counts.fonts.push(this.font); },
+    strokeText() {},
+    drawImage(_c, dx, dy) { counts.blits++; counts.offsets.push(dx); },
+  });
+  const mount = (z, lat, lon, theme = 'night') => new Function('__cx', '__off', `
+    const cx=__cx, SZ=256, R=Math.PI/180, W=1280, H=800, dpr=1;
+    const V={lon:${lon},lat:${lat},z:${z}};
+    const L={style:'world'};
+    const C={bg:'#0a1421',land:'#101d2b',coast:'#2c3f55',txt:'#e4ecf5',mut:'#8b9db3',ui:'#0d1927'};
+    const document={createElement:()=>({width:0,height:0,getContext:()=>__off}),documentElement:{dataset:{theme:'${theme}'}}};
+    ${projection}
+    ${worldData}
+    ${layer}
+    return { worldLayer, buildWorld, V, M:WM };
+  `)(stub('main'), stub('off'));
+
+  const world = mount(2.5, 30, -10);
+  world.buildWorld(stub('off'));
+  const seen = counts.labels.slice();
+  for (const continent of ['EUROPE', 'ASIA', 'AFRICA', 'NORTH AMERICA']) {
+    assert.ok(seen.includes(continent), `${continent} is named at world zoom`);
+  }
+  assert.ok(seen.some(l => /Atlantic Ocean/.test(l)), 'the Atlantic is named at world zoom');
+  assert.ok(seen.includes('France'), 'countries are named at world zoom');
+  // A whole-world view stays quiet: the great oceans are named in italic serif,
+  // seas wait for a closer look, and countries are muted rather than shouting.
+  assert.ok(!seen.includes('Mediterranean Sea'), 'seas wait until the view is closer than the whole world');
+  assert.ok(counts.fonts.some(f => /italic .*Georgia/.test(f)), 'water names are set in an italic serif');
+  assert.equal(counts.ink['France'], '#8b9db3', 'country names use the muted ink at world zoom');
+  assert.ok(seen.includes('United States') && !seen.includes('United States of America'), 'long official names are shortened on the map');
+  assert.ok(counts.fills.includes('#16212c'), 'land is painted with the world basemap tone');
+
+  // A saved World style must not kill the frame loop: the loop starts after the
+  // script is evaluated, and the layer resolves its data without a dead zone.
+  assert.match(TRACKER_HTML, /requestAnimationFrame\(function loop\(/, 'the render loop survives the first frame');
+  assert.match(TRACKER_HTML, /var WD=null;try\{WD=globalThis\.STRATOS_WORLD/, 'the world data has no temporal dead zone');
+
+  counts.labels = []; counts.fonts = []; counts.ink = {};
+  mount(4.6, 40, 15).buildWorld(stub('off'));
+  assert.ok(counts.labels.includes('Mediterranean Sea'), 'the sea is named once the view is close');
+
+  counts.labels = []; counts.fills = [];
+  mount(2.5, 30, -10, 'day').buildWorld(stub('off'));
+  assert.ok(!counts.fills.includes('#16212c'), 'the night land tone stays out of the day theme');
+  assert.ok(counts.fills.includes('#101d2b'), 'the day theme keeps the page land colour');
+
+  counts.labels = [];
+  mount(6.5, 48, 8).buildWorld(stub('off'));
+  assert.ok(counts.labels.includes('Germany'), 'closer in, the local country is named');
+
+  // Panning must reuse the sheet: a rebuild per frame would stutter.
+  const panned = mount(6, 40, -3);
+  counts.rebuilds = 0; counts.blits = 0; counts.offsets = [];
+  for (let i = 0; i < 60; i++) { panned.V.lon += 0.004; panned.worldLayer(); }
+  assert.equal(counts.blits, 60, 'every frame blits the cached sheet');
+  assert.ok(counts.rebuilds <= 10, `panning rebuilt only ${counts.rebuilds} times in 60 frames`);
+  // The sheet is drawn 24 px larger than the viewport on every side, so the
+  // viewport stays covered for any offset the clamp allows.
+  for (const dx of counts.offsets) {
+    assert.ok(dx <= 0 && dx >= -2 * panned.M, `blit offset ${dx} keeps the viewport covered`);
+  }
+});

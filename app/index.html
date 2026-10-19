@@ -143,7 +143,7 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 /* Sidebar: a bottom tab bar on phones, a labelled rail on desktop. */
 #tabs{grid-row:3;position:static;left:auto;right:auto;top:auto;bottom:auto;border-top:1px solid var(--ui2);border-radius:20px 20px 0 0;padding-bottom:max(6px,env(safe-area-inset-bottom));z-index:2}
 #tabs .rail-toggle{margin-top:auto;color:var(--mut)}
-.app-shell[data-collapsed="1"]{--rail:62px}
+.app-shell[data-collapsed="1"]{--rail:58px}
 .app-shell[data-collapsed="1"] .tab span,.app-shell[data-collapsed="1"] #tabs .rail-toggle span{display:none}
 @media(max-width:767px){#tabs .rail-toggle{display:none}}
 @media(max-width:767px){
@@ -151,7 +151,7 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 #sheet{bottom:12px}.live #sheet{bottom:12px}#attr{bottom:10px}#tel{bottom:12px}
 }
 @media(min-width:768px){
-.app-shell{--rail:84px;grid-template-columns:var(--rail) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+.app-shell{--rail:212px;grid-template-columns:var(--rail) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
 .app-shell .tb{grid-column:1/-1;grid-row:1}
 .app-main{grid-column:2;grid-row:2}
 #tabs{grid-column:1;grid-row:2;width:100%;height:100%;overflow-y:auto;overflow-x:hidden;flex-direction:column;flex-wrap:nowrap;justify-content:flex-start;gap:3px;padding:10px 6px 10px;border-radius:0;border-right:1px solid var(--ui2);border-top:0;border-bottom:0}
@@ -172,18 +172,18 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 #tabs .tab.act,#tabs .tab.on{background:rgba(56,189,248,.12);color:var(--acc)}
 #tabs .tab.on b{color:var(--acc)}
 @media(min-width:768px){
-.app-shell{--rail:76px}
-.app-shell[data-collapsed="1"]{--rail:56px}
+.app-shell{--rail:212px}
+.app-shell[data-collapsed="1"]{--rail:58px}
 #tabs{padding:8px 5px}
 .tab{min-height:46px;gap:3px;border-radius:11px}
 .tab b{font-size:17px}
 .tab span{font-size:9.5px;letter-spacing:.07em;text-transform:uppercase}
 #tabs .tab.act{box-shadow:none}
-#tabs .tab.act::before{left:-5px;top:8px;bottom:8px;width:2px;border-radius:0 2px 2px 0;background:var(--acc);box-shadow:0 0 10px var(--acc)}
+#tabs .tab.act::before{left:-5px;top:8px;bottom:8px;width:2px;border-radius:0 2px 2px 0;background:var(--acc);box-shadow:none}
 }
 </style><link rel="stylesheet" href="shell.css"></head><body><div class="app-shell">
-<header id="appbar" class="tb"></header>
-<nav id="tabs" aria-label="Sections"><button class="tab" id="bMap"><b>&#8982;</b><span>Home</span></button><a class="tab" href="discover.html"><b>&#10022;</b><span>Discover</span></a><button class="tab" id="bLive"><b>&#9673;</b><span>Live</span></button><button class="tab" id="bCh"><b>&#9707;</b><span>Charts</span></button><button class="tab" id="bRoute"><b>&#8599;</b><span>Route</span></button><button class="tab" id="bWx"><b>&#9729;</b><span>Weather</span></button><button class="tab" id="bData"><b>&#9636;</b><span>Data</span></button><a class="tab" href="logbook.html"><b>&#9776;</b><span>Logbook</span></a><a class="tab" href="pilot.html#airports"><b>&#9678;</b><span>Airports</span></a><a class="tab" href="pilot.html#career"><b>&#9733;</b><span>Stats</span></a><a class="tab" href="pilot.html#settings"><b>&#9881;</b><span>Settings</span></a><button class="tab rail-toggle" data-rail-toggle type="button" title="Collapse sidebar" aria-label="Collapse sidebar"><b>&#8249;</b><span>Hide</span></button></nav>
+<header id="appbar" class="tb" data-title="Flight Deck" data-context="Live Map"></header>
+<nav id="tabs" aria-label="Sections"><button class="tab" id="bMap" data-group="Flight Operations" data-label="Flight Deck"><b>&#8982;</b><span>Flight Deck</span></button><a class="tab" href="discover.html" data-group="Flight Operations" data-label="Route Discovery"><b>&#10022;</b><span>Route Discovery</span></a><button class="tab" id="bLive" data-group="Flight Operations" data-label="Live Tracking"><b>&#9673;</b><span>Live Tracking</span></button><button class="tab" id="bRoute" data-group="Flight Operations" data-label="Flight Planning"><b>&#8599;</b><span>Flight Planning</span></button><button class="tab" id="bCh" data-group="Flight Operations" data-label="Charts"><b>&#9707;</b><span>Charts</span></button><a class="tab" href="logbook.html" data-group="Flight Operations" data-label="Flight Logbook"><b>&#9776;</b><span>Flight Logbook</span></a><button class="tab" id="bWx" data-group="Flight Intelligence" data-label="Weather"><b>&#9729;</b><span>Weather</span></button><a class="tab" href="pilot.html#airports" data-group="Flight Intelligence" data-label="Airports"><b>&#9678;</b><span>Airports</span></a><a class="tab" href="pilot.html#career" data-group="Flight Intelligence" data-label="Flight Statistics"><b>&#9733;</b><span>Flight Statistics</span></a><button class="tab" id="bData" data-group="Application" data-label="Data &amp; Performance"><b>&#9636;</b><span>Data &amp; Performance</span></button><a class="tab" href="pilot.html#settings" data-group="Application" data-label="Settings"><b>&#9881;</b><span>Settings</span></a><button class="tab rail-toggle" data-rail-toggle type="button" title="Collapse sidebar" aria-label="Collapse sidebar"><b>&#8249;</b><span>Collapse</span></button></nav>
 <div class="app-main">
 <section id="homestats" class="stats" aria-label="Career totals"></section>
 <div id="app">
@@ -203,6 +203,7 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 </div>
 </div>
 </div>
+<script src="js/data/world.js"></script>
 <script>
 const A=`KSFO|San Francisco Intl|37.619|-122.375|13|10,1|120.5|135.1|29012KT 10SM FEW015 16/11 A3002
 KOAK|Oakland Intl|37.721|-122.221|9|12,30|118.3|128.5|28010KT 10SM CLR 17/10 A3001
@@ -381,7 +382,7 @@ return{...(P[m]||P.normal),mode:m}})();
 let deskStatus=null;
 try{if(window.stratosDesktop){window.stratosDesktop.getStatus().then(v=>{deskStatus=v}).catch(()=>{});window.stratosDesktop.onStatus(v=>{deskStatus=v})}}catch(_){}
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-N.length=0;const TRL=new Map(),CH={on:false,pg:'paper',a:null,prev:null},TS={ok:0,err:0},TC=new Map(),MS={sat:{n:'Satellite',m:18,a:'Imagery (c) Esri, Maxar, Earthstar Geographics'},hyb:{n:'Hybrid',m:18,a:'Imagery (c) Esri, Maxar, Earthstar Geographics'},st:{n:'Detailed',m:19,a:'(c) OpenStreetMap contributors'},lt:{n:'Light',m:19,a:'(c) OpenStreetMap contributors, (c) CARTO'},dk:{n:'Dark',m:19,a:'(c) OpenStreetMap contributors, (c) CARTO'},tr:{n:'Terrain',m:17,a:'(c) OpenStreetMap contributors, SRTM | style (c) OpenTopoMap (CC-BY-SA)'},vec:{n:'Basic',m:18,a:''}};const live={on:false,d:null,es:null,at:0,seen:0};
+N.length=0;const TRL=new Map(),CH={on:false,pg:'paper',a:null,prev:null},TS={ok:0,err:0},TC=new Map(),MS={sat:{n:'Satellite',m:18,a:'Imagery (c) Esri, Maxar, Earthstar Geographics'},hyb:{n:'Hybrid',m:18,a:'Imagery (c) Esri, Maxar, Earthstar Geographics'},st:{n:'Detailed',m:19,a:'(c) OpenStreetMap contributors'},lt:{n:'Light',m:19,a:'(c) OpenStreetMap contributors, (c) CARTO'},dk:{n:'Dark',m:19,a:'(c) OpenStreetMap contributors, (c) CARTO'},tr:{n:'Terrain',m:17,a:'(c) OpenStreetMap contributors, SRTM | style (c) OpenTopoMap (CC-BY-SA)'},vec:{n:'Basic',m:18,a:''},world:{n:'World',m:18,a:'Natural Earth (public domain)'}};const live={on:false,d:null,es:null,at:0,seen:0};
 const EX=[[[-123,49],[-125,50],[-130,54.5],[-133,58],[-137,59],[-141,60],[-141,69.6],[-135,69],[-128,70],[-115,68.5],[-105,68],[-95,71],[-90,69],[-85,70],[-82,66],[-87,64],[-94,60],[-93,57],[-85,55.5],[-82,53],[-79,51.5],[-79,55],[-77,60],[-70,59],[-65,60],[-61,56],[-56,52],[-60,50],[-65,49.2],[-66,48],[-61,46],[-64,45],[-66,44.5],[-67,45],[-70,47],[-71.5,45],[-75,45],[-79,43.3],[-83,42],[-82.5,45.3],[-84.5,46.5],[-88,48],[-95,49]],[[-59,47.6],[-56,51.6],[-53,47],[-55,46.9]],
 [[-9.5,43],[-9,37],[-6,36.2],[-2,36.7],[0,38.5],[3,42.5],[7,43.7],[9,44.4],[10,44],[12.5,41.5],[16,38],[18.5,40],[16,41.9],[12.5,44.5],[13.7,45.6],[15,44],[19,41.5],[21,39],[23,36.5],[24,38],[23.5,40.5],[26,40.8],[29,41],[28,43.5],[30,45.3],[33,46],[37,47],[40,47.5],[40,56],[40,60.5],[30,60.5],[28,60.5],[23.5,59.2],[21,57],[20,54.5],[18,54.8],[14,54],[10.5,54.3],[8.5,57],[8.2,55],[8.7,54],[7,53.5],[5,53],[4,51.5],[2,51],[1.5,50.2],[-1.5,49.7],[-1.5,48.7],[-4.5,48.5],[-2,47],[-1.2,46],[-1.8,43.5]],
 [[8,58],[5,59],[5,62],[12,66],[18,70],[28,71],[31,70],[30,67],[30,61],[28,60.5],[23,60],[21.5,61],[21.5,63],[25,65.5],[22,65.8],[18,62.5],[17.5,60.5],[19,59.5],[16.5,56.5],[14,55.5],[12.5,56],[11,58],[10.5,59.5]],
@@ -403,7 +404,7 @@ const brg=(a,b)=>{const y=Math.sin((b.lon-a.lon)*R)*Math.cos(b.lat*R),x=Math.cos
 const fwd=(a,h,d)=>{const r=d/3440.065,l1=a.lat*R,o1=a.lon*R,l2=Math.asin(Math.sin(l1)*Math.cos(r)+Math.cos(l1)*Math.sin(r)*Math.cos(h*R)),o2=o1+Math.atan2(Math.sin(h*R)*Math.sin(r)*Math.cos(l1),Math.cos(r)-Math.sin(l1)*Math.sin(l2));return{lat:l2/R,lon:o2/R}};
 const legs=()=>route.slice(1).map((p,i)=>dist(route[i],p)),total=()=>legs().reduce((a,b)=>a+b,0);
 const hm=h=>{if(!isFinite(h))return'–';const m=Math.round(h*60);return Math.floor(m/60)+':'+String(m%60).padStart(2,'0')};
-function theme(t){try{localStorage.setItem('dl.theme',t)}catch(_){}document.documentElement.dataset.theme=t;$('#bTheme').textContent={day:'Day',night:'Night',contrast:'High'}[t];const cs=getComputedStyle(document.documentElement);['bg','land','coast','grid','ap','nav','route','own','txt','trf'].forEach(n=>C[n]=cs.getPropertyValue('--'+n).trim())}
+function theme(t){try{localStorage.setItem('dl.theme',t)}catch(_){}document.documentElement.dataset.theme=t;$('#bTheme').textContent={day:'Day',night:'Night',contrast:'High'}[t];const cs=getComputedStyle(document.documentElement);['bg','land','coast','grid','ap','nav','route','own','txt','trf','mut'].forEach(n=>C[n]=cs.getPropertyValue('--'+n).trim())}
 theme((function(){try{return localStorage.getItem('dl.theme')||'night'}catch(e){return'night'}})());
 $('#bTheme').onclick=()=>{const o=['day','night','contrast'];theme(o[(o.indexOf(document.documentElement.dataset.theme)+1)%3])};
 function size(){dpr=devicePixelRatio||1;W=cv.clientWidth;H=cv.clientHeight;cv.width=W*dpr;cv.height=H*dpr}addEventListener('resize',size);size();
@@ -424,7 +425,7 @@ const el=route.length>1?t-trav:0;$('#tGS').textContent=CRUISE;$('#tAL').textCont
 if(V.fol){V.lon=own.lon;V.lat=own.lat}}
 /* drawing */
 function draw(){cx.setTransform(dpr,0,0,dpr,0,0);cx.fillStyle=C.bg;cx.fillRect(0,0,W,H);
-cx.beginPath();[LAND,...EX].forEach(po=>{po.forEach((p,i)=>{const[x,y]=sc(p[0],p[1]);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.closePath()});if(CH.on&&CH.pg!='sat'){cx.fillStyle='#fbfaf6';cx.fillRect(0,0,W,H)}else if(!SAT()){cx.fillStyle=C.land;cx.fill();cx.strokeStyle=C.coast;cx.lineWidth=1.5;cx.stroke()}else drawTiles();
+if(CH.on&&CH.pg!='sat'){cx.fillStyle='#fbfaf6';cx.fillRect(0,0,W,H)}else if(L.style=='world'){worldLayer()}else{cx.beginPath();[LAND,...EX].forEach(po=>{po.forEach((p,i)=>{const[x,y]=sc(p[0],p[1]);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.closePath()});if(!SAT()){cx.fillStyle=C.land;cx.fill();cx.strokeStyle=C.coast;cx.lineWidth=1.5;cx.stroke()}else drawTiles()}
 const tl=wpx(V.lon,V.lat);
 if(L.grid&&V.z<12&&!CH.on){const s=V.z<4?10:V.z<5.5?5:V.z<7?2:V.z<8.5?1:V.z<10?.5:.1,a=wun(tl[0]-W/2,tl[1]-H/2),b=wun(tl[0]+W/2,tl[1]+H/2);cx.strokeStyle=C.grid;cx.lineWidth=1;cx.fillStyle=C.coast;cx.font='10px sans-serif';cx.beginPath();
 for(let o=Math.ceil(a[0]/s)*s;o<b[0];o+=s){const x=sc(o,0)[0];cx.moveTo(x,0);cx.lineTo(x,H);cx.fillText(o.toFixed(s<1?1:0)+'°',x+2,H-100)}
@@ -442,7 +443,7 @@ if(liveOk()){const[x,y]=sc(own.lon,own.lat);cx.save();cx.translate(x,y);cx.rotat
 if(CH.on)chartFx();if(sel&&!CH.on){const q=sel.k=='own'?own:sel,[x,y]=sc(q.lon,q.lat);cx.strokeStyle=C.txt;cx.lineWidth=2;cx.beginPath();cx.arc(x,y,16+(tk?3*Math.sin(performance.now()/260):0),0,7);cx.stroke()}}
 let last=performance.now(),lastDraw=0;
 const frameMs=1000/RP.fps;
-(function loop(t){
+requestAnimationFrame(function loop(t){
   const dt=Math.min((t-last)/1000,.2);last=t;
   if(!document.hidden && t-lastDraw>=frameMs){
     lastDraw=t;
@@ -450,7 +451,7 @@ const frameMs=1000/RP.fps;
     draw();
   }
   requestAnimationFrame(loop);
-})(last);
+});
 /* interaction */
 let drag=null,pinch=null;
 cv.onpointerdown=e=>{V.in=null;V.tz=null;V.anchor=null;cv.setPointerCapture(e.pointerId);drag={startX:e.clientX,startY:e.clientY,startLon:V.lon,startLat:V.lat,m:0,t:performance.now(),px:e.clientX,py:e.clientY}};
@@ -464,7 +465,21 @@ $('#bZi').onclick=()=>{V.in=null;setFol(false);V.anchor={sx:W/2,sy:H/2,geo:[V.lo
 $('#bZo').onclick=()=>{V.in=null;setFol(false);V.anchor={sx:W/2,sy:H/2,geo:[V.lon,V.lat]};V.tz=Math.max(2.5,(V.tz==null?V.z:V.tz)-.7)};
 function setFol(v){V.fol=v;$('#bFol').classList.toggle('on',v)}
 function askSimbriefId(){return new Promise(res=>{const b=document.createElement('div');b.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999';b.innerHTML='<form style="background:#111a24;color:#e6edf4;padding:18px;border-radius:10px;min-width:280px;font:14px system-ui"><div style="margin-bottom:10px">Enter your SimBrief Username or Pilot ID</div><input name="v" autocomplete="off" style="width:100%;box-sizing:border-box;padding:6px"><div style="margin-top:12px;text-align:right"><button type="button" data-c>Cancel</button> <button type="submit">OK</button></div></form>';document.body.appendChild(b);const done=v=>{b.remove();res(v)};b.querySelector('form').onsubmit=e=>{e.preventDefault();done(b.querySelector('input').value.trim()||null)};b.querySelector('[data-c]').onclick=()=>done(null);b.querySelector('input').focus();});}
-function placeTod(){const ti=route.findIndex(p=>p.id=='TOD');if(ti<0||route.length<2)return;const dst=route[route.length-1],drop=route[ti].elev-(dst.elev||0);if(!(drop>0))return;const want=drop/318,pts=route.filter((_,i)=>i!==ti);let acc=0;for(let j=pts.length-1;j>0;j--){const seg=dist(pts[j-1],pts[j]);if(acc+seg>=want){const f=seg?(want-acc)/seg:0;route[ti]={...route[ti],lat:pts[j].lat+(pts[j-1].lat-pts[j].lat)*f,lon:pts[j].lon+(pts[j-1].lon-pts[j].lon)*f};return}acc+=seg}}
+// Planning descent gradient in ft per nm. Calibrated to a real sim descent that started ~2 nm after NOSIT
+// (~41 nm from MMMX, 18,000 ft to 9,800 ft). 318 would be a 3 degree glide path. Based on one flight.
+const DESC_DEFAULT=200;
+let DESC_FT_PER_NM=DESC_DEFAULT, DESC_SRC='default';
+function descActive(){return route.some(p=>p.id=='TOD')}
+function loadDescentRate(){
+  try{const c=JSON.parse(localStorage.getItem('dl.desc')||'null');if(c&&c.v>=50&&c.v<=500){DESC_FT_PER_NM=c.v;DESC_SRC=c.src||'default'}}catch(e){}
+  try{const b=location.origin&&location.origin!='null'?location.origin:'http://127.0.0.1:8765';
+  fetch(b+'/descent.json',{cache:'no-store',credentials:location.protocol=='file:'?'omit':'include'}).then(r=>r.ok?r.json():null).then(d=>{
+    if(d&&d.available&&d.ftPerNm>=50&&d.ftPerNm<=500){DESC_FT_PER_NM=d.ftPerNm;DESC_SRC='sim';try{localStorage.setItem('dl.desc',JSON.stringify({v:d.ftPerNm,src:'sim'}))}catch(e){}}
+    if(descActive()){placeTod();save();if(panel=='route')render()}
+  }).catch(()=>{})}catch(e){}
+}
+loadDescentRate();
+function placeTod(){const ti=route.findIndex(p=>p.id=='TOD');if(ti<0||route.length<2)return;const dst=route[route.length-1],drop=route[ti].elev-(dst.elev||0);if(!(drop>0))return;const want=drop/DESC_FT_PER_NM,pts=route.filter((_,i)=>i!==ti);let acc=0;for(let j=pts.length-1;j>0;j--){const seg=dist(pts[j-1],pts[j]);if(acc+seg>=want){const f=seg?(want-acc)/seg:0;const tod={...route[ti],lat:pts[j].lat+(pts[j-1].lat-pts[j].lat)*f,lon:pts[j].lon+(pts[j-1].lon-pts[j].lon)*f};route=pts.slice(0,j).concat([tod],pts.slice(j));return}acc+=seg}}
 async function importSB(){
   const id=await askSimbriefId();
   if(!id)return;
@@ -519,6 +534,7 @@ else s.innerHTML=`<h3>${o.id}</h3><div class="m">Alt ${Math.round(o.alt/10)*10} 
 const t=total();s.innerHTML=`<h3>Flight plan</h3><div class="m">${route.length?route.map(p=>p.id).join(' → '):'Empty'} · ${t.toFixed(0)} nm · ${hm(t/CRUISE)} @ ${CRUISE} kt</div>
 <table>${route.map((p,i)=>`<tr><td>${i+1}</td><td>${p.id}</td><td class="m">${p.name}</td><td>${i?Math.round(dist(route[i-1],p))+' nm':''}</td><td><button onclick="rm(${i})" aria-label="Remove">✕</button></td></tr>`).join('')}</table>
 <div class="m">${plan?'Plan mode on: tap map, airports or navaids to add waypoints.':'Turn on Plan, then tap the map to add waypoints.'}</div>
+<div class="m">Descent planned at <b>${DESC_FT_PER_NM} ft/nm</b> — ${DESC_SRC=='sim'?'measured from your simulator flights':'default planning value (no measured descent yet)'}</div>
 <div class="row"><button onclick="importSB()">Import SimBrief</button><button onclick="defRoute();save();render()">Reset</button><button onclick="route=[];save();trav=0;render()">Clear</button><button onclick="exp('pln')">MSFS .PLN</button><button onclick="exp('fms')">X-Plane .FMS</button></div><div id="ex"></div>`}
 const pad=n=>String(n).padStart(2,'0');
 function openChart(a){sel=a;getMetar(a);getFaa(a);const pr=pairs(a),ln=RL[a.id]||[],mx=Math.max(...pr.map((p,i)=>ln[i]||8000)),k=230/mx,w=wind(a.metar);
@@ -609,7 +625,7 @@ function tabHi(){[['bMap',null],['bCh','charts'],['bRoute','route'],['bWx','wx']
 $('#bLay').onclick=()=>{const l=$('#lay');l.style.display=l.style.display=='flex'?'none':'flex'};
 $('#bMap').onclick=()=>{panel=null;sel=null;tk=false;render()};
 $('#st').onclick=()=>{panel='live';render()};
-function TILED(){if(!RP.tiles)return false;if(CH.on)return CH.pg=='sat'&&!(TS.ok==0&&TS.err>6);return L.style!='vec'&&!(TS.ok==0&&TS.err>6)}
+function TILED(){if(!RP.tiles)return false;if(CH.on)return CH.pg=='sat'&&!(TS.ok==0&&TS.err>6);return L.style!='vec'&&L.style!='world'&&!(TS.ok==0&&TS.err>6)}
 function SAT(){return TILED()}
 function DKM(){return TILED()&&(L.style=='sat'||L.style=='hyb'||L.style=='dk')}
 function PVC(){const s=L.style;return !TILED()?C.txt:(s=='sat'||s=='hyb')?'#d8d8d8':s=='dk'?'#a9b4bd':'#4a4f55'}
@@ -629,6 +645,105 @@ function tl(l){const mz=l=='lab'?18:(MS[l]||MS.sat).m,Z=Math.min(mz,Math.max(0,M
 for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const dx=x*s-c[0]+W/2,dy=y*s-c[1]+H/2,t=tImg(l,Z,x,y);
 if(Z>0){const p=t.ok&&now-t.t>260?null:tImg(l,Z-1,x>>1,y>>1);if(p&&p.ok)cx.drawImage(p.i,(x&1)*128,(y&1)*128,128,128,dx,dy,s+.5,s+.5)}
 if(t.ok){cx.globalAlpha=Math.min(1,(now-t.t)/220);cx.drawImage(t.i,dx,dy,s+.5,s+.5);cx.globalAlpha=1}}}
+/* World basemap: country outlines, country names, continent names and ocean
+   names from the bundled Natural Earth layer. The sheet is drawn into an
+   offscreen canvas at a snapped centre and reused, so panning is a blit rather
+   than re-pathing ~9,500 points; the margin keeps a snapped pan from exposing
+   an edge. */
+/* Resolved lazily as well: a missing or failed js/data/world.js should cost
+   the World style its detail, not the whole map. */
+var WD=null;try{WD=globalThis.STRATOS_WORLD||null}catch(_){}
+const WM=24, WSTEP=0.05;
+let wcv=null,wkey='',wdx=0,wdy=0;
+function wSnap(v,step){return Math.round(v/step)*step}
+function worldKeyNow(){return [W,H,dpr,V.z.toFixed(3),wSnap(V.lon,WSTEP),wSnap(V.lat,WSTEP),L.style,document.documentElement.dataset.theme].join('|')}
+function worldLayer(){
+  if(!WD){try{WD=globalThis.STRATOS_WORLD||null}catch(_){}}
+  if(!WD||!WD.countries){cx.fillStyle=C.land;cx.fillRect(0,0,W,H);return}
+  const slon=wSnap(V.lon,WSTEP),slat=wSnap(V.lat,WSTEP),key=worldKeyNow();
+  const p=wpx(V.lon,V.lat,V.z),ps=wpx(slon,slat,V.z);
+  if(!wcv||key!==wkey){
+    if(!wcv)wcv=document.createElement('canvas');
+    wcv.width=Math.max(1,Math.round((W+WM*2)*dpr));wcv.height=Math.max(1,Math.round((H+WM*2)*dpr));
+    const lon0=V.lon,lat0=V.lat;V.lon=slon;V.lat=slat;
+    buildWorld(wcv.getContext('2d'));
+    V.lon=lon0;V.lat=lat0;wkey=key
+  }
+  wdx=Math.max(-WM,Math.min(WM,p[0]-ps[0]));wdy=Math.max(-WM,Math.min(WM,p[1]-ps[1]));
+  cx.drawImage(wcv,wdx-WM,wdy-WM,W+WM*2,H+WM*2)
+}
+/* Long official names are trimmed to what a map label uses. */
+const WSHORT={'United States of America':'United States',"People's Republic of China":'China','Republic of Korea':'South Korea',"Democratic People's Republic of Korea":'North Korea','Republic of the Congo':'Congo','United Republic of Tanzania':'Tanzania','Democratic Republic of the Congo':'Dem. Rep. Congo','Central African Republic':'Central African Rep.'};
+function buildWorld(g){
+  g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,W+WM*2,H+WM*2);g.translate(WM,WM);
+  const night=document.documentElement.dataset.theme!=='day';
+  const landC=night?'#16212c':C.land,coastC=night?'rgba(122,160,200,.34)':C.coast;
+  g.fillStyle=C.bg;g.fillRect(-WM,-WM,W+WM*2,H+WM*2);
+  const labelBg=C.ui||C.bg, M=WM+40;
+  /* Heaviest outlines first so a dropped label is never a big country's. */
+  const order=WD.countries.slice().sort((a,b)=>(a.k||8)-(b.k||8));
+  for(const co of order){
+    let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+    g.beginPath();
+    for(const ring of co.p){
+      for(let i=0;i<ring.length;i+=2){
+        const pt=sc(ring[i],ring[i+1]),x=pt[0],y=pt[1];
+        if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;
+        i?g.lineTo(x,y):g.moveTo(x,y)
+      }
+      g.closePath()
+    }
+    if(x1<-M||x0>W+M||y1<-M||y0>H+M)continue;
+    g.fillStyle=landC;g.fill();
+    g.strokeStyle=coastC;g.lineWidth=1;g.stroke()
+  }
+  const taken=[];
+  const fits=(x,y,w,h)=>!taken.some(r=>x<r[2]&&x+w>r[0]&&y<r[3]&&y+h>r[1]);
+  const wrap=(text,max)=>{const bits=String(text).split(' '),lines=[];let line='';for(const bit of bits){const next=line?line+' '+bit:bit;if(line&&g.measureText(next).width>max){lines.push(line);line=bit}else line=next}if(line)lines.push(line);return lines.slice(0,3)};
+  const place=(text,x,y,o)=>{
+    if(x<-M||x>W+M||y<-M||y>H+M)return false;
+    const size=o.size,track=o.track||0;
+    g.font=(o.italic?'italic ':'')+(o.weight||600)+' '+size+'px '+(o.serif?'Georgia,"Times New Roman",serif':'"Segoe UI Variable","Segoe UI",system-ui,sans-serif');
+    if('letterSpacing' in g)g.letterSpacing=track+'px';
+    const lines=o.maxWidth?wrap(text,o.maxWidth):[text];
+    let w=0;for(const line of lines)w=Math.max(w,g.measureText(line).width);
+    const lh=size*1.12,h=lh*lines.length;
+    if(!fits(x-w/2,y-h/2,w,h))return false;
+    taken.push([x-w/2,y-h/2,x-w/2+w,y-h/2+h]);
+    g.textAlign='center';g.textBaseline='middle';
+    for(let i=0;i<lines.length;i++){
+      const ly=y+(i-(lines.length-1)/2)*lh;
+      g.lineWidth=3;g.strokeStyle=labelBg;g.strokeText(lines[i],x,ly);
+      g.fillStyle=o.color;g.fillText(lines[i],x,ly)
+    }
+    if('letterSpacing' in g)g.letterSpacing='0px';
+    return true
+  };
+  /* Water, then continents, then countries: the quiet layers claim their space
+     before the names that matter most, and the seas only appear once the view
+     is zoomed past the point where the whole world fits on screen. */
+  if(L.wlab!==0){
+    const zo=V.z;
+    if(zo<6.4)for(const o of WD.oceans){
+      if(o.r>0&&zo<4.4)continue;
+      const pt=sc(o.x,o.y);
+      place(o.n,pt[0],pt[1],{size:o.r>0?11:13,color:C.mut,italic:true,serif:true,track:.3})
+    }
+    if(zo<5.4)for(const c of WD.continents){
+      const pt=sc(c.x,c.y);
+      place(c.n.toUpperCase(),pt[0],pt[1],{size:Math.max(11,Math.min(19,11+(5.4-zo)*2.4)),color:C.mut,track:2,weight:700})
+    }
+    for(const co of order){
+      const k=co.k||8,limit=zo>=5?99:zo>=3.6?5:zo>=2.9?3:2;
+      if(k>limit)continue;
+      const pt=sc(co.x,co.y);
+      /* Country names grow with the zoom: 10.5 px reads on a world view, but by
+         the time one country fills the screen it would be unreadably small. */
+      const size=zo<4.6?10.5:Math.min(18,10.5+(zo-4.6)*1.15);
+      place(WSHORT[co.n]||co.n,pt[0],pt[1],{size,color:zo>=5?C.txt:C.mut,weight:500,maxWidth:Math.max(88,size*9)})
+    }
+  }
+}
 function drawTiles(){const l=L.style;tl(l=='hyb'?'sat':l);if(l=='hyb')tl('lab');const tx=(MS[l]||MS.sat).a||'';cx.font='10px sans-serif';cx.lineWidth=3;cx.strokeStyle='rgba(0,0,0,.65)';cx.strokeText(tx,8,H-84);cx.fillStyle='#fff';cx.fillText(tx,8,H-84)}
 function msUi(){const e=$('#ms');if(!e)return;e.innerHTML=Object.keys(MS).map(k=>'<button data-ms="'+k+'" class="'+(L.style==k?'on':'')+'">'+MS[k].n+'</button>').join('')}
 $('#ms').onclick=e=>{const k=e.target.dataset&&e.target.dataset.ms;if(!k)return;L.style=k;try{localStorage.setItem('dl.style',k)}catch(_){}TS.err=0;msUi()};
@@ -749,7 +864,7 @@ for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++)jobs.push([x,y]);
 let out=[],bad=0;
 for(let i=0;i<jobs.length;i+=6)await Promise.all(jobs.slice(i,i+6).map(async([x,y])=>{try{const r=await fetch(OFMT.replace('{z}',z).replace('{x}',x).replace('{y}',y));if(!r.ok)return;let b=await r.arrayBuffer();const u=new Uint8Array(b);if(u[0]==31&&u[1]==139)b=await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();out=out.concat(mvtAero(b,z,x,y))}catch(e){bad++}}));
 if(!out.length){a.err=bad?'map tiles unreachable':'no airfield data in tiles';return null}return out}catch(e){a.err='map tiles: '+((e&&e.message)||e);return null}}
-function connect(base){disc();live.on=true;fetch(base+'/airports.json').then(r=>r.json()).then(l=>{l.forEach(a=>{const e=A.find(z=>z.id==a[0]);if(e){e.rws=a[7];e._rl=null;e.lat=a[2];e.lon=a[3];e.elev=a[4];e.rw=a[5];RL[a[0]]=a[6];e.twr=(a[8]||{}).TWR||'—';e.atis=(a[8]||{}).ATIS||'—';e.fqs=a[8]||{};return}A.push({rws:a[7],k:'apt',x:1,id:a[0],name:a[1],lat:a[2],lon:a[3],elev:a[4],rw:a[5],twr:(a[8]||{}).TWR||'—',atis:(a[8]||{}).ATIS||'—',fqs:a[8]||{},metar:'No METAR loaded'});RL[a[0]]=a[6]})}).catch(()=>{});fetch(base+'/navaids.json').then(r=>r.json()).then(l=>{N.length=0;l.forEach(n=>N.push({k:'nav',id:n[0],name:n[1],type:n[2],lat:n[3],lon:n[4],freq:n[5]}))}).catch(()=>{});try{live.es=new EventSource(base+'/stream');live.es.onmessage=e=>{try{live.d=JSON.parse(e.data);live.at=performance.now();if(live.d.trt!==live.trt){live.trt=live.d.trt;T.length=0;(live.d.tr||[]).forEach(a=>{T.push({k:'trf',seen:Date.now(),...a});trlAdd(a.hx||a.id,a.lat,a.lon,a.alt,400)});if(sel&&sel.k=='trf'){const n=T.find(a=>a.id==sel.id);if(n)sel=n}}if(live.d.lat!=null&&!live.seen){live.seen=1;V.lon=live.d.lon;V.lat=live.d.lat;V.tz=null;V.z=Math.max(V.z,9);setFol(true);if(panel=='live')render()}}catch(_){}}}catch(_){live.on=false}$('#bLive').classList.add('on')}
+function connect(base){disc();live.on=true;fetch(base+'/airports.json').then(r=>r.json()).then(l=>{l.forEach(a=>{const e=A.find(z=>z.id==a[0]);if(e){e.rws=a[7];e._rl=null;e.lat=a[2];e.lon=a[3];e.elev=a[4];e.rw=a[5];RL[a[0]]=a[6];e.twr=(a[8]||{}).TWR||'—';e.atis=(a[8]||{}).ATIS||'—';e.fqs=a[8]||{};return}A.push({rws:a[7],k:'apt',x:1,id:a[0],name:a[1],lat:a[2],lon:a[3],elev:a[4],rw:a[5],twr:(a[8]||{}).TWR||'—',atis:(a[8]||{}).ATIS||'—',fqs:a[8]||{},metar:'No METAR loaded'});RL[a[0]]=a[6]})}).catch(()=>{});fetch(base+'/navaids.json').then(r=>r.json()).then(l=>{N.length=0;l.forEach(n=>N.push({k:'nav',id:n[0],name:n[1],type:n[2],lat:n[3],lon:n[4],freq:n[5]}))}).catch(()=>{});try{live.es=new EventSource(base+'/stream');live.es.onmessage=e=>{try{live.d=JSON.parse(e.data);live.at=performance.now();if(live.d.trt!==live.trt){live.trt=live.d.trt;T.length=0;(live.d.tr||[]).forEach(a=>{T.push({k:'trf',seen:Date.now(),...a});trlAdd(a.hx||a.id,a.lat,a.lon,a.alt,400)});if(sel&&sel.k=='trf'){const n=T.find(a=>a.id==sel.id);if(n)sel=n}}if(live.d.lat!=null&&!live.seen){live.seen=1;V.lon=live.d.lon;V.lat=live.d.lat;V.tz=null;V.z=Math.max(V.z,9);setFol(true);if(panel=='live')render()}}catch(_){}}}catch(_){live.on=false}$('#bLive').classList.add('on');loadDescentRate()}
 function disc(){if(live.es)live.es.close();live.on=false;live.d=null;live.seen=0;$('#bLive').classList.remove('on');if(panel=='live')render()}
 function liveHtml(){const web=location.protocol=='http:'||location.protocol=='file:',ok=liveOk(),lb=location.protocol=='http:'?location.origin:'http://127.0.0.1:8765';return `<h3>Live tracking</h3><div class="m"><b>Traffic:</b> ${wtTxt()}${WT.src?' via '+WT.src:''}. Live aircraft load automatically in Stratos; no Python process is needed for public traffic.</div><div class="m" style="margin-top:8px"><b>Simulator link (optional)</b></div><div class="m">${ok?'● Receiving live data from the simulator':live.on?'Connected to bridge, waiting for simulator data…':'Not connected'}</div>`+(web?'':'<div class="m" style="margin-top:6px">This hosted copy cannot reach your PC. Use the bridge address in step 4 instead.</div>')+'<div class="m">To see your own aircraft from X-Plane or MSFS 2020/2024, run the Stratos bridge on your PC.</div><ol class="m" style="padding-left:18px"><li>The Stratos desktop app starts the bridge for you. Manual start: <b>python stratos_bridge.py</b>. For MSFS 2020/2024, run it on the same Windows PC as the sim after a one-time <b>pip install SimConnect</b>, then start a flight. No other MSFS setup.</li><li>X-Plane only: Settings → Data Output: tick “Network via UDP” for rows 3, 17 and 20</li><li>X-Plane only: tick “Send network data output”, enter the IP the bridge prints, port 49003</li><li>On iPhone Safari open <b>http://PC-IP:8765</b>, then Share → Add to Home Screen</li></ol>'+(web?'<div class="row"><button onclick="connect(\''+lb+'\')">Reconnect</button><button onclick="disc()">Disconnect</button></div>':'')}
 $('#bLive').onclick=()=>{panel=panel=='live'?null:'live';render()};

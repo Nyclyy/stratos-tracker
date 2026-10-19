@@ -40,10 +40,23 @@ Inputs: synthetic 12,000-point curved track; 2,000 completed flights with a 60-p
 | Normalize + prepare 12k replay | 16.95 ms | 59/s |
 | Sample prepared replay | 0.0011 ms | ~897k/s |
 | Simplify 12k track only | 4.36 ms | 229/s |
+| Rebuild the world basemap sheet (177 countries, ~9,500 points, 1,280x800 at dpr 1, headless Chromium) | 1.3 ms at z6-z9, 2.7-3.2 ms on a whole-world view | ~310-760/s |
+| Pan one frame with the world basemap cached | one `drawImage`, no re-pathing | — |
 | Summarize 2,000 landings | 1.34 ms | 744/s |
 | Career totals, 2,000 flights | 14.24 ms | 70/s |
 | Route totals, 25 points | 0.0041 ms | ~245k/s |
 | Heap used after benchmark | 89.4 MiB | — |
+
+The world basemap sheet is rebuilt only when the projected centre moves past the snap step, the zoom changes or the theme changes; every other frame is a single `drawImage` of the cached sheet. A rebuild costs 1.3 ms at z6-z9 and 2.7-3.2 ms on a whole-world view, where the most country names and continent labels are tested for overlap. Blitting the cached sheet and repainting the overlay costs 2.7-4.5 ms per frame under headless software rasterisation, which is the pessimistic case; a GPU-backed browser composites the same blit on the GPU.
+
+Reproduce with:
+
+```bash
+npx playwright install chromium
+node scripts/world-bench.mjs
+```
+
+The script serves `app/` from a throwaway static server, opens the tracker with the World style saved, and times sheet rebuilds, cached pan frames and centre changes at z2.9, z6 and z9. Chromium 156, Linux x64, software rasterisation.
 
 Interpretation: opening a replay of a very long flight costs roughly 17 ms of main-thread work once; playback sampling is negligible. A full career recalculation over 2,000 flights costs ~14 ms, which happens on logbook refresh, not per animation frame. These numbers exclude canvas painting and the browser’s layout.
 

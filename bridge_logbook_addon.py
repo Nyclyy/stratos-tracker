@@ -34,6 +34,14 @@ PARKED_SPEED_KT  = 2
 PARKED_SECONDS   = 30
 MIN_FLIGHT_SEC   = 60
 
+# Descent gradient analysis. A flight teaches the app its real descent only
+# when the measured values are plausible; anything outside these bounds is ignored.
+DESC_LEVEL_TOL_FT = 50       # altitude noise still counted as level cruise
+DESC_MIN_DROP_FT  = 2000     # shorter drops are pattern work, not a descent profile
+DESC_MIN_NM       = 5.0      # too little distance to measure a gradient
+DESC_MIN_FT_NM    = 40.0
+DESC_MAX_FT_NM    = 600.0
+
 # Landing rating guidelines (fpm). Display code in the web app can override
 # these; they are recorded with each landing so a later threshold change does
 # not rewrite history.
@@ -267,6 +275,7 @@ _flight_state = {
     "flight": None,
     "parked_since": None,
     "recent": [],
+    "touchdown_t": None,
 }
 _fs_lock = threading.Lock()
 _last_snapshot = 0.0
@@ -357,12 +366,55 @@ def _regression_fpm(samples):
     return (n * sxy - sx * sy) / denom * 60.0
 
 
-def _analyse_landing(data, airports_list, recent=None):
+def _analyse_descent(track):
+    """Measure the real descent gradient of a completed flight.
+
+    The descent starts where the level segment at the highest recorded altitude
+    ends. The gradient is the altitude lost divided by the distance flown from
+    that point to touchdown, in feet per nautical mile. Nothing is invented: an
+    unusable track returns None.
+    """
+    points = [p for p in (track or [])
+              if isinstance(p.get("lat"), (int, float)) and isinstance(p.get("lon"), (int, float))
+              and isinstance(p.get("alt"), (int, float))]
+    if len(points) < 4:
+        return None
+    peak = max(points, key=lambda p: p["alt"])
+    if peak["alt"] - points[-1]["alt"] < DESC_MIN_DROP_FT:
+        return None
+    # The descent starts where the level segment ends: walk forward while the
+    # aircraft is still at cruise altitude (allowing tiny altitude noise).
+    index = points.index(peak)
+    while index + 1 < len(points) and points[index + 1]["alt"] >= peak["alt"] - DESC_LEVEL_TOL_FT:
+        index += 1
+    start = points[index]
+    distance = 0.0
+    for i in range(index + 1, len(points)):
+        distance += _haversine_nm(points[i - 1]["lat"], points[i - 1]["lon"],
+                                  points[i]["lat"], points[i]["lon"])
+    drop = start["alt"] - points[-1]["alt"]
+    if distance < DESC_MIN_NM:
+        return None
+    ft_per_nm = drop / distance
+    if not (DESC_MIN_FT_NM <= ft_per_nm <= DESC_MAX_FT_NM):
+        return None
+    return {
+        "ftPerNm": round(ft_per_nm, 1),
+        "startAltFt": round(start["alt"]),
+        "sinkNm": round(distance, 1),
+        "source": "measured from the recorded track",
+    }
+
+
+def _analyse_landing(data, airports_list, recent=None, touchdown_t=None):
     if recent is None:
         with _fs_lock:
             recent = list(_flight_state["recent"])
     else:
         recent = list(recent)
+    if touchdown_t is not None:
+        # Only samples up to first wheel contact: the ground roll is flat and would dilute the descent rate.
+        recent = [s for s in recent if s.get("t") and s["t"] <= touchdown_t]
     vs = _regression_fpm(recent[-12:])
     vs_source = "derived from recorded altitude"
     if vs is None or vs >= 0:
@@ -441,18 +493,21 @@ def process_telemetry_for_logbook(data, airports_list=None):
         elif phase == "TAXI":
             if agl > AIRBORNE_AGL_FT and gs > TAKEOFF_SPEED_KT:
                 flight["phase"] = state["phase"] = "AIRBORNE"
+                state["touchdown_t"] = None
                 flight["takeoffTime"] = now_ms
             elif gs < PARKED_SPEED_KT and on_ground:
                 flight["phase"] = state["phase"] = "PARKED"
 
         elif phase == "AIRBORNE":
+            if on_ground and state["touchdown_t"] is None:
+                state["touchdown_t"] = now_ms  # first wheel contact, anchors the landing-rate window
             if on_ground and gs < LANDED_SPEED_KT:
                 flight["phase"] = state["phase"] = "LANDED"
                 flight["landingTime"] = now_ms
                 flight["fuelArr"] = data.get("fuel")
                 if airports_list:
                     flight["arrAirport"] = nearest_airport(lat, lon, airports_list)
-                landing = _analyse_landing(data, airports_list, state["recent"])
+                landing = _analyse_landing(data, airports_list, state["recent"], state["touchdown_t"])
                 flight["landing"] = landing
                 flight["landingVS"] = landing.get("vsFpm")
                 state["parked_since"] = time.time()
@@ -462,6 +517,7 @@ def process_telemetry_for_logbook(data, airports_list=None):
                 flight["phase"] = state["phase"] = "AIRBORNE"
                 flight["landingTime"] = None
                 flight["arrAirport"] = None
+                state["touchdown_t"] = None
                 flight["landingVS"] = None
                 flight["landing"] = None
                 state["parked_since"] = None
@@ -486,6 +542,9 @@ def _complete_flight(flight, airports_list=None):
     flight["phase"] = "COMPLETE"
     flight["endTime"] = _now_ms()
     flight["distanceNm"] = _track_distance(flight["track"])
+    descent = _analyse_descent(flight["track"])
+    if descent:
+        flight["descent"] = descent
     if flight.get("takeoffTime") and flight.get("landingTime"):
         airborne = (flight["landingTime"] - flight["takeoffTime"]) / 1000.0
         if airborne < MIN_FLIGHT_SEC:
@@ -567,6 +626,9 @@ def finalize_active_flight(note="Stratos closed before the flight was finalised.
         flight["phase"] = "COMPLETE"
         flight["endTime"] = _now_ms()
         flight["distanceNm"] = _track_distance(flight["track"])
+        descent = _analyse_descent(flight["track"])
+        if descent:
+            flight["descent"] = descent
         flight["recoveryNote"] = note
         saved = lb_add(flight)
         _flight_state["flight"] = None
@@ -598,6 +660,7 @@ def get_current_flight():
             "distanceNm": _track_distance(flight.get("track") or []),
             "trackPoints": len(flight.get("track") or []),
             "landingVS": flight.get("landingVS"),
+            "descent": flight.get("descent"),
         }
 
 
@@ -617,6 +680,48 @@ def get_stats():
         "distanceNm": round(sum(float(f.get("distanceNm") or 0) for f in complete), 1),
         "landings": sum(1 for f in complete if f.get("landing") or f.get("landingVS") is not None),
     }
+
+
+def get_descent_profile():
+    """The descent gradient the app should plan with, learned from real flights.
+
+    The newest measured flight is used, because it reflects the aircraft being
+    flown now. Nothing is returned until the bridge has measured a usable
+    descent, so the app keeps its own default until then.
+    """
+    flights = lb_load()
+    measured = []
+    for flight in flights:
+        descent = flight.get("descent")
+        if isinstance(descent, dict):
+            value = descent.get("ftPerNm")
+            if isinstance(value, (int, float)) and math.isfinite(value) \
+                    and DESC_MIN_FT_NM <= value <= DESC_MAX_FT_NM:
+                measured.append((flight.get("endTime") or 0, value, flight))
+    if not measured:
+        return {"available": False, "flights": 0,
+                "note": "No completed flight has a measured descent yet."}
+    measured.sort(key=lambda item: item[0])
+    newest_time, newest_value, newest = measured[-1]
+    values = sorted(value for _, value, _ in measured)
+    middle = len(values) // 2
+    median = values[middle] if len(values) % 2 else (values[middle - 1] + values[middle]) / 2.0
+    return {
+        "available": True,
+        "ftPerNm": round(newest_value, 1),
+        "medianFtPerNm": round(median, 1),
+        "flights": len(measured),
+        "lastFlightAt": newest_time,
+        "aircraft": newest.get("aircraft") or "",
+        "source": "measured from the recorded track",
+    }
+
+
+def _handle_descent(handler):
+    if getattr(handler, "command", "GET") != "GET":
+        _json_response(handler, {"ok": False, "error": "Method not allowed."}, 405)
+        return
+    _json_response(handler, get_descent_profile())
 
 
 # ── HTTP handler additions (auth handled by stratos_bridge.py) ───────

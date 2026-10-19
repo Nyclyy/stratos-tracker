@@ -195,3 +195,185 @@
 .stats .stat-card b { font-size: 18px; letter-spacing: -.015em; }
 .stats .stat-card span { font-size: 9.5px; letter-spacing: .12em; color: #6f879c; }
 .stats .stat-card.is-empty b { color: #55708a; }
+
+/* ═══ Stratos Flight Deck: sidebar and bar finish ═══════════════════
+   Navy and charcoal surfaces, one blue accent, hairline dividers and no
+   glow. Nothing here paints per frame: every rule is static colour and a
+   120 ms hover fade. The page still owns its layout grid. */
+
+:root {
+  --shell-panel: #0a1420;
+  --shell-rail-bg: #0c1826;
+  --shell-line: rgba(122, 160, 205, .14);
+  --shell-line-strong: rgba(122, 160, 205, .22);
+  --shell-soft: rgba(255, 255, 255, .04);
+  --shell-ink: #e7eef7;
+  --shell-mute: #8397ac;
+  --shell-faint: #61748a;
+  --shell-accent: #4d9fe8;
+  --shell-accent-soft: rgba(77, 159, 232, .12);
+  --shell-good: #3ecf8e;
+  --shell-warn: #e9c05e;
+  --shell-font: "Bahnschrift", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+}
+
+/* ── Top bar ─────────────────────────────────────────────────────── */
+.tb {
+  gap: 14px;
+  padding: 0 14px;
+  background: var(--shell-panel);
+  border-bottom: 1px solid var(--shell-line);
+}
+.tb-brand { letter-spacing: .17em; font-size: 12px; gap: 8px; }
+.tb-mark {
+  width: 26px; height: 26px; border-radius: 7px;
+  background: var(--shell-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--shell-accent) 24%, transparent);
+}
+.tb-brand small { font-size: 7.5px; letter-spacing: .26em; color: var(--shell-faint); }
+
+/* Page identity lives in the bar; the number of headings per screen stays one. */
+.tb-title {
+  display: flex; align-items: baseline; gap: 9px; min-width: 0;
+  padding-left: 14px; margin-left: 2px;
+  border-left: 1px solid var(--shell-line);
+}
+.tb-title b {
+  font-size: 13px; font-weight: 700; letter-spacing: .015em;
+  color: var(--shell-ink); white-space: nowrap;
+}
+.tb-crumb {
+  font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--shell-faint); white-space: nowrap;
+}
+
+.tb .status {
+  height: 26px; padding: 0 10px; border-radius: 999px;
+  background: rgba(255, 255, 255, .03); border: 1px solid var(--shell-line);
+  font-size: 10.5px; font-weight: 650; letter-spacing: .05em;
+}
+.tb .status i { width: 6px; height: 6px; }
+.tb .status.is-live i { box-shadow: none; }
+.tb-perf {
+  height: 26px; border-radius: 7px; padding: 0 8px;
+  background: rgba(255, 255, 255, .03); border: 1px solid var(--shell-line);
+  color: var(--shell-ink); font-size: 10.5px; font-weight: 600;
+}
+.tb-perf:hover { border-color: var(--shell-line-strong); }
+.tb-btn { height: 28px; min-width: 28px; border-radius: 7px; }
+.tb-btn:hover { background: var(--shell-soft); border-color: transparent; }
+.tb-avatar {
+  width: 26px; height: 26px; border-radius: 7px;
+  background: var(--shell-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--shell-accent) 30%, transparent);
+  color: var(--shell-accent); font-size: 10.5px; letter-spacing: .06em;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────── */
+#tabs {
+  background: var(--shell-rail-bg);
+  border-right: 1px solid var(--shell-line);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 12px 10px;
+  gap: 1px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+#tabs::before { display: none; }
+
+#tabs .rail-group {
+  margin: 14px 0 6px;
+  padding: 0 9px;
+  font-size: 9.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--shell-faint);
+  white-space: nowrap;
+}
+#tabs .rail-group:first-child { margin-top: 2px; }
+
+#tabs .tab {
+  position: relative;
+  display: flex; align-items: center; gap: 10px;
+  min-height: 34px; padding: 0 10px;
+  border: 1px solid transparent; border-radius: 7px;
+  background: none;
+  color: var(--shell-mute);
+  font-size: 12.5px; font-weight: 620; letter-spacing: .01em;
+  text-align: left; text-decoration: none;
+  transition: color .12s ease, background-color .12s ease, border-color .12s ease;
+}
+#tabs .tab:hover:not(:disabled) {
+  color: var(--shell-ink); background: var(--shell-soft);
+  border-color: transparent; box-shadow: none; transform: none;
+}
+#tabs .tab[aria-current="page"] {
+  color: var(--shell-ink); background: var(--shell-accent-soft);
+}
+#tabs .tab[aria-current="page"]::before {
+  content: ""; position: absolute; left: -10px; top: 8px; bottom: 8px;
+  width: 2px; border-radius: 0 2px 2px 0; background: var(--shell-accent);
+}
+#tabs .tab b {
+  flex: 0 0 auto; width: 17px; height: 17px;
+  display: grid; place-items: center; color: currentColor;
+}
+#tabs .tab b svg { width: 17px; height: 17px; }
+#tabs .tab[aria-current="page"] b { color: var(--shell-accent); }
+#tabs .tab span {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12.5px; letter-spacing: .01em;
+}
+
+#tabs .rail-toggle {
+  margin-top: auto; color: var(--shell-faint);
+  border-top: 1px solid var(--shell-line); border-radius: 0;
+  padding-top: 10px; margin-top: 14px;
+}
+#tabs .rail-toggle:hover { color: var(--shell-ink); background: none; }
+
+/* Icon-only rail: labels and group headings step aside, tooltips carry the name. */
+.app-shell[data-collapsed="1"] #tabs { padding: 12px 8px; }
+.app-shell[data-collapsed="1"] #tabs .rail-group { display: none; }
+.app-shell[data-collapsed="1"] #tabs .tab { justify-content: center; padding: 0; }
+.app-shell[data-collapsed="1"] #tabs .tab[aria-current="page"]::before { left: -8px; }
+.app-shell[data-collapsed="1"] #tabs .rail-toggle { justify-content: center; }
+
+/* ── Home stat strip: quiet labels, crisp tabular numbers ────────── */
+.shell .stats, .app-main .stats { background: var(--shell-line); }
+.stats .stat-card {
+  background: var(--shell-panel); padding: 10px 16px;
+  min-height: 56px; justify-content: center;
+}
+.stats .stat-card b { font-size: 18px; letter-spacing: -.015em; color: var(--shell-ink); }
+.stats .stat-card span { font-size: 9.5px; letter-spacing: .12em; color: var(--shell-faint); }
+.stats .stat-card.is-empty b { color: var(--shell-faint); }
+
+/* ── Compact screens ─────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .tb-title { border-left: 0; padding-left: 0; }
+  .tb-crumb { display: none; }
+  #tabs { padding: 6px; border-right: 0; }
+  #tabs .rail-group { display: none; }
+  #tabs .tab { justify-content: center; padding: 0 6px; }
+  #tabs .tab[aria-current="page"]::before { left: auto; right: 10px; left: 10px; top: auto; bottom: 0; height: 2px; width: auto; border-radius: 2px 2px 0 0; }
+}
+@media (max-width: 560px) {
+  .tb-title { display: none; }
+}
+
+/* The map page marks its active panel with `.act` (see tabHi in index.html);
+   every other page marks the current destination with aria-current. One look. */
+#tabs .tab.act { color: var(--shell-ink); background: var(--shell-accent-soft); }
+#tabs .tab.act b { color: var(--shell-accent); }
+#tabs .tab.act::before {
+  content: ""; position: absolute; left: -10px; top: 8px; bottom: 8px;
+  width: 2px; border-radius: 0 2px 2px 0; background: var(--shell-accent); box-shadow: none;
+}
+#tabs .tab.on b { color: var(--shell-good); }
+.app-shell[data-collapsed="1"] #tabs .tab.act::before { left: -8px; }
+@media (max-width: 767px) {
+  #tabs .tab.act::before {
+    left: 10px; right: 10px; top: auto; bottom: 0; height: 2px; width: auto;
+    border-radius: 2px 2px 0 0;
+  }
+}

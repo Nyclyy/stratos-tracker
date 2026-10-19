@@ -59,6 +59,20 @@ class LandingAnalysisTests(unittest.TestCase):
         self.assertLess(result["vsFpm"], 0)
         self.assertTrue(result["estimated"]["vs"] is False)
 
+    def test_landing_rate_window_ends_at_first_wheel_contact(self):
+        # 200 fpm descent until wheel contact at t=2000 ms, then a flat ground roll.
+        # Using ground-roll samples flattens the slope (old bug: ~85 fpm instead of 200).
+        base = 1_700_000_000_000
+        samples = []
+        for index in range(14):
+            alt = 1000 - (200 / 60) * min(index, 8) * 0.25
+            samples.append({"lat": 37.0, "lon": -122.01, "alt": alt, "agl": 0, "gs": 100,
+                            "hdg": 90, "vs": -200, "t": base + index * 250})
+        result = addon._analyse_landing(
+            telemetry(lat=37.0, lon=-122.01, alt=1000, agl=0, gs=40, hdg=90), AIRPORTS,
+            samples, touchdown_t=base + 2000)
+        self.assertAlmostEqual(result["vsFpm"], -200, delta=1)
+
     def test_runway_match_and_distance(self):
         result = addon._analyse_landing(
             telemetry(lat=37.0002, lon=-122.01, alt=10, agl=0, gs=120, hdg=90), AIRPORTS)
@@ -169,6 +183,53 @@ class FlightLifecycleTests(unittest.TestCase):
         self.assertEqual(len(flights), 1)
         self.assertTrue(flights[0]["recovered"])
         self.assertFalse(os.path.exists(addon.INPROGRESS_FILE))
+
+    def test_descent_gradient_is_measured_from_the_track(self):
+        # 20 nm level at 18,000 ft, then 18,000 ft down to 1,800 ft over 60 nm
+        # of straight track: 270 ft/nm.
+        step = 1.0 / 60.0  # one nautical mile of latitude
+        track = []
+        for index in range(20):
+            track.append({"lat": 37.0 + index * step, "lon": -122.0, "alt": 18000,
+                          "t": index * 60000})
+        for index in range(61):
+            track.append({"lat": 39.0 + index * step, "lon": -122.0,
+                          "alt": 18000 - index * 270, "t": (20 + index) * 60000})
+        result = addon._analyse_descent(track)
+        self.assertIsNotNone(result)
+        self.assertAlmostEqual(result["ftPerNm"], 270.0, delta=2.0)
+        self.assertEqual(result["startAltFt"], 18000)
+        self.assertEqual(result["source"], "measured from the recorded track")
+
+    def test_descent_is_ignored_when_the_track_is_unusable(self):
+        self.assertIsNone(addon._analyse_descent([]))
+        # Pattern work: a 1,000 ft drop is not a descent profile.
+        short = [{"lat": 37.0 + i * 0.05, "lon": -122.0, "alt": 2000 - i * 200, "t": i} for i in range(6)]
+        self.assertIsNone(addon._analyse_descent(short))
+        # A descent with no distance is not a gradient either.
+        stacked = [{"lat": 37.0, "lon": -122.0, "alt": 18000 - i * 1000, "t": i} for i in range(12)]
+        self.assertIsNone(addon._analyse_descent(stacked))
+
+    def test_descent_profile_uses_the_newest_measured_flight(self):
+        addon.lb_save([
+            {"id": "a", "complete": True, "endTime": 1000, "aircraft": "B738",
+             "descent": {"ftPerNm": 250.0}},
+            {"id": "b", "complete": True, "endTime": 2000, "aircraft": "B738",
+             "descent": {"ftPerNm": 200.0}},
+            {"id": "c", "complete": True, "endTime": 3000, "aircraft": "A320",
+             "descent": {"ftPerNm": 9999.0}},
+        ])
+        profile = addon.get_descent_profile()
+        self.assertTrue(profile["available"])
+        self.assertEqual(profile["ftPerNm"], 200.0)
+        self.assertEqual(profile["medianFtPerNm"], 225.0)
+        self.assertEqual(profile["flights"], 2)
+
+    def test_descent_profile_is_unavailable_before_any_flight(self):
+        addon.lb_save([])
+        profile = addon.get_descent_profile()
+        self.assertFalse(profile["available"])
+        self.assertEqual(profile["flights"], 0)
 
     def test_current_flight_summary_has_no_track(self):
         addon.process_telemetry_for_logbook(telemetry(gs=20), AIRPORTS)

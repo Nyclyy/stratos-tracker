@@ -217,44 +217,44 @@ table td,table th { border-color:rgba(145,168,177,.18); }
 
 /* ── STRATOS / Flight-deck visual pass ────────────────────────────── */
 :root {
-  --bg:#0b171d;
-  --land:#13252c;
-  --coast:#354a51;
-  --grid:rgba(166,195,194,.12);
+  --bg:#0a1421;
+  --land:#101d2b;
+  --coast:#2c3f55;
+  --grid:rgba(150,180,215,.12);
   --ap:#e7b36c;
   --nav:#86bdb1;
   --route:#e7b36c;
   --own:#df827a;
-  --txt:#e3ebea;
-  --ui:#101e24;
-  --ui2:#17272d;
-  --mut:#91a3a4;
-  --trf:#a5c3d7;
-  --acc:#9bc8b8;
+  --txt:#e4ecf5;
+  --ui:#0d1927;
+  --ui2:#132132;
+  --mut:#8b9db3;
+  --trf:#9dc0e0;
+  --acc:#4d9fe8;
   --red:#df827a;
-  --grn:#98c5a4;
+  --grn:#5ec99a;
   --warn:#e7b36c;
-  --mag:#b5a4c7;
-  --line:rgba(174,197,192,.18);
+  --mag:#9fb0d8;
+  --line:rgba(140,170,205,.16);
   --focus:#e7b36c;
   color-scheme:dark;
   font-family:"Segoe UI Variable Text","Bahnschrift","Segoe UI",system-ui,sans-serif;
   font-synthesis:none;
 }
 :root[data-theme="day"] {
-  --bg:#dce5e2; --land:#e9eeea; --coast:#9aada9; --grid:rgba(54,78,76,.14);
+  --bg:#e7ecf2; --land:#f2f5f8; --coast:#a9b8c7; --grid:rgba(54,78,76,.14);
   --ap:#9a5f20; --nav:#276f66; --route:#a76820; --own:#ac5550;
-  --txt:#1c2b2d; --ui:#f0f3ef; --ui2:#e3eae6; --mut:#5d706f;
-  --trf:#315c78; --acc:#316e65; --red:#a33d3a; --grn:#3b7357;
-  --warn:#915711; --mag:#715884; --line:rgba(48,69,66,.2); --focus:#9a5f20;
+  --txt:#16222e; --ui:#f7f9fb; --ui2:#e8eef5; --mut:#5d6f82;
+  --trf:#2c5d84; --acc:#1f6fb8; --red:#a33d3a; --grn:#2f7d55;
+  --warn:#915711; --mag:#715884; --line:rgba(46,70,100,.18); --focus:#9a5f20;
   color-scheme:light;
 }
 :root[data-theme="night"] {
-  --bg:#0b171d; --land:#13252c; --coast:#354a51; --grid:rgba(166,195,194,.12);
+  --bg:#0a1421; --land:#101d2b; --coast:#2c3f55; --grid:rgba(150,180,215,.12);
   --ap:#e7b36c; --nav:#86bdb1; --route:#e7b36c; --own:#df827a;
-  --txt:#e3ebea; --ui:#101e24; --ui2:#17272d; --mut:#91a3a4;
-  --trf:#a5c3d7; --acc:#9bc8b8; --red:#df827a; --grn:#98c5a4;
-  --warn:#e7b36c; --mag:#b5a4c7; --line:rgba(174,197,192,.18); --focus:#e7b36c;
+  --txt:#e4ecf5; --ui:#0d1927; --ui2:#132132; --mut:#8b9db3;
+  --trf:#9dc0e0; --acc:#4d9fe8; --red:#df827a; --grn:#5ec99a;
+  --warn:#e7b36c; --mag:#9fb0d8; --line:rgba(140,170,205,.16); --focus:#e7b36c;
   color-scheme:dark;
 }
 :root[data-theme="contrast"] {

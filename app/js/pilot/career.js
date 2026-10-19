@@ -1,5 +1,6 @@
 import { computeMilestones, weeklyActivity } from '../lib/stats.js';
-import { getDashboardLayout, saveDashboardLayout } from '../lib/store.js';
+import { getDashboardLayout, saveDashboardLayout, getSetting } from '../lib/store.js';
+import { routeTotals } from '../lib/planner.js';
 import { esc, fmtDate, hoursText, num, statTile, barChart, lineChart, tag, emptyState } from '../ui.js';
 import { flightRow } from './common.js';
 
@@ -117,6 +118,115 @@ export async function mount(root, ctx) {
     </div>`;
   };
 
+  // ── Flight operations centre ─────────────────────────────────────
+  // Every value here comes from something that exists: the bridge, the live
+  // stream, the route the planner saved, or the last recorded flight. Nothing
+  // is invented, and a missing value is shown as missing rather than as a zero.
+  const live = { message: ctx.live || null, health: ctx.health || null, briefing: null };
+
+  const R_DEG = Math.PI / 180;
+  function nmBetween(a, b) {
+    const dl = (Number(b.lat) - Number(a.lat)) * R_DEG, dn = (Number(b.lon) - Number(a.lon)) * R_DEG;
+    const h = Math.sin(dl / 2) ** 2 + Math.cos(Number(a.lat) * R_DEG) * Math.cos(Number(b.lat) * R_DEG) * Math.sin(dn / 2) ** 2;
+    return 6880.13 * Math.asin(Math.sqrt(h));
+  }
+  const placeLabel = p => p.id || p.icao || p.code || p.ident || p.name || null;
+
+  function plannedRoute() {
+    try {
+      const stored = JSON.parse(localStorage.getItem('stratos.activeRoute') || 'null');
+      const points = (stored && Array.isArray(stored.points) ? stored.points : [])
+        .filter(p => p && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon)));
+      if (points.length < 2) return null;
+      let nm = 0;
+      for (let i = 1; i < points.length; i++) nm += nmBetween(points[i - 1], points[i]);
+      return {
+        name: stored.name || 'Unsaved route',
+        count: points.length,
+        from: placeLabel(points[0]), to: placeLabel(points[points.length - 1]),
+        distanceNm: nm, points,
+      };
+    } catch (_) { return null; }
+  }
+
+  function opsBand() {
+    const health = live.health;
+    const current = live.message && live.message.currentFlight ? live.message.currentFlight : null;
+    const plan = plannedRoute();
+    const done = flights.filter(f => f.complete && !f.incomplete).sort((a, b) => (b.startTime || 0) - (a.startTime || 0));
+    const last = done[0] || null;
+    const cruiseAlt = Number(live.briefing && live.briefing.cruiseAlt) || null;
+    const cruiseKts = Number(live.briefing && live.briefing.cruiseKts) || 430;
+
+    const connected = Boolean(health && health.simulator && health.simulator.connected);
+    const sim = !health
+      ? { tone: 'is-off', value: 'Bridge offline', note: 'No bridge on this address' }
+      : connected
+        ? { tone: 'is-live', value: 'Simulator live', note: (health.simulator.source || 'simulator') + (health.version ? ' \u00b7 v' + health.version : '') }
+        : { tone: 'is-wait', value: 'Waiting for simulator', note: (health.simulator && health.simulator.source) || 'bridge ready' };
+
+    const aircraft = (current && current.aircraft) || (last && last.aircraft) || null;
+    const registration = (current && current.registration) || (last && last.registration) || null;
+    const from = current ? (current.depAirport || '????') : plan ? plan.from : last ? (last.depAirport || '????') : null;
+    const to = current ? (current.arrAirport || '????') : plan ? plan.to : last ? (last.arrAirport || '????') : null;
+    const routeNote = current ? 'in progress' : plan ? plan.count + ' waypoints' : last ? 'last recorded flight' : 'no route yet';
+
+    let distance = null, distanceNote = '';
+    if (current && Number.isFinite(Number(current.distanceNm))) {
+      distance = Math.round(Number(current.distanceNm)) + ' nm'; distanceNote = 'flown this flight';
+    } else if (plan) {
+      distance = Math.round(plan.distanceNm) + ' nm'; distanceNote = 'planned track';
+    } else if (last && Number.isFinite(Number(last.distanceNm))) {
+      distance = Math.round(Number(last.distanceNm)) + ' nm'; distanceNote = 'last recorded flight';
+    }
+
+    let ete = null, eteNote = '';
+    if (plan) {
+      try {
+        const totals = routeTotals(plan.points, { cruiseAlt: cruiseAlt || 35000, cruiseKts });
+        const minutes = Number(totals && (totals.totalMinutes ?? totals.airborneMinutes));
+        if (Number.isFinite(minutes) && minutes > 0) {
+          ete = Math.floor(minutes / 60) + ' h ' + String(Math.round(minutes % 60)).padStart(2, '0') + ' m';
+          eteNote = 'estimate, no winds';
+        }
+      } catch (_) { /* the planner could not estimate this route; show nothing */ }
+    }
+
+    const airborne = current && String(current.phase || '').toUpperCase() === 'AIRBORNE';
+    let progress = null;
+    if (airborne && plan && plan.distanceNm > 0 && Number.isFinite(Number(current.distanceNm))) {
+      progress = Math.max(0, Math.min(1, Number(current.distanceNm) / plan.distanceNm));
+    }
+
+    const empty = !current && !plan && !last;
+    const cell = (label, value, note, tone) => '<div class="ops-cell"><span>' + esc(label) + '</span>'
+      + '<b class="' + (tone || '') + '">' + esc(value) + '</b>'
+      + (note ? '<small>' + esc(note) + '</small>' : '') + '</div>';
+
+    const strip = '<div class="ops-strip">'
+      + cell('Simulator', sim.value, sim.note, sim.tone)
+      + cell('Flight', current ? String(current.phase || 'Active') : (last ? 'Last flight' : 'None'), current ? 'in progress' : last ? fmtDate(last.startTime) : 'nothing recorded')
+      + cell('Aircraft', aircraft || '—', registration || (aircraft ? 'no registration' : 'no aircraft yet'))
+      + cell('Route', from && to ? from + ' → ' + to : '—', routeNote)
+      + cell('Cruise', cruiseAlt ? 'FL' + Math.round(cruiseAlt / 100) : '—', cruiseAlt ? 'from your briefing' : 'set it in Briefing')
+      + cell('Distance', distance || '—', distanceNote)
+      + cell('ETE', ete || '—', eteNote)
+      + '</div>';
+
+    const bar = progress == null ? '' : '<div class="ops-progress"><div class="ops-track" role="progressbar" aria-label="Flight progress" '
+      + 'aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.round(progress * 100) + '"><span style="width:' + (progress * 100).toFixed(1) + '%"></span></div>'
+      + '<div class="ops-progress-note"><span>' + esc((current.phase || 'Airborne')) + '</span><span>'
+      + Math.round(Number(current.distanceNm)) + ' of ' + Math.round(plan.distanceNm) + ' nm planned</span></div></div>';
+
+    const prompt = empty ? '<div class="ops-empty"><div><strong>Nothing is flying and no route is saved.</strong>'
+      + '<br>Import a SimBrief plan or open the Flight Deck and plan a route; this band then reports the real thing.</div>'
+      + '<span class="spacer"></span><a class="btn small" href="index.html">Open the Flight Deck</a></div>' : '';
+
+    return '<section class="ops" aria-label="Flight overview"><div class="ops-head">'
+      + '<h2>Flight overview</h2><span class="hint">Reported from the bridge, the live stream and your saved route</span></div>'
+      + strip + bar + prompt + '</section>';
+  }
+
   const render = () => {
     root.innerHTML = `
       <div class="page-head">
@@ -128,6 +238,8 @@ export async function mount(root, ctx) {
         <button class="btn small ghost" data-customize>Customize</button>
         <span class="tag tag-accent">${esc(career.rank.name)}</span>
       </div>
+
+      ${opsBand()}
 
       <div class="grid grid-4 dashboard-cards">
         ${cards.map(key => RENDER[key]()).join('')}
@@ -382,6 +494,32 @@ export async function mount(root, ctx) {
     if (firstHandle && typeof firstHandle.focus === 'function') firstHandle.focus();
   }
 
+  const onLive = event => {
+    const detail = event && event.detail ? event.detail : null;
+    live.message = detail;
+    if (detail && detail.health) live.health = detail.health;
+    render();
+  };
+  const onBridge = event => {
+    const detail = event && event.detail ? event.detail : null;
+    if (detail && detail.health) live.health = detail.health;
+    render();
+  };
+  // The briefing holds the planned cruise level; read it once, then draw.
+  getSetting('briefing', null).then(value => {
+    live.briefing = value || null;
+    render();
+  }).catch(() => {});
+  window.addEventListener('stratos:telemetry', onLive);
+  window.addEventListener('stratos:bridge-status', onBridge);
+
   render();
-  return { destroy() { dialog?.remove(); dialog = null; root.innerHTML = ''; root.classList.remove('dash-dense'); } };
+  return {
+    destroy() {
+      window.removeEventListener('stratos:telemetry', onLive);
+      window.removeEventListener('stratos:bridge-status', onBridge);
+      dialog?.remove(); dialog = null;
+      root.innerHTML = ''; root.classList.remove('dash-dense');
+    },
+  };
 }
