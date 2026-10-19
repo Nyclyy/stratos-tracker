@@ -25,6 +25,7 @@ Stratos runs as a static website/PWA, an Electron desktop app, and an optional l
 | Phone relay with short-lived pairing codes | Working, tested end-to-end locally |
 | Automatic Windows bridge startup, diagnostics, packaging | Implemented; installer must be built on Windows/CI |
 | Resource profiles (normal / low / minimal) | Working; recording is never reduced |
+| Automatic updates (Windows) | Working from 2.1.12: a packaged build checks the latest GitHub release in the background and installs it on quit; the first updater-aware build must be installed by hand |
 
 See [README-DEPLOY.md](README-DEPLOY.md) for build and deployment, [PERFORMANCE.md](PERFORMANCE.md) for measured overhead, and [TEST_REPORT.md](TEST_REPORT.md) for exactly what was and was not tested.
 

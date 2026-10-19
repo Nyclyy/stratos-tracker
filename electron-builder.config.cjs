@@ -22,6 +22,12 @@ module.exports = {
   directories: {
     output: 'dist',
   },
+  // Where the packaged app-update.yml points. This is what electron-updater
+  // reads: the latest published release, including its latest.yml manifest.
+  // The workflow still does the upload itself, so building never publishes.
+  publish: [
+    { provider: 'github', owner: 'Nyclyy', repo: 'stratos-tracker', releaseType: 'release' },
+  ],
   files: [
     'electron-main.cjs',
     'electron-preload.cjs',

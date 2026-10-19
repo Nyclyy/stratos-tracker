@@ -71,6 +71,9 @@ jobs:
           if (!(Test-Path "dist\Stratos-Setup.exe")) { throw "electron-builder did not produce Stratos-Setup.exe" }
           $size = (Get-Item "dist\Stratos-Setup.exe").Length
           if ($size -lt 30000000) { throw "Installer is unexpectedly small ($size bytes); app assets are probably missing" }
+          # Without the update manifest, installed copies can never find a newer
+          # release, so a build that cannot update is not a successful release.
+          if (!(Test-Path "dist\latest.yml")) { throw "electron-builder did not produce latest.yml; automatic updates would be broken" }
           $hash = (Get-FileHash "dist\Stratos-Setup.exe" -Algorithm SHA256).Hash.ToLower()
           "$hash  Stratos-Setup.exe" | Set-Content -Encoding ascii "dist\Stratos-Setup.exe.sha256"
           Write-Host "Installer size: $size bytes"
@@ -83,6 +86,8 @@ jobs:
           path: |
             dist/Stratos-Setup.exe
             dist/Stratos-Setup.exe.sha256
+            dist/latest.yml
+            dist/*.blockmap
           retention-days: 30
 
       - name: Publish installer to GitHub Release
@@ -92,5 +97,7 @@ jobs:
           files: |
             dist/Stratos-Setup.exe
             dist/Stratos-Setup.exe.sha256
+            dist/latest.yml
+            dist/*.blockmap
           generate_release_notes: true
           fail_on_unmatched_files: true

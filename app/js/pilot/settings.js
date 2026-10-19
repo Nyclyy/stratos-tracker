@@ -216,7 +216,7 @@ export async function mount(root, ctx) {
 
       <div class="section-title"><h2>About</h2></div>
       <div class="card">
-        <div class="row"><strong>Stratos</strong><span class="tag">v2.1.11</span></div>
+        <div class="row"><strong>Stratos</strong><span class="tag">v2.1.12</span></div>
         <p class="help" style="margin-top:8px">Independent flight-simulation companion. Map data © OpenStreetMap contributors. Airports: OurAirports (CC0). Weather: NOAA Aviation Weather Center (public domain). Charts are linked from official providers; Stratos does not redistribute licensed charts.</p>
         <p class="help" style="margin-top:6px">Not for real-world navigation. No analytics or personal data are collected by the app itself.</p>
       </div>

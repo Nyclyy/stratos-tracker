@@ -5,10 +5,18 @@ const http = require('node:http');
 const net = require('node:net');
 const { spawn, spawnSync } = require('node:child_process');
 
+// Optional at runtime: a build that somehow shipped without the dependency still
+// opens, it just cannot update itself.
+let autoUpdater = null;
+try {
+  ({ autoUpdater } = require('electron-updater'));
+} catch (_) { /* updates stay unavailable */ }
+
 const BRIDGE_PORT = Number(process.env.STRATOS_HTTP_PORT || 8765);
 const BRIDGE_HOST = '127.0.0.1';
 const MAX_RESTARTS = 6;
 const LOG_LIMIT = 120;
+const UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 let mainWindow = null;
 let bridgeChild = null;
@@ -315,6 +323,26 @@ function stopBridge() {
   }
 }
 
+// ── Updates ──────────────────────────────────────────────────────────
+// A packaged build asks GitHub for the latest release shortly after the window
+// appears, downloads in the background and installs the new version when the
+// user quits. Development runs and unpacked builds never check.
+function startAutoUpdate() {
+  if (!app.isPackaged || !autoUpdater) return;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.allowPrerelease = false;
+  autoUpdater.on('error', error => note(`Update check failed: ${error && error.message ? error.message : error}`));
+  autoUpdater.on('update-available', info => note(`Update ${info.version} is available; downloading in the background.`));
+  autoUpdater.on('update-downloaded', info => note(`Update ${info.version} downloaded; it installs when Stratos quits.`));
+  const check = () => {
+    autoUpdater.checkForUpdates().catch(error => note(`Update check failed: ${error && error.message ? error.message : error}`));
+  };
+  // Let the map and the bridge settle first; start-up never waits on GitHub.
+  setTimeout(check, 8000).unref?.();
+  setInterval(check, UPDATE_INTERVAL_MS).unref?.();
+}
+
 // ── Window ───────────────────────────────────────────────────────────
 function escapeHtml(value) {
   return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -481,6 +509,7 @@ if (!gotLock) {
     setState('starting', 'Starting the simulator bridge…');
     startBridge();
     createWindow();
+    startAutoUpdate();
     clearInterval(probeTimer);
     probeTimer = setInterval(async () => {
       if (quitting) return;

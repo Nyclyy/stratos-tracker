@@ -86,6 +86,20 @@ A workflow that merely starts is not a successful build. Check the job log for t
 
 The installer is not code-signed. Windows SmartScreen will warn; choose **More info → Run anyway**. Code signing requires a certificate you own; do not put one in the repository.
 
+### Automatic updates
+
+From 2.1.12 onwards a packaged Windows build updates itself. Eight seconds after the window appears, and every six hours after that, `electron-main.cjs` asks GitHub for the latest release through `electron-updater`. A newer installer is downloaded in the background and installed when Stratos quits; the next launch is the new version. Development runs and unpacked builds skip the check (`app.isPackaged`).
+
+What makes this work:
+
+- `electron-updater` is a **runtime** dependency (`dependencies`, not `devDependencies`), so it is packed into the asar.
+- `electron-builder.config.cjs` sets a GitHub `publish` provider; that writes `app-update.yml` into `resources/` with the repository and channel.
+- Every release must attach **`latest.yml`** (the manifest with the version and SHA-512) and the **`.blockmap`** for differential downloads, not just `Stratos-Setup.exe`. The workflow verifies `latest.yml` exists before uploading and publishes all of them; a build without the manifest fails instead of shipping an app that cannot update.
+- The installer is still unsigned, so the **first** install of an updater-aware build shows the SmartScreen warning. Updates themselves are verified against the SHA-512 in `latest.yml` and install without the wizard.
+- Never publish the same version twice: `electron-updater` compares the installed version with `latest.yml`, so a rebuilt 2.1.12 will not reach copies that already have 2.1.12. Bump the patch version for every release.
+
+Limits worth stating: this only updates installs created by the NSIS installer on Windows. A build started with `npm start`, a portable/unpacked copy, or the browser/PWA version is not touched. The first build that contains the updater has to be installed manually — there is nothing in the older version that could fetch it.
+
 ### Bridge lifecycle in the desktop app
 
 `electron-main.cjs` owns the bridge:

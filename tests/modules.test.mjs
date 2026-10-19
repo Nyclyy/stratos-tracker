@@ -95,6 +95,27 @@ test('the shipped version is stamped the same in the app, the bridge and the pac
   assert.match(read('.github/workflows/release-windows.yml'), /--allow-same-version/);
 });
 
+test('a packaged build can update itself from the GitHub releases', () => {
+  const root = path.resolve(import.meta.dirname, '..');
+  const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+  const pkg = JSON.parse(read('package.json'));
+  assert.ok(pkg.dependencies?.['electron-updater'], 'the updater is a runtime dependency, not a dev one');
+
+  const main = read('electron-main.cjs');
+  assert.match(main, /require\('electron-updater'\)/, 'the main process loads the updater');
+  assert.match(main, /if \(!app\.isPackaged \|\| !autoUpdater\) return;/, 'development runs never check for updates');
+  assert.match(main, /autoUpdater\.autoInstallOnAppQuit = true;/, 'a downloaded update installs when the app quits');
+
+  const config = read('electron-builder.config.cjs');
+  assert.match(config, /provider: 'github'/, 'the packaged app-update.yml points at GitHub');
+  assert.match(config, /repo: 'stratos-tracker'/, 'the update provider names this repository');
+
+  const workflow = read('.github/workflows/release-windows.yml');
+  assert.match(workflow, /dist\/latest\.yml/, 'the release ships the update manifest');
+  assert.match(workflow, /blockmap/, 'differential update blocks are published too');
+  assert.match(workflow, /did not produce latest\.yml/, 'a release without the manifest fails instead of shipping');
+});
+
 test('bridge runtime state cannot be committed again', () => {
   const root = path.resolve(import.meta.dirname, '..');
   const ignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8').split('\n').map(line => line.trim());
