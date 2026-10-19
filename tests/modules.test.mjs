@@ -67,7 +67,7 @@ test('every local ES module import resolves and is exported', () => {
 });
 
 test('pilot section modules evaluate without a browser DOM', async () => {
-  const sections = ['career', 'landings', 'replay', 'briefing', 'routes', 'airports', 'settings'];
+  const sections = ['career', 'landings', 'replay', 'briefing', 'routes', 'airports', 'charts', 'settings'];
   for (const section of sections) {
     await assert.doesNotReject(
       import(`../app/js/pilot/${section}.js`),

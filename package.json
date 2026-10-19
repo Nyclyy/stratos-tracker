@@ -1,6 +1,6 @@
 {
   "name": "stratos-desktop",
-  "version": "2.1.12",
+  "version": "2.1.13",
   "description": "Stratos flight simulation companion: map, logbook, replay, landing analytics and secure phone access",
   "main": "electron-main.cjs",
   "author": "Stratos",
@@ -8,7 +8,7 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "test": "node --test tests/lib.test.mjs tests/modules.test.mjs tests/ui.test.mjs tests/discover.test.mjs tests/relay.test.mjs",
+    "test": "node --test tests/lib.test.mjs tests/charts.test.mjs tests/modules.test.mjs tests/ui.test.mjs tests/discover.test.mjs tests/relay.test.mjs",
     "test:py": "python3 -m unittest -v tests.test_bridge",
     "dist:win": "electron-builder --config electron-builder.config.cjs --win nsis --publish never",
     "test:integration": "node --test tests/integration.test.mjs"

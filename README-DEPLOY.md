@@ -168,14 +168,27 @@ The relay only accepts data from the desktop. There is no route that sends a com
 
 - `GET /api/weather?icao=KJFK` → `{ metar, taf, decoded, fetchedAt, source }`. NOAA Aviation Weather Center, public domain. Cached five minutes.
 - `GET /api/ourairports?q=heathrow&limit=25&country=GB` → `{ results, count, totalMatches, source, fetchedAt, stale }`. OurAirports CC0. Cached 24 hours; parser handles quoted CSV fields and falls back to a stale copy with a `Warning` header if the upstream is down.
+- `GET /api/charts?icao=KJFK` → `{ source, cycle, effective, expires, checkedAt, charts[] }` from the FAA d-TPP metafile. The metafile (about 16 MB) is fetched once per warm instance, reused for six hours and never shipped with the site. An airport outside the FAA publication returns 404 with an explicit coverage message.
+- `GET /api/chart?cycle=2610&file=00610AD.PDF` → the FAA PDF (`application/pdf`, immutable cache). Only a four-digit cycle and a `[A-Z0-9]{1,12}.PDF` name are accepted; the host is fixed. This is a pass-through of a public-domain document, not a chart library.
 
-Both reject invalid input with 400 and never echo secrets.
+All of them reject invalid input with 400 and never echo secrets.
+
+### Premium entitlement (charts)
+
+The chart viewer is Premium-only. There is **no payment implementation** in this repository, and the app does not treat a browser flag as a purchase. The Electron main process decides; two environment variables control it:
+
+| Variable | Purpose |
+| --- | --- |
+| `STRATOS_ENTITLEMENT_URL` | HTTPS endpoint that receives `{ token, product }` and answers `{ active, plan, expiresAt }`. Without it, no purchase can be verified. |
+| `STRATOS_DEV_PREMIUM=1` | Development override. The UI labels it “Development entitlement — this build has no payment step”, so it can never be mistaken for a purchase. |
+
+The token is read from `entitlement.json` in the app's user-data folder (beside `stratos.log`), so it never enters the page, the DOM or browser storage. Hosted pages have no trusted channel and are therefore free until a licence service exists for them.
 
 ## 6. Tests and checks
 
 ```bash
 npm ci
-npm test                     # 21 data tests + 4 module/UI tests + 2 relay tests
+npm test                     # data, chart, module, DOM/UI, Discovery and relay suites (83 tests)
 npm run test:py              # 10 bridge lifecycle/landing tests
 npm run test:integration     # real bridge + relay + SSE + pairing (about 10 s)
 node scripts/benchmark.mjs   # data-path benchmark
@@ -187,7 +200,7 @@ Static JS syntax check used in development:
 for f in app/js/*.js app/js/lib/*.js app/js/pilot/*.js; do node --check "$f" || exit 1; done
 ```
 
-There is no browser automation in this environment (Chromium system libraries were unavailable and `sudo` is blocked), so layout, canvas rendering, Home Screen installation and iPhone signing were **not** executed here. See `TEST_REPORT.md`.
+Browser automation was available for the charts check on Windows (Playwright + Chromium); the earlier layout/rail checks used a private Chromium prefix, and Home Screen installation and iPhone signing were **not** executed. See `TEST_REPORT.md` for what each run covered.
 
 ## 7. Data and migration
 
@@ -211,6 +224,6 @@ There is no browser automation in this environment (Chromium system libraries we
 
 ## 9. Attribution
 
-Map data © OpenStreetMap contributors (ODbL). Airport data from OurAirports (CC0). Weather from NOAA Aviation Weather Center (public domain). FAA charts are linked from the official site and are not redistributed. See `SOURCES_AND_LICENSING.md`.
+Map data © OpenStreetMap contributors (ODbL). Airport data from OurAirports (CC0). Weather from NOAA Aviation Weather Center (public domain). FAA terminal procedures are fetched from the official site and shown in the in-app viewer; Stratos does not redistribute a chart library. See `SOURCES_AND_LICENSING.md`.
 
 Stratos is not for real-world navigation.

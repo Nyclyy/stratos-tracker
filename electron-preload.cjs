@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('stratosDesktop', {
   stopBridge: () => ipcRenderer.invoke('bridge:stop'),
   getDiagnostics: () => ipcRenderer.invoke('bridge:diagnostics'),
   getVersion: () => ipcRenderer.invoke('app:version'),
+  // Verified in the main process against the configured licence service.
+  getEntitlement: () => ipcRenderer.invoke('premium:status'),
   getUpdateStatus: () => ipcRenderer.invoke('updater:status'),
   checkForUpdates: () => ipcRenderer.invoke('updater:check'),
   installUpdate: () => ipcRenderer.invoke('updater:install'),

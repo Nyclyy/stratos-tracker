@@ -4,7 +4,25 @@ Date: 2026-10-19. Environment: Linux x64 cloud VM, Node v24.21.0, Python 3 (Free
 
 ## Passed
 
-The `npm test` total is 70: 23 data-path tests, 5 module-graph tests, 27 DOM/UI tests, 13 Route Discovery tests and 2 relay tests. All 70 pass, including from a simulated Windows (CRLF) checkout.
+The `npm test` total is 83 across the data-path, chart, module-graph, DOM/UI, Route Discovery and relay suites. All 83 pass, including from a simulated Windows (CRLF) checkout.
+
+## Charts and vertical profile (2026-10-19, Windows 11 x64)
+
+Run on the development PC with Node 26, Chromium via Playwright, and the real Python bridge holding FAA d-TPP cycle 2610.
+
+| Check | Command / method | Result |
+| --- | --- | --- |
+| Chart catalogue rules: 28-day cycle codes and windows, metafile header, airport lookup, every published category (APD, DP, STR, IAP, MIN, HOT), runway and approach extraction, amendment dates, expiry states, search | `node --test tests/charts.test.mjs` | 8/8 pass |
+| Premium entitlement: trusted desktop answer, a `premium:true` answer with `verified:false` refused, no desktop channel, browser storage ignored | `node --test tests/charts.test.mjs` | pass |
+| Charts page DOM: free pilot gets the catalogue plus the upgrade panel and no canvas; verified Premium pilot gets the empty viewer | `node --test tests/charts.test.mjs` | pass |
+| ChartFox removal: no `chartfox` or hard-coded FAA filenames remain in the Flight Deck, airports page links to the workspace, nav and section registry include Charts | `node --test tests/charts.test.mjs` | pass |
+| Real catalogue through the bridge: `/charts?icao=KJFK` returns 31 documents in six categories, cycle 2610, window 2026-10-01 09:01Z to 2026-10-29 09:01Z; `EGLL` returns an explicit 404 coverage message | `curl http://127.0.0.1:8765/charts?icao=...` | pass |
+| Real document through the bridge: `/chart?cycle=2610&file=00610AD.PDF` returns 301,837 bytes, `application/pdf`, starting `%PDF-1.4` | `curl` + `xxd` | pass |
+| Real catalogue and document through the hosted handlers: `/api/charts?icao=KJFK` returns 38 documents for cycle 2610 with the FAA window; `/api/chart` proxies the same 301,837-byte PDF; `file=../secret.PDF` is refused with 400 before any request | in-process handler invocation against the live FAA host | pass |
+| Native viewer in a real browser, 1440x900: six category groups and 31 rows for KJFK, the airport diagram paints at fit width (690 px page in a 710 px stage), zoom 178% → 278% re-renders to 1078 px, dragging changes the transform, Fit width returns to 690 px, switching to `DEEZZ SIX (RNAV)` loads a different document with its cycle and effective date, KDEN catalogues 74 documents, the `ILS` filter narrows to 12, no page or console errors | Playwright 1.64 + Chromium, screenshots inspected | pass |
+| Premium gate in a real browser: 31 rows with 31 Premium badges, clicking a row shows the upgrade panel, no canvas or document request is made, the panel reports the missing licence service | Playwright, DOM state measured | pass |
+| Vertical profile: TOC/TOD equal the route estimate's values, waypoint altitudes come from that estimate, imported `.pln` altitudes are kept as constraints and round-trip through export | `node --test tests/charts.test.mjs` | pass |
+| Chart timings | bridge catalogue 1.5-2 ms warm; hosted API 1.87 s cold / 3 ms warm; first chart 254 ms, cached reopen 166 ms; zoom re-render ~100-125 ms; 9.4 MB heap with one chart open | see `PERFORMANCE.md` |
 
 | Check | Command | Result |
 | --- | --- | --- |
@@ -54,6 +72,10 @@ The integration test is the important one: it starts the real Python bridge and 
 | Route Discovery visual review in a real browser, and the map preview tiles | Same missing Chromium libraries as below. Card layout, selection states, the single reusable `MiniMap` canvas and the mobile breakpoints are covered by a linkedom DOM test and CSS review only; the map is described as implemented but not visually confirmed here. |
 | Route Discovery with the bridge's worldwide airport list | Needs the Python bridge with its airport pack. The bundled snapshot has 152 airports and no field shorter than 5,000 ft, so Bush Flying falls back to demanding-terrain alternatives and says so; island hopping is limited to the New Zealand, Japan and Southeast Asia fields it contains. |
 | Automatic update end-to-end (install 2.1.12, publish 2.1.13, quit, relaunch) | Needs two Windows releases and an installed copy. This environment has no Windows host and no Wine, so the Windows package could not be built here; the dependency, packaged-only guard, publish provider and release-asset requirements are source-tested, and the workflow refuses to publish without `latest.yml`. |
+| Premium purchase and licence delivery | No payment provider or licence service is configured, so no purchase path was exercised. The entitlement check itself is implemented and tested (desktop IPC, licence endpoint, development override); the setup still required is listed in the app and in `SOURCES_AND_LICENSING.md`. |
+| Charts for Canada or other national authorities | NAV CANADA and other AIP publishers do not grant redistribution/display rights without a commercial licence, so no adapter was added and no chart data for those regions is shown. The catalogue reports the lack of coverage instead of substituting a diagram. |
+| Packaged Electron run of the chart viewer and entitlement IPC | The browser check used Chromium with a stubbed desktop bridge; the packaged app, its preload IPC and Electron's bundled Chromium were not launched here. The IPC handler, preload surface and gating rules are source-tested. |
+| Multi-page procedure documents in the viewer | Every current FAA d-TPP document is a single page, so page navigation was exercised as UI state only (1 / 1); no multi-page document was available from an authorized source. |
 | Interactive shell states in a real browser | The bar, both rail modes, the card, focus rings and responsive breakpoints were seen in browser screenshots. Hover, the resource-profile change and the Support dialog were exercised through DOM tests and computed styles only, and touch gestures were not available. |
 | Chromium without a private library prefix | Playwright's Chromium could not start from the stock image (`libnspr4`, `libnss3`, `libatk*`, `libX*`, `libasound`, `libatspi` missing, and `playwright install-deps` needs `sudo`, which the container blocks). For this report the required Ubuntu 24.04 packages were downloaded and unpacked into a private prefix and exposed through `LD_LIBRARY_PATH` plus a minimal fontconfig file with DejaVu and Liberation fonts. A stock machine does not need that step. |
 | GPU compositing, iPhone Safari, Home Screen install | The browser run was headless with software rasterisation and substituted fonts. Safari, touch gestures, PWA installation and GPU frame timing were not available. |

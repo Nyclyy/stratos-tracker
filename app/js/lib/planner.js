@@ -33,6 +33,9 @@ export function normalizeWaypoint(input) {
     lat, lon,
     elev: isFiniteNumber(Number(input.elev)) ? Number(input.elev) : 0,
     kind: ['apt', 'nav', 'fix'].includes(input.kind || input.k) ? (input.kind || input.k) : 'fix',
+    // Only a value that came from an imported flight plan; never guessed.
+    constraintAlt: isFiniteNumber(Number(input.constraintAlt)) && Number(input.constraintAlt) > 0
+      ? Math.round(Number(input.constraintAlt)) : null,
   };
 }
 
@@ -100,11 +103,19 @@ export function routeTotals(route, options = {}) {
     greatCircleNm: points.length > 1 ? distanceNm(points[0], points[points.length - 1]) : 0,
     legs,
     cruiseKts: speed,
+    cruiseAlt: estimate.cruiseAlt,
     eteMinutes: estimate.totalMinutes,
     airborneMinutes: estimate.airborneMinutes,
     taxiMinutes: estimate.taxiMinutes,
     climbMinutes: estimate.climbMinutes,
     descentMinutes: estimate.descentMinutes,
+    climbDistanceNm: estimate.climbDistanceNm || 0,
+    descentDistanceNm: estimate.descentDistanceNm || 0,
+    tocNm: Math.min(totalNm, estimate.climbDistanceNm || 0),
+    todNm: Math.max(
+      Math.min(totalNm, estimate.climbDistanceNm || 0),
+      totalNm - (estimate.descentDistanceNm || 0),
+    ),
     estimated: true,
     method: estimate.method,
   };
@@ -124,7 +135,8 @@ export function estimateFlightTime(distanceNm, options = {}) {
   if (!(distanceNm > 0)) {
     return {
       airborneMinutes: 0, totalMinutes: taxiMinutes, taxiMinutes, climbMinutes: 0, descentMinutes: 0,
-      cruiseMinutes: 0, method: 'No distance to estimate.',
+      cruiseMinutes: 0, cruiseAlt, climbDistanceNm: 0, descentDistanceNm: 0,
+      method: 'No distance to estimate.',
     };
   }
   const climbMinutes = Math.max(0, (cruiseAlt - depElev) / climbFpm);
@@ -136,6 +148,8 @@ export function estimateFlightTime(distanceNm, options = {}) {
     // Short sector: the aircraft never reaches cruise altitude. Scale the
     // profile proportionally; still an approximation, not a performance model.
     const ratio = distanceNm / (climbDist + descentDist || 1);
+    climbDist *= ratio;
+    descentDist *= ratio;
     minutes = (climbMinutes + descentMinutes) * ratio;
   } else {
     const cruiseDist = distanceNm - climbDist - descentDist;
@@ -148,7 +162,67 @@ export function estimateFlightTime(distanceNm, options = {}) {
     climbMinutes: Math.round(climbMinutes),
     descentMinutes: Math.round(descentMinutes),
     cruiseMinutes: Math.max(0, Math.round(minutes - climbMinutes - descentMinutes)),
+    cruiseAlt,
+    climbDistanceNm: climbDist,
+    descentDistanceNm: descentDist,
     method: `Estimate from ${Math.round(cruiseTas)} kt cruise, ${Math.round(climbFpm)} fpm climb and ${Math.round(descentFpm)} fpm descent. No wind, fuel or ATC modelling.`,
+  };
+}
+
+/**
+ * Vertical profile for a route. Every altitude here is derived from the same
+ * estimate routeTotals() returns, so the TOC/TOD shown in the planner, the
+ * estimate card and the profile can never disagree. A waypoint's planned
+ * altitude comes from that estimate; an imported flight plan's own altitude is
+ * kept separately as a constraint and is never overwritten.
+ */
+export function routeProfile(route, options = {}) {
+  const points = (route || []).map(normalizeWaypoint).filter(Boolean);
+  if (points.length < 2) return null;
+  const totals = routeTotals(points, options);
+  const cruiseAlt = totals.cruiseAlt;
+  const depElev = points[0].elev || 0;
+  const arrElev = points[points.length - 1].elev || 0;
+  const distance = totals.distanceNm;
+  const tocNm = Math.min(distance, Math.max(0, totals.tocNm));
+  const todNm = Math.max(tocNm, Math.min(distance, totals.todNm));
+
+  const altAt = nm => {
+    if (tocNm > 0 && nm <= tocNm) return depElev + (cruiseAlt - depElev) * (nm / tocNm);
+    if (nm >= todNm) {
+      const span = distance - todNm;
+      return span > 0 ? arrElev + (cruiseAlt - arrElev) * ((distance - nm) / span) : arrElev;
+    }
+    return cruiseAlt;
+  };
+
+  let travelled = 0;
+  const waypoints = points.map((point, index) => {
+    if (index > 0) travelled += totals.legs[index - 1] ? totals.legs[index - 1].distanceNm : 0;
+    return {
+      index,
+      id: point.id,
+      name: point.name || '',
+      nm: travelled,
+      elev: point.elev || 0,
+      plannedAlt: Math.round(altAt(travelled)),
+      constraintAlt: point.constraintAlt,
+      kind: point.kind,
+    };
+  });
+
+  return {
+    points: waypoints,
+    distanceNm: distance,
+    cruiseAlt,
+    depElev,
+    arrElev,
+    tocNm,
+    todNm,
+    toc: { nm: tocNm, alt: Math.round(cruiseAlt) },
+    tod: { nm: todNm, alt: Math.round(cruiseAlt) },
+    totals,
+    estimated: true,
   };
 }
 
@@ -259,8 +333,9 @@ export function exportPln(route, options = {}) {
   const body = points.map(p => {
     const type = p.kind === 'apt' ? 'Airport' : p.kind === 'nav' ? 'VOR' : 'User';
     const alt = Number(p.elev) || 0;
+    const planned = p.constraintAlt ? `\n        <Altitude>${Number(p.constraintAlt).toFixed(2)}</Altitude>` : '';
     return `      <ATCWaypoint id="${xesc(p.id)}">
-        <ATCWaypointType>${type}</ATCWaypointType>
+        <ATCWaypointType>${type}</ATCWaypointType>${planned}
         <WorldPosition>${dms(p.lat, 'N', 'S')},${dms(p.lon, 'E', 'W')},+${String(alt.toFixed(2)).padStart(9, '0')}</WorldPosition>
       </ATCWaypoint>`;
   }).join('\n');
@@ -295,8 +370,12 @@ export function importPln(text) {
     if (!validLatLon(lat, lon)) continue;
     const typeMatch = /<ATCWaypointType>([^<]+)<\/ATCWaypointType>/i.exec(inner);
     const type = (typeMatch ? typeMatch[1] : '').toUpperCase();
+    // MSFS plans carry the planned altitude per waypoint. Keep it: it is the
+    // only altitude the file actually provides.
+    const altitude = /<Altitude>\s*(-?[\d.]+)\s*<\/Altitude>/i.exec(inner);
+    const constraintAlt = altitude && Number(altitude[1]) > 0 ? Math.round(Number(altitude[1])) : null;
     points.push({
-      id, name: id, lat, lon, elev: 0,
+      id, name: id, lat, lon, elev: 0, constraintAlt,
       kind: type.includes('AIRPORT') ? 'apt' : type.includes('VOR') || type.includes('NDB') ? 'nav' : 'fix',
     });
   }

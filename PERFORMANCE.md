@@ -60,6 +60,30 @@ The script serves `app/` from a throwaway static server, opens the tracker with 
 
 Interpretation: opening a replay of a very long flight costs roughly 17 ms of main-thread work once; playback sampling is negligible. A full career recalculation over 2,000 flights costs ~14 ms, which happens on logbook refresh, not per animation frame. These numbers exclude canvas painting and the browser’s layout.
 
+## Charts
+
+Measured on Windows 11 x64, Node v26, Chromium (Playwright headless) at 1440x900, with the bridge serving the FAA cycle 2610 catalogue.
+
+| Operation | Measurement |
+| --- | ---: |
+| Bridge catalogue for one airport, warm (`/charts?icao=KJFK`, 31 documents) | 1.5-2.0 ms |
+| Hosted API, cold (download + parse the 16 MB FAA metafile) | 1.87 s |
+| Hosted API, warm instance | 3 ms |
+| First chart open (300 KB PDF: download, pdf.js parse, fit-width paint) | 254 ms |
+| Second chart open (168 KB PDF) | 132 ms |
+| Reopening a chart from the IndexedDB cache | 166 ms |
+| Zoom re-render (fit width → next scale, same page) | ~100-125 ms |
+| JS heap after one chart is open | 9.4 MB |
+
+Why this does not compete with the simulator:
+
+- pdf.js (1.9 MB with standard fonts) is dynamically imported the first time a Premium pilot opens a chart. Browsing the catalogue downloads no renderer at all.
+- The viewer owns exactly one canvas and one pdf.js document. Switching charts destroys the previous document; zooming cancels the in-flight render task before starting the next one.
+- The backing store is capped at device pixel ratio 2, and at 1.25 above 200% zoom, so a deep zoom costs a bounded amount of canvas memory instead of growing with zoom².
+- Documents are cached in their own IndexedDB database, keyed by cycle and filename, capped at 40 entries / 30 days. A repeated open does no network request.
+- The catalogue is fetched per airport, not as a global collection. The 16 MB metafile is parsed by the bridge (already resident) or by the hosted function; it is never downloaded to a tablet or phone.
+- No timers run while a chart is idle; panning and zooming are pointer and wheel driven, and the only animation is the loading spinner.
+
 ## Bridge measurements
 
 Method: start `python3 stratos_bridge.py` with `STRATOS_HOST=127.0.0.1`, a temporary data directory and free ports; wait 15 s for startup; read `/proc/<pid>/stat` ticks over a 15 s window and RSS from `ps`.

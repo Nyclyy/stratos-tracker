@@ -1,0 +1,722 @@
+/* Charts — the native chart viewer.
+ *
+ * The list is real catalogue data from the FAA d-TPP publication, fetched per
+ * airport (never a bundled snapshot of URLs, which would go stale every 28
+ * days). The document is a PDF rendered by a locally bundled pdf.js build, so
+ * the chart stays inside Stratos: no redirect and no third-party frame.
+ *
+ * Opening a document needs a verified Premium entitlement. The catalogue
+ * itself is visible to everyone, which is the "preview" a free pilot gets.
+ */
+
+import { esc, fmtDateTime, num, tag, toast } from '../ui.js';
+import { airportResultHtml, searchDirectory, wireSearch } from './common.js';
+import {
+  describeEntitlement, getEntitlement, isPremium, premiumFeatures, premiumSetupNotes,
+} from '../lib/entitlement.js';
+import {
+  FAA_SOURCE, chartCacheKey, groupCharts, normaliseCatalogue, readChartCache,
+  searchCharts, validityState, validityText, writeChartCache,
+} from '../lib/charts.js';
+
+const FETCH_TIMEOUT = 12000;
+
+let pdfjsPromise = null;
+
+/** Lazy: pdf.js is only fetched when a Premium pilot actually opens a chart. */
+function loadPdfjs() {
+  if (!pdfjsPromise) {
+    pdfjsPromise = import('../../vendor/pdfjs/pdf.min.mjs')
+      .then(library => {
+        library.GlobalWorkerOptions.workerSrc = new URL('../../vendor/pdfjs/pdf.worker.min.mjs', import.meta.url).href;
+        return library;
+      })
+      .catch(error => { pdfjsPromise = null; throw error; });
+  }
+  return pdfjsPromise;
+}
+
+function withTimeout(ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return { signal: controller.signal, done: () => clearTimeout(timer) };
+}
+
+function formatWindow(from, to) {
+  if (!from || !to) return '';
+  const fmt = value => new Date(value).toISOString().replace('T', ' ').slice(0, 16) + 'Z';
+  return `${fmt(from)} → ${fmt(to)}`;
+}
+
+function bytesLabel(bytes) {
+  const value = Number(bytes) || 0;
+  if (value >= 1048576) return `${(value / 1048576).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(value / 1024))} KB`;
+}
+
+/* ── the viewer ───────────────────────────────────────────────────────── */
+
+class ChartViewer {
+  constructor(host, { onState } = {}) {
+    this.host = host;
+    this.onState = typeof onState === 'function' ? onState : () => {};
+    this.doc = null;
+    this.pageNumber = 1;
+    this.mode = 'fit-width';
+    this.zoom = 1;
+    this.scale = 1;
+    this.pageWidth = 1;
+    this.pageHeight = 1;
+    this.offset = { x: 0, y: 0 };
+    this.renderTask = null;
+    this.frame = 0;
+    this.destroyed = false;      this.stage = document.createElement('div');
+    this.stage.className = 'chart-stage';
+    this.stage.tabIndex = 0;
+    this.stage.setAttribute('role', 'region');
+    this.stage.setAttribute('aria-label', 'Chart document. Use the wheel to zoom, drag to pan, and Page Up or Page Down for other pages.');
+    this.canvas = document.createElement('canvas');
+    this.canvas.className = 'chart-page';
+    this.stage.appendChild(this.canvas);
+    this.host.appendChild(this.stage);
+    this.bind();
+  }
+
+  bind() {
+    this.onWheel = event => {
+      if (!this.doc) return;
+      event.preventDefault();
+      const factor = Math.exp(-event.deltaY * 0.0016);
+      this.zoomAt(factor, event.clientX, event.clientY);
+    };
+    this.onPointerDown = event => {
+      if (!this.doc || event.button !== 0) return;
+      this.drag = { x: event.clientX, y: event.clientY, ox: this.offset.x, oy: this.offset.y };
+      this.stage.setPointerCapture(event.pointerId);
+      this.stage.classList.add('is-dragging');
+    };
+    this.onPointerMove = event => {
+      if (!this.drag) return;
+      this.offset.x = this.drag.ox + (event.clientX - this.drag.x);
+      this.offset.y = this.drag.oy + (event.clientY - this.drag.y);
+      this.clamp();
+      this.apply();
+    };
+    this.onPointerUp = () => {
+      if (!this.drag) return;
+      this.drag = null;
+      this.stage.classList.remove('is-dragging');
+    };
+    this.onDoubleClick = () => {
+      if (!this.doc) return;
+      if (this.mode === 'custom' && this.zoom > 1.2) this.fit('fit-width');
+      else this.zoomAt(1.8);
+    };
+    this.onKey = event => {
+      if (!this.doc) return;
+      const step = 90;
+      if (event.key === '+' || event.key === '=') { event.preventDefault(); this.zoomAt(1.25); }
+      else if (event.key === '-' || event.key === '_') { event.preventDefault(); this.zoomAt(0.8); }
+      else if (event.key === 'ArrowLeft') { this.offset.x += step; this.clamp(); this.apply(); }
+      else if (event.key === 'ArrowRight') { this.offset.x -= step; this.clamp(); this.apply(); }
+      else if (event.key === 'ArrowUp') { this.offset.y += step; this.clamp(); this.apply(); }
+      else if (event.key === 'ArrowDown') { this.offset.y -= step; this.clamp(); this.apply(); }
+      else if (event.key === 'PageDown') { event.preventDefault(); this.setPage(this.pageNumber + 1); }
+      else if (event.key === 'PageUp') { event.preventDefault(); this.setPage(this.pageNumber - 1); }
+    };
+    this.onResize = () => { if (this.mode !== 'custom') this.scheduleRender(); };
+
+    this.stage.addEventListener('wheel', this.onWheel, { passive: false });
+    this.stage.addEventListener('pointerdown', this.onPointerDown);
+    this.stage.addEventListener('pointermove', this.onPointerMove);
+    this.stage.addEventListener('pointerup', this.onPointerUp);
+    this.stage.addEventListener('pointercancel', this.onPointerUp);
+    this.stage.addEventListener('dblclick', this.onDoubleClick);
+    this.stage.addEventListener('keydown', this.onKey);
+    window.addEventListener('resize', this.onResize);
+  }
+
+  async load(bytes) {
+    const pdfjs = await loadPdfjs();
+    this.doc = await pdfjs.getDocument({
+      data: bytes,
+      standardFontDataUrl: new URL('../../vendor/pdfjs/standard_fonts/', import.meta.url).href,
+      isEvalSupported: false,
+    }).promise;
+    if (this.destroyed) { this.doc.destroy(); return; }
+    this.pageNumber = 1;
+    this.mode = 'fit-width';
+    await this.render();
+  }
+
+  setPage(number) {
+    if (!this.doc) return;
+    const next = Math.max(1, Math.min(this.doc.numPages, Math.round(number)));
+    if (next === this.pageNumber) return;
+    this.pageNumber = next;
+    this.offset = { x: 0, y: 0 };
+    this.render().catch(error => this.onState({ error: error.message }));
+  }
+
+  fit(mode) {
+    this.mode = mode === 'fit-page' ? 'fit-page' : 'fit-width';
+    this.scheduleRender();
+  }
+
+  zoomAt(factor, clientX, clientY) {
+    if (!this.doc) return;
+    const next = Math.max(0.15, Math.min(6, this.scale * factor));
+    if (!Number.isFinite(next) || next === this.scale) return;
+    const rect = this.stage.getBoundingClientRect();
+    const cx = clientX == null ? rect.width / 2 : clientX - rect.left;
+    const cy = clientY == null ? rect.height / 2 : clientY - rect.top;
+    const ratio = next / this.scale;
+    this.offset.x = cx - (cx - this.offset.x) * ratio;
+    this.offset.y = cy - (cy - this.offset.y) * ratio;
+    this.mode = 'custom';
+    this.zoom = next;
+    // Scale the existing bitmap now so the gesture never feels blocked, then
+    // re-render at the new resolution on the next frame.
+    this.scale = next;
+    this.pageWidth *= ratio;
+    this.pageHeight *= ratio;
+    this.canvas.style.width = `${this.pageWidth}px`;
+    this.canvas.style.height = `${this.pageHeight}px`;
+    this.clamp();
+    this.apply();
+    this.scheduleRender();
+  }
+
+  zoomBy(factor) {
+    this.zoomAt(factor, null, null);
+  }
+
+  scheduleRender() {
+    if (this.frame || this.destroyed) return;
+    this.frame = requestAnimationFrame(() => {
+      this.frame = 0;
+      this.render().catch(error => {
+        if (this.destroyed) return;
+        this.onState({ error: error && error.message ? error.message : String(error) });
+      });
+    });
+  }
+
+  async render() {
+    if (!this.doc || this.destroyed) return;
+    const page = await this.doc.getPage(this.pageNumber);
+    if (this.destroyed) return;
+    const base = page.getViewport({ scale: 1 });
+    const width = this.stage.clientWidth || 640;
+    const height = this.stage.clientHeight || 520;
+    const fitWidth = (width - 20) / base.width;
+    const fitPage = Math.min(fitWidth, (height - 20) / base.height);
+    let scale = this.mode === 'fit-page' ? fitPage : this.mode === 'fit-width' ? fitWidth : this.zoom;
+    scale = Math.max(0.15, Math.min(6, scale));
+    this.scale = scale;
+    // Keep the backing store near the CSS size; 3x on a 400% chart costs memory
+    // for no visible gain and competes with the simulator for GPU bandwidth.
+    const dpr = Math.min(scale > 2 ? 1.25 : 2, window.devicePixelRatio || 1);
+    const viewport = page.getViewport({ scale: scale * dpr });
+    this.canvas.width = Math.max(1, Math.round(viewport.width));
+    this.canvas.height = Math.max(1, Math.round(viewport.height));
+    this.pageWidth = viewport.width / dpr;
+    this.pageHeight = viewport.height / dpr;
+    this.canvas.style.width = `${this.pageWidth}px`;
+    this.canvas.style.height = `${this.pageHeight}px`;
+
+    const context = this.canvas.getContext('2d', { alpha: false });
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    if (this.renderTask) {
+      try { this.renderTask.cancel(); } catch (_) {}
+      this.renderTask = null;
+    }
+    this.renderTask = page.render({ canvasContext: context, viewport });
+    try {
+      await this.renderTask.promise;
+    } catch (error) {
+      if (error && error.name === 'RenderingCancelledException') return;
+      throw error;
+    } finally {
+      this.renderTask = null;
+    }
+    if (this.destroyed) return;
+    if (this.mode !== 'custom') this.offset = { x: 0, y: 0 };
+    this.clamp();
+    this.apply();
+    this.onState({
+      ready: true,
+      page: this.pageNumber,
+      pages: this.doc.numPages,
+      scale: this.scale,
+      mode: this.mode,
+    });
+  }
+
+  clamp() {
+    const width = this.stage.clientWidth;
+    const height = this.stage.clientHeight;
+    if (this.pageWidth <= width) this.offset.x = (width - this.pageWidth) / 2;
+    else this.offset.x = Math.min(0, Math.max(width - this.pageWidth, this.offset.x));
+    if (this.pageHeight <= height) this.offset.y = (height - this.pageHeight) / 2;
+    else this.offset.y = Math.min(0, Math.max(height - this.pageHeight, this.offset.y));
+  }
+
+  apply() {
+    this.canvas.style.transform = `translate3d(${this.offset.x.toFixed(1)}px, ${this.offset.y.toFixed(1)}px, 0)`;
+  }
+
+  destroy() {
+    this.destroyed = true;
+    if (this.frame) cancelAnimationFrame(this.frame);
+    if (this.renderTask) { try { this.renderTask.cancel(); } catch (_) {} }
+    this.stage.removeEventListener('wheel', this.onWheel);
+    this.stage.removeEventListener('pointerdown', this.onPointerDown);
+    this.stage.removeEventListener('pointermove', this.onPointerMove);
+    this.stage.removeEventListener('pointerup', this.onPointerUp);
+    this.stage.removeEventListener('pointercancel', this.onPointerUp);
+    this.stage.removeEventListener('dblclick', this.onDoubleClick);
+    this.stage.removeEventListener('keydown', this.onKey);
+    window.removeEventListener('resize', this.onResize);
+    if (this.doc) {
+      try { this.doc.destroy(); } catch (_) {}
+      this.doc = null;
+    }
+    this.stage.remove();
+  }
+}
+
+/* ── the page ─────────────────────────────────────────────────────────── */
+
+export async function mount(root, ctx) {
+  let icao = String(ctx.params.get('icao') || '').trim().toUpperCase();
+  let catalogue = null;
+  let source = null;
+  let phase = 'idle';            // idle | loading | ready | missing | unsupported | error
+  let message = '';
+  let filter = '';
+  let selected = null;
+  let entitlement = null;
+  let documentState = { status: 'idle' };  // idle | loading | ready | error
+  let viewer = null;
+  let cleanups = [];
+
+  const sources = () => {
+    const list = [];
+    const bridge = String(ctx.bridgeBase || '').replace(/\/+$/, '');
+    if (bridge) {
+      list.push({
+        kind: 'bridge',
+        meta: code => `${bridge}/charts?icao=${encodeURIComponent(code)}`,
+        doc: chart => `${bridge}/chart?cycle=${encodeURIComponent(chart.cycle || '')}&file=${encodeURIComponent(chart.pdf)}`,
+      });
+    }
+    const hosted = /^https?:$/.test(location.protocol) && !/^127\.0\.0\.1$|^localhost$/.test(location.hostname);
+    if (hosted) {
+      list.push({
+        kind: 'hosted',
+        meta: code => `/api/charts?icao=${encodeURIComponent(code)}`,
+        doc: chart => `/api/chart?cycle=${encodeURIComponent(chart.cycle || '')}&file=${encodeURIComponent(chart.pdf)}`,
+      });
+    }
+    return list;
+  };
+
+  function setStatus(text) {
+    const el = document.getElementById('chart-viewer-status');
+    if (el) el.textContent = text;
+  }
+
+  function destroyViewer() {
+    if (viewer) { viewer.destroy(); viewer = null; }
+  }
+
+  async function loadCatalogue(code) {
+    if (!code) { phase = 'idle'; renderList(); return; }
+    phase = 'loading';
+    message = '';
+    catalogue = null;
+    selected = null;
+    documentState = { status: 'idle' };
+    destroyViewer();
+    renderList();
+    renderViewer();
+    let lastError = '';
+    for (const candidate of sources()) {
+      const timeout = withTimeout(FETCH_TIMEOUT);
+      try {
+        const response = await fetch(candidate.meta(code), { signal: timeout.signal, cache: 'no-store' });
+        timeout.done();
+        if (response.status === 404) {
+          const payload = await response.json().catch(() => ({}));
+          source = candidate;
+          phase = payload && payload.unsupported ? 'unsupported' : 'missing';
+          message = (payload && (payload.message || payload.error)) || 'No published charts were found for this airport.';
+          renderList();
+          renderViewer();
+          return;
+        }
+        if (!response.ok) throw new Error(`The chart source answered ${response.status}.`);
+        const payload = await response.json();
+        source = candidate;
+        catalogue = {
+          cycle: payload.cycle || null,
+          effective: Number(payload.effective) || null,
+          expires: Number(payload.expires) || null,
+          checkedAt: Number(payload.checkedAt) || null,
+          sourceName: payload.sourceName || FAA_SOURCE.name,
+          sourceId: payload.source || FAA_SOURCE.id,
+          licence: payload.license || FAA_SOURCE.license,
+          charts: normaliseCatalogue(payload, code),
+        };
+        phase = catalogue.charts.length ? 'ready' : 'missing';
+        if (!catalogue.charts.length) message = 'This airport has no published terminal procedures in the current cycle.';
+        renderList();
+        renderViewer();
+        return;
+      } catch (error) {
+        timeout.done();
+        lastError = error && error.name === 'AbortError' ? 'The chart source did not answer in time.' : (error.message || String(error));
+      }
+    }
+    phase = 'error';
+    message = lastError || 'The chart source is not reachable.';
+    renderList();
+    renderViewer();
+  }
+
+  function renderHeader() {
+    const count = document.getElementById('chart-count');
+    if (count) count.textContent = catalogue ? `${catalogue.charts.length} documents` : '';
+    const el = document.getElementById('charts-head');
+    if (!el) return;
+    const cycle = catalogue && catalogue.cycle;
+    const window = catalogue ? formatWindow(catalogue.effective, catalogue.expires) : '';
+    el.innerHTML = `
+      <div class="page-head">
+        <div>
+          <h1>Charts</h1>
+          <p>Official terminal procedures inside Stratos. The catalogue is fetched from the publishing authority; documents are downloaded only when you open one.</p>
+        </div>
+        <span class="spacer"></span>
+        ${catalogue && cycle ? `<span class="tag" title="FAA publication cycle">Cycle ${esc(String(cycle))}</span>` : ''}
+        ${isPremium(entitlement) ? tag('Premium', 'good', describeEntitlement(entitlement)) : tag('Premium only', 'warn', 'Opening a chart needs a verified Premium licence')}
+      </div>
+      ${catalogue ? `<div class="chart-meta">
+        <span><b>${esc(catalogue.sourceName)}</b></span>
+        <span>${esc(catalogue.licence)}</span>
+        ${window ? `<span>${esc(window)}</span>` : ''}
+        ${catalogue.checkedAt ? `<span>Checked ${esc(fmtDateTime(catalogue.checkedAt))}</span>` : ''}
+        <span class="spacer"></span>
+        <a href="${FAA_SOURCE.terms}" target="_blank" rel="noopener">Source ↗</a>
+      </div>` : ''}
+    `;
+  }
+
+  function renderList() {
+    const host = document.getElementById('chart-list');
+    if (!host) return;
+    renderHeader();
+    if (phase === 'idle') {
+      host.innerHTML = `<div class="chart-empty">
+        <strong>Search an airport to see its published charts</strong>
+        <span>Try KJFK, KDEN or PAJN. Charts are catalogued by ICAO code and procedure type.</span>
+      </div>`;
+      return;
+    }
+    if (phase === 'loading') {
+      host.innerHTML = `<div class="chart-empty"><span class="spinner" aria-hidden="true"></span><strong>Looking up charts for ${esc(icao)}…</strong></div>`;
+      return;
+    }
+    if (phase === 'unsupported') {
+      host.innerHTML = `<div class="chart-empty">
+        <strong>${esc(icao)} is outside the current chart coverage</strong>
+        <span>${esc(message)}</span>
+        <span>Coverage today is the FAA d-TPP publication: airports in the United States and its territories. Other authorities publish their own products and are not mirrored by Stratos.</span>
+      </div>`;
+      return;
+    }
+    if (phase === 'missing') {
+      host.innerHTML = `<div class="chart-empty">
+        <strong>No published charts for ${esc(icao)}</strong>
+        <span>${esc(message || 'The source has no terminal procedures for this airport in the current cycle.')}</span>
+      </div>`;
+      return;
+    }
+    if (phase === 'error') {
+      host.innerHTML = `<div class="chart-empty bad">
+        <strong>Charts could not be loaded</strong>
+        <span>${esc(message)}</span>
+        <button class="btn small" id="chart-retry">Try again</button>
+      </div>`;
+      document.getElementById('chart-retry')?.addEventListener('click', () => loadCatalogue(icao));
+      return;
+    }
+    const charts = searchCharts(catalogue.charts, filter);
+    if (!charts.length) {
+      host.innerHTML = `<div class="chart-empty"><strong>No chart matches “${esc(filter)}”</strong><span>Clear the filter to see all ${num(catalogue.charts.length)} documents.</span></div>`;
+      return;
+    }
+    const premium = isPremium(entitlement);
+    host.innerHTML = groupCharts(charts).map(group => `
+      <div class="chart-group">
+        <div class="chart-group-head"><h3>${esc(group.label)}</h3><span class="hint">${group.charts.length}</span></div>
+        ${group.charts.map(chart => `
+          <button class="chart-row${selected && selected.id === chart.id ? ' is-active' : ''}" data-chart="${esc(chart.id)}" type="button">
+            <span class="chart-row-main">
+              <b>${esc(chart.title || chart.pdf)}</b>
+              <span class="chart-row-sub">
+                ${chart.runways.length ? `RWY ${esc(chart.runways.join('/'))} · ` : ''}
+                ${chart.approach ? `${esc(chart.approach)} · ` : ''}
+                ${esc(chart.code)}
+                ${chart.amended ? ` · amended ${esc(new Date(chart.amended).toISOString().slice(0, 10))}` : ''}
+              </span>
+            </span>
+            ${validityState(chart) === 'expired' ? tag('expired', 'bad', validityText(chart)) : ''}
+            ${premium ? '<span class="chart-row-go">Open</span>' : '<span class="chart-row-lock" aria-hidden="true">Premium</span>'}
+          </button>`).join('')}
+      </div>`).join('');
+
+    host.querySelectorAll('[data-chart]').forEach(button => {
+      button.addEventListener('click', () => {
+        const chart = catalogue.charts.find(item => item.id === button.dataset.chart);
+        if (chart) openChart(chart);
+      });
+    });
+  }
+
+  function renderViewer() {
+    const host = document.getElementById('chart-viewer');
+    if (!host) return;
+    const premium = isPremium(entitlement);
+
+    if (!premium) {
+      destroyViewer();
+      host.innerHTML = premiumPanel();
+      wirePremiumPanel(host);
+      return;
+    }
+    if (!selected) {
+      destroyViewer();
+      host.innerHTML = `<div class="chart-empty tall">
+        <strong>Select a chart</strong>
+        <span>Zoom with the wheel, drag to pan, double-click to toggle fit, and use the toolbar for pages and full screen.</span>
+      </div>`;
+      return;
+    }
+    if (documentState.status === 'error') {
+      destroyViewer();
+      host.innerHTML = `<div class="chart-empty tall bad">
+        <strong>That chart could not be opened</strong>
+        <span>${esc(documentState.error)}</span>
+        <button class="btn small" id="chart-open-retry">Try again</button>
+      </div>`;
+      document.getElementById('chart-open-retry')?.addEventListener('click', () => openChart(selected, true));
+      return;
+    }
+    if (documentState.status !== 'ready') {
+      destroyViewer();
+      host.innerHTML = `<div class="chart-empty tall">
+        <span class="spinner" aria-hidden="true"></span>
+        <strong>Opening ${esc(selected.title || selected.pdf)}…</strong>
+        <span>${esc(selected.sourceName)} · cycle ${esc(selected.cycle || '—')}</span>
+      </div>`;
+      return;
+    }
+
+    host.innerHTML = `
+      <div class="chart-toolbar">
+        <button class="btn small" data-zoom="out" aria-label="Zoom out" title="Zoom out">−</button>
+        <button class="btn small" data-zoom="in" aria-label="Zoom in" title="Zoom in">+</button>
+        <span class="chart-zoom" id="chart-zoom">100%</span>
+        <span class="chart-tool-sep"></span>
+        <button class="btn small" data-fit="width">Fit width</button>
+        <button class="btn small" data-fit="page">Fit page</button>
+        <span class="chart-tool-sep"></span>
+        <button class="btn small icon" data-page="-1" aria-label="Previous page" title="Previous page">‹</button>
+        <span class="chart-pages" id="chart-pages">1 / 1</span>
+        <button class="btn small icon" data-page="1" aria-label="Next page" title="Next page">›</button>
+        <span class="spacer"></span>
+        <button class="btn small" data-full>Full screen</button>
+        <a class="btn small ghost" href="${esc(selected.url || '#')}" target="_blank" rel="noopener" title="Open the official document in your browser">Official PDF ↗</a>
+      </div>
+      <div class="chart-canvas" id="chart-canvas"></div>
+      <div class="chart-footer">
+        <div class="chart-footer-main">
+          <b>${esc(selected.title || selected.pdf)}</b>
+          <span>${esc(selected.sourceName)} · cycle ${esc(selected.cycle || '—')}${selected.effective ? ` · effective ${esc(new Date(selected.effective).toISOString().slice(0, 10))}` : ''}</span>
+        </div>
+        <div class="chart-validity${validityState(selected) === 'expired' ? ' bad' : ''}">
+          <span id="chart-viewer-status">${esc(validityText(selected))}</span>
+        </div>
+      </div>`;
+
+    const canvasHost = document.getElementById('chart-canvas');
+    viewer = new ChartViewer(canvasHost, {
+      onState: state => {
+        if (state.error) { documentState = { status: 'error', error: state.error }; renderViewer(); return; }
+        const zoom = document.getElementById('chart-zoom');
+        if (zoom) zoom.textContent = `${Math.round(state.scale * 100)}%`;
+        const pages = document.getElementById('chart-pages');
+        if (pages) pages.textContent = `${state.page} / ${state.pages}`;
+      },
+    });
+    document.querySelectorAll('[data-zoom]').forEach(button => button.addEventListener('click', () => {
+      viewer.zoomBy(button.dataset.zoom === 'in' ? 1.25 : 0.8);
+    }));
+    document.querySelectorAll('[data-fit]').forEach(button => button.addEventListener('click', () => viewer.fit(button.dataset.fit === 'page' ? 'fit-page' : 'fit-width')));
+    document.querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => viewer.setPage(viewer.pageNumber + Number(button.dataset.page))));
+    document.querySelector('[data-full]')?.addEventListener('click', () => toggleFullscreen(host, viewer));
+  }
+
+  function toggleFullscreen(host, instance) {
+    const surface = host.closest('.chart-viewer-card') || host;
+    if (!document.fullscreenElement) {
+      const request = surface.requestFullscreen || surface.webkitRequestFullscreen;
+      if (!request) { toast('Full screen is not available in this window.', 'bad'); return; }
+      Promise.resolve(request.call(surface)).then(() => setTimeout(() => instance.scheduleRender(), 60)).catch(() => {});
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  }
+
+  async function openChart(chart, force = false) {
+    selected = chart;
+    documentState = { status: 'loading' };
+    renderList();
+    renderViewer();
+    if (!isPremium(entitlement)) return;
+    try {
+      const key = chartCacheKey(chart);
+      let bytes = force ? null : (await readChartCache(key))?.bytes || null;
+      if (!bytes) {
+        const timeout = withTimeout(20000);
+        const response = await fetch(source.doc(chart), { signal: timeout.signal });
+        timeout.done();
+        if (!response.ok) throw new Error(`The chart document answered ${response.status}.`);
+        const buffer = await response.arrayBuffer();
+        if (buffer.byteLength < 2048) throw new Error('The chart document is empty.');
+        bytes = buffer;
+        writeChartCache(key, buffer).catch(() => {});
+        setStatus(`${bytesLabel(buffer.byteLength)} downloaded · ${validityText(chart)}`);
+      }
+      if (!bytes) throw new Error('The chart document could not be read.');
+      documentState = { status: 'ready' };
+      renderViewer();
+      await viewer.load(bytes);
+    } catch (error) {
+      documentState = { status: 'error', error: error && error.name === 'AbortError' ? 'The download timed out.' : (error.message || String(error)) };
+      renderViewer();
+    }
+  }
+
+  function premiumPanel() {
+    const list = premiumFeatures().map(feature => `<li><b>${esc(feature.label)}</b><span>${esc(feature.description)}</span></li>`).join('');
+    const notes = premiumSetupNotes().map(note => `<li>${esc(note)}</li>`).join('');
+    return `<div class="premium-panel">
+      <span class="premium-kicker">Stratos Premium</span>
+      <h2>Integrated charts</h2>
+      <p class="premium-lede">Every procedure in the catalogue opens inside Stratos: zoom, pan, fit, pages and full screen. No redirect, no embedded third-party site.</p>
+      <ul class="premium-list">${list}</ul>
+      ${selected ? `<div class="premium-target">Selected: <b>${esc(selected.icao)} · ${esc(selected.title || selected.pdf)}</b></div>` : ''}
+      <div class="premium-status">
+        <b>${isPremium(entitlement) ? 'Premium active' : entitlement && entitlement.mode === 'unavailable' ? 'Premium unavailable here' : 'No active licence'}</b>
+        <span>${esc(describeEntitlement(entitlement))}</span>
+      </div>
+      <details class="premium-setup">
+        <summary>What still has to be configured</summary>
+        <p>Charts are gated by the app's trusted entitlement channel. This build does not process payments, and a value in browser storage is never treated as a purchase.</p>
+        <ol>${notes}</ol>
+        <p>For testing, start the desktop app with <code>STRATOS_DEV_PREMIUM=1</code>; it reports a clearly labelled development entitlement.</p>
+      </details>
+      <div class="btn-row">
+        <button class="btn" id="premium-retry">Re-check licence</button>
+        <a class="btn ghost" href="#settings">Settings</a>
+      </div>
+    </div>`;
+  }
+
+  function wirePremiumPanel(host) {
+    document.getElementById('premium-retry')?.addEventListener('click', async () => {
+      entitlement = await getEntitlement({ force: true });
+      renderList();
+      renderViewer();
+      toast(isPremium(entitlement) ? 'Premium licence verified.' : 'No verified Premium licence on this device.', isPremium(entitlement) ? 'good' : '');
+    });
+  }
+
+  root.innerHTML = `
+    <div id="charts-head"></div>
+    <div class="charts-layout">
+      <div class="stack charts-viewer-col">
+        <div class="card chart-viewer-card">
+          <div class="card-head"><h2>Viewer</h2><span class="spacer"></span><span class="hint">Official documents only</span></div>
+          <div id="chart-viewer"></div>
+        </div>
+        <div class="notice"><div><strong>Not for navigation.</strong><br>The documents are reproduced from the publishing authority. Stratos does not verify that the installed cycle matches your simulator's AIRAC, and a chart is flagged when its published cycle has expired.</div></div>
+      </div>
+      <div class="stack charts-list-col">
+        <div class="card">
+          <div class="card-head"><h2>Chart catalogue</h2><span class="spacer"></span><span class="hint" id="chart-count"></span></div>
+          <div class="chart-search">
+            <input class="input" id="chart-airport" placeholder="Airport ICAO — KJFK, KDEN, PAJN" autocomplete="off" spellcheck="false" value="${esc(icao)}">
+            <div class="chart-filter-wrap">
+              <input class="input" id="chart-filter" placeholder="Filter — ILS 04R, SID, RNAV" autocomplete="off" spellcheck="false">
+            </div>
+          </div>
+          <div id="chart-list" class="chart-list" aria-live="polite"></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const airportInput = document.getElementById('chart-airport');
+  cleanups.push(wireSearch(airportInput, {
+    getItems: query => searchDirectory(ctx.directory, query, 8),
+    renderItem: airportResultHtml,
+    onPick: item => {
+      icao = item.id;
+      airportInput.value = item.id;
+      airportInput.blur();
+      loadCatalogue(icao);
+      if (history.replaceState) history.replaceState(null, '', `#charts?icao=${encodeURIComponent(icao)}`);
+    },
+  }));
+  airportInput.addEventListener('change', () => {
+    const code = airportInput.value.trim().toUpperCase();
+    if (!code) return;
+    icao = code;
+    loadCatalogue(icao);
+  });
+
+  const filterInput = document.getElementById('chart-filter');
+  let filterTimer = null;
+  filterInput.addEventListener('input', () => {
+    clearTimeout(filterTimer);
+    filterTimer = setTimeout(() => { filter = filterInput.value; renderList(); }, 120);
+  });
+  cleanups.push(() => clearTimeout(filterTimer));
+
+  // Resolve the entitlement first, so the list never opens with a lock icon
+  // that belongs to an unverified state.
+  entitlement = await getEntitlement();
+  if (icao) {
+    // The catalogue is a network read; showing the shell first keeps the page
+    // responsive and gives the loading state somewhere to live.
+    loadCatalogue(icao);
+  } else {
+    renderList();
+    renderViewer();
+  }
+
+  return {
+    destroy() {
+      destroyViewer();
+      cleanups.forEach(fn => { try { fn(); } catch (_) {} });
+      cleanups = [];
+      root.innerHTML = '';
+    },
+  };
+}

@@ -2,7 +2,7 @@ import { getSavedRoutes, saveRoutes } from '../lib/store.js';
 import {
   validateRoute, routeTotals, moveWaypoint, removeWaypoint, directTo, insertWaypoint,
   parseWaypointText, exportPln, exportFms, exportGpx, importRoute, createSavedRoute,
-  duplicateSavedRoute, searchPlaces, defaultRouteName,
+  duplicateSavedRoute, searchPlaces, defaultRouteName, routeProfile,
 } from '../lib/planner.js';
 import { BUNDLED_NAVAIDS } from '../data/airports.js';
 import { fetchSimbriefPlan } from '../lib/simbrief.js';
@@ -21,6 +21,56 @@ export async function mount(root, ctx) {
   let map = null;
   let cleanups = [];
   let lastValidation = null;
+  let selectedWaypoint = null;
+
+  function profileSvg(profile) {
+    const W = 760, H = 210, left = 52, right = 18, top = 22, bottom = 34;
+    const maxAlt = Math.max(profile.cruiseAlt, profile.depElev, profile.arrElev, 1000) * 1.08;
+    const x = nm => left + (profile.distanceNm ? (nm / profile.distanceNm) * (W - left - right) : 0);
+    const y = alt => top + (1 - Math.max(0, Number(alt) || 0) / maxAlt) * (H - top - bottom);
+    const line = [
+      `M ${x(0).toFixed(1)} ${y(profile.depElev).toFixed(1)}`,
+      `L ${x(profile.tocNm).toFixed(1)} ${y(profile.cruiseAlt).toFixed(1)}`,
+      `L ${x(profile.todNm).toFixed(1)} ${y(profile.cruiseAlt).toFixed(1)}`,
+      `L ${x(profile.distanceNm).toFixed(1)} ${y(profile.arrElev).toFixed(1)}`,
+    ].join(' ');
+    const grid = [0, 0.5, 1].map(fraction => {
+      const altitude = profile.cruiseAlt * fraction;
+      const gy = y(altitude).toFixed(1);
+      return `<line class="profile-grid" x1="${left}" x2="${W - right}" y1="${gy}" y2="${gy}"></line>`
+        + `<text class="profile-axis" x="${left - 8}" y="${Number(gy) + 3}" text-anchor="end">${Math.round(altitude / 100) === 0 ? 'GND' : `FL${String(Math.round(altitude / 100)).padStart(3, '0')}`}</text>`;
+    }).join('');
+    const marks = profile.points.map(point => {
+      const active = selectedWaypoint === point.index;
+      return `<g class="profile-wp${active ? ' is-active' : ''}" data-profile-wp="${point.index}" tabindex="0" role="button" aria-label="${esc(point.id)}, ${Math.round(point.nm)} nautical miles, planned ${Math.round(point.plannedAlt)} feet">
+        <line class="profile-stem" x1="${x(point.nm).toFixed(1)}" x2="${x(point.nm).toFixed(1)}" y1="${y(point.plannedAlt).toFixed(1)}" y2="${(H - bottom).toFixed(1)}"></line>
+        <circle class="profile-dot" cx="${x(point.nm).toFixed(1)}" cy="${y(point.plannedAlt).toFixed(1)}" r="${active ? 5.5 : 4}"></circle>
+        <text class="profile-label${active ? ' is-active' : ''}" x="${x(point.nm).toFixed(1)}" y="${(H - 14).toFixed(1)}" text-anchor="${point.index === 0 ? 'start' : point.index === profile.points.length - 1 ? 'end' : 'middle'}">${esc(point.id)}</text>
+      </g>`;
+    }).join('');
+    return `<svg class="profile-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Vertical profile from ${esc(profile.points[0].id)} to ${esc(profile.points[profile.points.length - 1].id)}">
+      ${grid}
+      <path class="profile-line" d="${line}"></path>
+      <g class="profile-toc"><line x1="${x(profile.tocNm).toFixed(1)}" x2="${x(profile.tocNm).toFixed(1)}" y1="${top}" y2="${(H - bottom).toFixed(1)}"></line>
+        <text x="${x(profile.tocNm).toFixed(1)}" y="${top - 6}" text-anchor="middle">TOC</text></g>
+      <g class="profile-tod"><line x1="${x(profile.todNm).toFixed(1)}" x2="${x(profile.todNm).toFixed(1)}" y1="${top}" y2="${(H - bottom).toFixed(1)}"></line>
+        <text x="${x(profile.todNm).toFixed(1)}" y="${top - 6}" text-anchor="middle">TOD</text></g>
+      ${marks}
+    </svg>`;
+  }
+
+  function profileReadout(profile, index) {
+    const point = profile.points[Math.max(0, Math.min(profile.points.length - 1, index))];
+    if (!point) return '';
+    const fl = point.plannedAlt >= 18000 ? `FL${String(Math.round(point.plannedAlt / 100)).padStart(3, '0')}` : `${num(point.plannedAlt)} ft`;
+    const constraint = point.constraintAlt
+      ? `${point.constraintAlt >= 18000 ? `FL${String(Math.round(point.constraintAlt / 100)).padStart(3, '0')}` : `${num(point.constraintAlt)} ft`} in the imported plan`
+      : 'none in the imported plan';
+    return `<b>${esc(point.id)}</b>
+      <span>${num(point.nm, 1)} nm from ${esc(profile.points[0].id)}</span>
+      <span>Planned ${fl}</span>
+      <span>Constraint ${esc(constraint)}</span>`;
+  }
 
   // Restore the last active route or start from the most recent saved route.
   try {
@@ -167,8 +217,11 @@ export async function mount(root, ctx) {
 
     const validation = validateRoute(points);
     lastValidation = validation;
-    const totals = routeTotals(validation.points, { cruiseKts, cruiseAlt });
+    // One estimate feeds the card, the profile and the TOC/TOD markers.
+    const profile = routeProfile(validation.points, { cruiseKts, cruiseAlt });
+    const totals = profile ? profile.totals : routeTotals(validation.points, { cruiseKts, cruiseAlt });
     const legs = totals.legs;
+    if (profile && selectedWaypoint != null && selectedWaypoint >= profile.points.length) selectedWaypoint = null;
 
     root.innerHTML = `
       <div class="page-head">
@@ -220,6 +273,15 @@ export async function mount(root, ctx) {
                 </tr>`;
               }).join('')}
               </tbody></table></div>` : `<p class="muted small" style="padding:16px">No waypoints yet. Search for an airport above or import a flight plan.</p>`}
+          </div>
+
+          <div class="card profile-card">
+            <div class="card-head"><h2>Vertical profile</h2>${tag('estimate', 'warn')}<span class="spacer"></span>
+              ${profile ? `<span class="hint">TOC ${num(profile.tocNm, 0)} nm · TOD ${num(profile.todNm, 0)} nm · cruise ${num(profile.cruiseAlt)} ft</span>` : ''}</div>
+            ${profile ? `<div class="profile-wrap">${profileSvg(profile)}</div>
+              <div class="profile-readout" id="profile-readout">${profileReadout(profile, selectedWaypoint == null ? 0 : selectedWaypoint)}</div>
+              <p class="help" style="padding:0 16px 14px">Climb and descent are estimate gradients at the cruise speed above; TOC and TOD come from the same calculation as the flight time. Terrain is not drawn because no terrain source is bundled, and only a waypoint altitude that arrived in an imported flight plan is shown as a constraint.</p>`
+              : '<p class="muted small" style="padding:16px">Add a destination to draw the profile.</p>'}
           </div>
 
           <div class="card">
@@ -276,6 +338,22 @@ export async function mount(root, ctx) {
       map = new MiniMap(mapWrap);
       map.setTrack(points);
     }
+
+    // Selecting a waypoint on the profile is a local DOM update: the map,
+    // the estimate and the simulator feed are not rebuilt for a click.
+    root.querySelectorAll('[data-profile-wp]').forEach(node => {
+      const pick = () => {
+        if (!profile) return;
+        selectedWaypoint = Number(node.dataset.profileWp);
+        root.querySelectorAll('[data-profile-wp]').forEach(other => other.classList.toggle('is-active', other === node));
+        const readout = document.getElementById('profile-readout');
+        if (readout) readout.innerHTML = profileReadout(profile, selectedWaypoint);
+      };
+      node.addEventListener('click', pick);
+      node.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); pick(); }
+      });
+    });
 
     document.getElementById('route-name').addEventListener('change', event => {
       name = event.target.value.trim().slice(0, 60) || defaultRouteName(points);

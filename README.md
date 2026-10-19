@@ -8,7 +8,9 @@ Stratos runs as a static website/PWA, an Electron desktop app, and an optional l
 
 | Area | Status |
 | --- | --- |
-| Map, airports, navaids, public ADS-B traffic, charts, METAR/TAF | Working; data-provider dependent |
+| Map, airports, navaids, public ADS-B traffic, METAR/TAF | Working; data-provider dependent |
+| Integrated charts (Premium) | The current FAA d-TPP catalogue per airport (diagrams, SIDs, STARs, approaches, minimums, hot spots), a bundled pdf.js viewer with zoom, pan, fit, full screen and document cache, and a trusted Premium gate. Coverage is the United States and its territories; no other authority is mirrored |
+| Route vertical profile | Planned altitude, climb/cruise/descent, TOC/TOD and per-waypoint inspection from the same estimate the planner reports; imported flight-plan altitudes are kept as constraints |
 | Offline vector world map | Working; the **World** style draws bundled Natural Earth country outlines with muted country names, letter-spaced continent names and italic ocean names, adds seas only when zoomed past a whole-world view, and needs no tiles, key or network |
 | X-Plane UDP bridge, MSFS SimConnect (optional package) | Implemented; not tested against a live simulator here |
 | Flight recording, crash recovery, duplicate prevention | Working, tested |

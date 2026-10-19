@@ -68,8 +68,8 @@ export async function mount(root, ctx) {
         ${airport.fqs && Object.keys(airport.fqs).length ? `<dt>Frequencies</dt><dd>${Object.entries(airport.fqs).slice(0, 6).map(([key, value]) => `${esc(key)} ${esc(value)}`).join(' · ')}</dd>` : ''}
       </dl>
       <div class="btn-row" style="margin-top:10px">
-        <a class="btn small" href="https://skyvector.com/airport/${encodeURIComponent(airport.id)}" target="_blank" rel="noopener">SkyVector ↗</a>
-        <a class="btn small ghost" href="https://chartfox.org/${encodeURIComponent(airport.id)}" target="_blank" rel="noopener">ChartFox ↗</a>
+        <a class="btn small" href="pilot.html#charts?icao=${encodeURIComponent(airport.id)}">Charts</a>
+        <a class="btn small ghost" href="https://skyvector.com/airport/${encodeURIComponent(airport.id)}" target="_blank" rel="noopener">SkyVector ↗</a>
       </div>
     </div>`;
   }

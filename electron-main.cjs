@@ -475,6 +475,63 @@ ipcMain.handle('bridge:stop', async () => {
 });
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('bridge:diagnostics', () => diagnostics());
+
+// ── Premium entitlement ──────────────────────────────────────────────
+// The page can ask; it cannot decide. A licence is only "premium" when the
+// configured licence service says so, or when this build was started with
+// STRATOS_DEV_PREMIUM=1 (a clearly labelled development entitlement, not a
+// purchase). No value in browser storage is ever trusted.
+async function premiumStatus() {
+  if (String(process.env.STRATOS_DEV_PREMIUM || '') === '1') {
+    return {
+      premium: true, verified: true, mode: 'development', plan: 'Development entitlement',
+      expiresAt: null, reason: 'This build has no payment step; the entitlement is a development override.',
+    };
+  }
+  const endpoint = String(process.env.STRATOS_ENTITLEMENT_URL || '').trim();
+  let record = null;
+  try {
+    record = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'entitlement.json'), 'utf8'));
+  } catch (_) { /* no stored licence */ }
+  if (!endpoint) {
+    return {
+      premium: false, verified: true, mode: 'none', plan: null, expiresAt: null,
+      reason: 'No licence service is configured (STRATOS_ENTITLEMENT_URL), so a purchase cannot be verified on this device.',
+    };
+  }
+  if (!record || typeof record.token !== 'string' || record.token.length < 8) {
+    return {
+      premium: false, verified: true, mode: 'none', plan: null, expiresAt: null,
+      reason: 'No licence token is stored on this device.',
+    };
+  }
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: record.token, product: 'stratos' }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) {
+      note(`Licence check answered ${response.status}.`);
+      return { premium: false, verified: true, mode: 'none', plan: null, expiresAt: null, reason: `The licence service answered ${response.status}.` };
+    }
+    const answer = await response.json();
+    const active = answer && answer.active === true;
+    note(`Licence check: ${active ? 'active' : 'not active'}.`);
+    return {
+      premium: active, verified: true, mode: active ? 'licence' : 'none',
+      plan: (answer && answer.plan) || null, expiresAt: (answer && answer.expiresAt) || null,
+      reason: active ? '' : 'The licence service reports that this licence is not active.',
+    };
+  } catch (error) {
+    const message = error && error.message ? error.message : String(error);
+    note(`Licence check failed: ${message}`);
+    return { premium: false, verified: true, mode: 'none', plan: null, expiresAt: null, reason: `The licence service could not be reached: ${message}` };
+  }
+}
+
+ipcMain.handle('premium:status', () => premiumStatus());
 ipcMain.handle('updater:status', () => updateStatus());
 ipcMain.handle('updater:check', async () => {
   if (!app.isPackaged || !autoUpdater) return { ...updateStatus(), available: false, supported: false };
@@ -515,7 +572,7 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     // The renderer is a local file (origin "null"). Only the known public data
-    // providers need CORS, and only official chart hosts may be framed.
+    // providers need CORS; charts arrive through the loopback bridge.
     const corsHosts = new Set([
       'aviationweather.gov', 'adsb.fi', 'opensky-network.org', 'api.adsb.lol', 'airplanes.live',
       'ourairports.com', 'davidmegginson.github.io', 'raw.githubusercontent.com',
@@ -523,7 +580,8 @@ if (!gotLock) {
       'overpass.kumi.systems', 'overpass.private.coffee', 'simbrief.com',
       'www.simbrief.com', 'metar.vatsim.net', '127.0.0.1', 'localhost',
     ]);
-    const frameHosts = new Set(['aeronav.faa.gov', 'www.faa.gov', 'chartfox.org', 'www.chartfox.org']);
+    // Charts are rendered by the bundled pdf.js from bytes fetched through the
+    // bridge, so no third-party site is framed any more.
 
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
       let hostname = '';
@@ -533,12 +591,6 @@ if (!gotLock) {
         headers['Access-Control-Allow-Origin'] = ['*'];
         headers['Access-Control-Allow-Headers'] = ['Content-Type, X-Stratos-Token'];
         headers['Access-Control-Allow-Methods'] = ['GET, POST, OPTIONS'];
-      }
-      if (frameHosts.has(hostname)) {
-        for (const key of Object.keys(headers)) {
-          const lower = key.toLowerCase();
-          if (lower === 'x-frame-options' || lower === 'content-security-policy') delete headers[key];
-        }
       }
       callback({ responseHeaders: headers });
     });

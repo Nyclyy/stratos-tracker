@@ -76,6 +76,11 @@ METARS = {}
 METARS_LOCK = threading.Lock()
 FAA = {}
 FAA_LOCK = threading.Lock()
+# Cycle, publication window and check time for the catalogue currently in FAA.
+FAAMETA = {"cycle": "", "from": 0, "to": 0, "checkedAt": 0, "airports": 0}
+CHART_CACHE_DIR = os.path.join(DATA_DIR, "charts")
+CHART_FILE_RE = re.compile(r"^[A-Z0-9]{1,12}\.PDF$")
+MAX_CHART_BYTES = 24 * 1024 * 1024
 OSMDIR = os.path.join(DATA_DIR, "osm_cache")
 airports = []
 navaids = []
@@ -458,8 +463,24 @@ def faa_cycle(back=0):
     return "26%02d" % (1 + offset)
 
 
+def faa_epoch(value):
+    """FAA effective dates look like '0901Z  10/01/26'."""
+    match = re.search(r"(\d{2})(\d{2})Z\s+(\d{2})/(\d{2})/(\d{2})", value or "")
+    if not match:
+        return 0
+    hh, mm, month, day, year = (int(part) for part in match.groups())
+    return int(datetime.datetime(2000 + year, month, day, hh, mm,
+                                 tzinfo=datetime.timezone.utc).timestamp() * 1000)
+
+
 def load_faa():
-    """Official FAA airport diagrams + ILS charts (public domain)."""
+    """The complete FAA d-TPP catalogue: diagrams, approaches, SIDs, STARs and
+    supplementary documents (U.S. Government work, public domain).
+
+    The old loader kept only airport diagrams and ILS approaches; the chart
+    viewer needs every published category, and it needs the publication window
+    so an expired cycle is never presented as current.
+    """
     for back in (0, 1):
         cycle = faa_cycle(back)
         url = "https://aeronav.faa.gov/d-tpp/%s/xml_data/d-TPP_Metafile.xml" % cycle
@@ -467,6 +488,12 @@ def load_faa():
             request = urllib.request.Request(url, headers={"User-Agent": "Stratos-Bridge/%s" % VERSION})
             with urllib.request.urlopen(request, timeout=180) as response:
                 for _, element in ET.iterparse(response):
+                    if element.tag == "digital_tpp":
+                        FAAMETA["cycle"] = element.get("cycle") or cycle
+                        FAAMETA["from"] = faa_epoch(element.get("from_edate"))
+                        FAAMETA["to"] = faa_epoch(element.get("to_edate"))
+                        FAAMETA["checkedAt"] = int(time.time() * 1000)
+                        continue
                     if element.tag != "airport_name":
                         continue
                     icao = element.get("icao_ident") or ("K" + (element.get("apt_ident") or ""))
@@ -474,13 +501,17 @@ def load_faa():
                     for record in element.findall("record"):
                         code = (record.findtext("chart_code") or "").strip()
                         name = (record.findtext("chart_name") or "").strip()
-                        pdf = (record.findtext("pdf_name") or "").strip()
-                        if pdf and (code == "APD" or (code == "IAP" and "ILS" in name)):
-                            charts.append([code, name, pdf])
+                        pdf = (record.findtext("pdf_name") or "").strip().upper()
+                        amended = (record.findtext("amdtdate") or "").strip()
+                        if not pdf or not CHART_FILE_RE.match(pdf):
+                            continue
+                        charts.append([code, name, pdf, amended or None])
                     if charts:
                         with FAA_LOCK:
                             FAA[icao] = {"cycle": cycle, "c": charts}
                     element.clear()
+            with FAA_LOCK:
+                FAAMETA["airports"] = len(FAA)
             log("Loaded FAA d-TPP cycle %s (%d airports)" % (cycle, len(FAA)))
             return
         except Exception as exc:
@@ -973,6 +1004,12 @@ class Handler(BaseHTTPRequestHandler):
         if match:
             self.handle_tile(*map(int, match.groups()))
             return
+        if path == "/charts":
+            self.handle_charts(parsed)
+            return
+        if path == "/chart":
+            self.handle_chart(parsed)
+            return
         if path == "/faa":
             ident = re.sub(r"\W", "", (urllib.parse.parse_qs(parsed.query).get("id", [""])[0])).upper()
             with FAA_LOCK:
@@ -1069,6 +1106,97 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "max-age=86400")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def handle_charts(self, parsed):
+        """Catalogue for one airport, with the cycle and its publication window."""
+        query = urllib.parse.parse_qs(parsed.query)
+        icao = re.sub(r"\W", "", (query.get("icao", [""])[0])).upper()
+        if not re.fullmatch(r"[A-Z0-9]{3,5}", icao or ""):
+            self.send_json({"error": "A 3-5 character airport identifier is required."}, 400)
+            return
+        with FAA_LOCK:
+            meta = dict(FAAMETA)
+            entry = FAA.get(icao)
+            charts = [{"code": c[0], "title": c[1], "pdf": c[2], "amended": c[3]}
+                      for c in (entry or {}).get("c", [])]
+        if not meta.get("cycle"):
+            # The metafile is still downloading: this is not "no charts".
+            self.send_json({"error": "source-unavailable",
+                            "message": "The FAA catalogue is still loading on the bridge.",
+                            "retry": True}, 503)
+            return
+        payload = {
+            "source": "faa-dtpp",
+            "sourceName": "FAA Digital Terminal Procedures",
+            "license": "U.S. Government work - public domain",
+            "icao": icao,
+            "cycle": entry.get("cycle") if entry else meta.get("cycle"),
+            "effective": meta.get("from"),
+            "expires": meta.get("to"),
+            "checkedAt": meta.get("checkedAt"),
+            "charts": charts,
+        }
+        if not charts:
+            payload["unsupported"] = True
+            payload["message"] = ("No FAA d-TPP charts are published for %s. Current coverage is the FAA "
+                                  "publication (United States and territories); other authorities are not mirrored." % icao)
+            self.send_json(payload, 404)
+            return
+        self.send_json(payload)
+
+    def handle_chart(self, parsed):
+        """One official FAA PDF, cached on disk and served only for the current cycle."""
+        query = urllib.parse.parse_qs(parsed.query)
+        cycle = (query.get("cycle", [""])[0] or "").strip()
+        name = (query.get("file", [""])[0] or "").strip().upper()
+        if not re.fullmatch(r"\d{4}", cycle) or not CHART_FILE_RE.match(name):
+            self.send_json({"error": "Invalid chart request."}, 400)
+            return
+        with FAA_LOCK:
+            current = FAAMETA.get("cycle") or ""
+        if current and cycle != current:
+            self.send_json({"error": "cycle-mismatch",
+                            "message": "Only the current FAA cycle is served; refresh the catalogue."}, 409)
+            return
+        path = os.path.join(CHART_CACHE_DIR, cycle, name)
+        body = None
+        if os.path.isfile(path):
+            try:
+                with open(path, "rb") as handle:
+                    body = handle.read()
+            except OSError:
+                body = None
+        if body is None:
+            url = "https://aeronav.faa.gov/d-tpp/%s/%s" % (cycle, name)
+            try:
+                request = urllib.request.Request(url, headers={"User-Agent": "Stratos-Bridge/%s" % VERSION})
+                with urllib.request.urlopen(request, timeout=60) as response:
+                    body = response.read(MAX_CHART_BYTES + 1)
+            except Exception as exc:
+                self.send_json({"error": "upstream",
+                                "message": "The FAA document could not be downloaded: %s" % exc}, 502)
+                return
+            if len(body) > MAX_CHART_BYTES:
+                self.send_json({"error": "too-large", "message": "The document is larger than Stratos will serve."}, 502)
+                return
+            if not body.startswith(b"%PDF"):
+                self.send_json({"error": "not-a-pdf", "message": "The source did not return a PDF document."}, 502)
+                return
+            try:
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                temporary = path + ".part"
+                with open(temporary, "wb") as handle:
+                    handle.write(body)
+                os.replace(temporary, path)
+            except OSError:
+                pass
+        self.send_response(200)
+        self.send_header("Content-Type", "application/pdf")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Cache-Control", "max-age=31536000, immutable")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)

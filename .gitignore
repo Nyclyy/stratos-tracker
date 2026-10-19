@@ -13,6 +13,8 @@ Thumbs.db
 
 # Bridge runtime state written into the data dir on first launch
 bridge_token.txt
+# Cached FAA chart documents (public-domain PDFs, still runtime state)
+charts/
 airports_cache*.json
 relay.json
 aircraft.json

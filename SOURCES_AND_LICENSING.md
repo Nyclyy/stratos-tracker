@@ -34,9 +34,19 @@
 
 ## Charts
 
-- **FAA Digital Terminal Procedures (dTPP)** are U.S. Government works. Stratos links to the official `aeronav.faa.gov` PDFs and may display them in an embedded viewer. It does not redistribute a chart library.
-- **ChartFox, SkyVector, AirNav, Navigraph/Jeppesen** are linked, not copied. Jeppesen charts are licensed per subscriber and are never bundled.
-- **NAV CANADA** and other national AIP charts remain subject to their publishers’ terms; only links are provided.
+- **FAA Digital Terminal Procedures (d-TPP)** — U.S. Government work, public domain. Stratos reads the FAA's own `d-TPP_Metafile.xml` for the current 28-day cycle, so the catalogue carries the publisher's chart codes, titles, document names, amendment dates and the publication window. Documents are fetched on demand from `aeronav.faa.gov` (directly through the local bridge, or through Stratos' own narrow pass-through on the hosted site) and rendered in the app by the bundled pdf.js build. Stratos does not bundle, mirror or sell a chart library; the FAA PDFs stay on the FAA's servers and are cached on the user's own device only so the same chart is not downloaded twice.
+- **Coverage** is exactly what the FAA publishes: airports in the United States and its territories. There is no invented coverage anywhere else; an airport without FAA charts gets an explicit "not covered / no charts" state instead of a generated diagram.
+- **ChartFox** is not used at all: no redirect, no frame, no scraping. The old Flight Deck launcher pointed at `chartfox.org`; that path is gone.
+- **NAV CANADA** publishes Canadian charts commercially (`NAV CANADA Aeronautical Publications`). Their terms do not grant redistribution or API display rights to a third-party app, so no Canadian charts are imported. A NAV CANADA adapter should only be added under a written licence; the catalogue and viewer are source-agnostic, but no unlicensed source is wired in.
+- **Jeppesen / Navigraph** charts are licensed per subscriber. They are never bundled, and a Stratos Premium entitlement is not a Jeppesen or Navigraph licence.
+- **SkyVector, AirNav, OurAirports** remain optional outbound links from the airport page; they are not embedded and their terms are their own.
+
+### Chart viewer and caching rules
+
+- The catalogue request is answered by the bridge (`/charts?icao=`) or the hosted API (`/api/charts?icao=`). Both only ever read the FAA publication.
+- A document request names a cycle and a PDF filename and nothing else: `^\d{4}$` for the cycle, `^[A-Z0-9]{1,12}\.PDF$` for the file. No arbitrary URL, header or credential is forwarded. The bridge refuses a document from a cycle other than the one it currently holds.
+- Downloaded documents are cached in a separate IndexedDB database (`stratos_charts`), capped at 40 documents / 30 days. Clearing site data clears them.
+- The FAA publication window from the metafile is shown with every chart. A document whose window has passed is labelled expired; if the window is missing it is labelled unverified. Stratos never calls a chart current without the publisher's dates.
 
 ## Relay and privacy
 
