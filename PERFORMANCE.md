@@ -40,14 +40,14 @@ Inputs: synthetic 12,000-point curved track; 2,000 completed flights with a 60-p
 | Normalize + prepare 12k replay | 16.95 ms | 59/s |
 | Sample prepared replay | 0.0011 ms | ~897k/s |
 | Simplify 12k track only | 4.36 ms | 229/s |
-| Rebuild the world basemap sheet (177 countries, ~9,500 points, 1,280x800 at dpr 1, headless Chromium) | 1.3 ms at z6-z9, 2.7-3.2 ms on a whole-world view | ~310-760/s |
+| Rebuild the world basemap sheet (177 countries, ~9,500 points, 1,280x800 at dpr 1, headless Chromium) | 1.3-1.5 ms at z6-z9, 2.7-4.1 ms on a whole-world view | ~245-760/s |
 | Pan one frame with the world basemap cached | one `drawImage`, no re-pathing | — |
 | Summarize 2,000 landings | 1.34 ms | 744/s |
 | Career totals, 2,000 flights | 14.24 ms | 70/s |
 | Route totals, 25 points | 0.0041 ms | ~245k/s |
 | Heap used after benchmark | 89.4 MiB | — |
 
-The world basemap sheet is rebuilt only when the projected centre moves past the snap step, the zoom changes or the theme changes; every other frame is a single `drawImage` of the cached sheet. A rebuild costs 1.3 ms at z6-z9 and 2.7-3.2 ms on a whole-world view, where the most country names and continent labels are tested for overlap. Blitting the cached sheet and repainting the overlay costs 2.7-4.5 ms per frame under headless software rasterisation, which is the pessimistic case; a GPU-backed browser composites the same blit on the GPU.
+The world basemap sheet is rebuilt only when the projected centre moves past the snap step, the zoom changes or the theme changes; every other frame is a single `drawImage` of the cached sheet. A rebuild costs 1.3-1.5 ms at z6-z9 and 2.7-4.1 ms on a whole-world view (run to run on a shared VM), where the most country names and continent labels are tested for overlap. Blitting the cached sheet and repainting the overlay costs 2.7-4.5 ms per frame under headless software rasterisation, which is the pessimistic case; a GPU-backed browser composites the same blit on the GPU.
 
 Reproduce with:
 

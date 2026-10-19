@@ -27,7 +27,7 @@ The `npm test` total is 65: 23 data-path tests, 4 module-graph tests, 23 DOM tes
 | NOAA weather API, live call for KJFK | in-process handler invocation | 200, real METAR and TAF, source NOAA |
 | OurAirports API, `q=heathrow` | in-process handler invocation | 200, EGLL first, correct typed fields |
 | World basemap in a real browser: the World style renders at z2.2, z2.9, z4.5 and z6.2 in the night theme and at z3.4 in the day theme; 177 country fills and borders, muted country names, letter-spaced continent names, italic serif ocean names, seas appearing only past z4.4, airports and traffic drawn on top; no page errors | Playwright 1.64 + Chromium 156 headless, screenshots inspected | pass |
-| World basemap cost in a real browser: sheet rebuild 1.3 ms at z6-z9 and 2.7-3.2 ms on a whole-world view; cached pan frame 2.7-4.5 ms with software rasterisation | `node scripts/world-bench.mjs` | pass |
+| World basemap cost in a real browser: sheet rebuild 1.3-1.5 ms at z6-z9 and 2.7-4.1 ms on a whole-world view across runs; cached pan frame 2.7-4.5 ms with software rasterisation | `node scripts/world-bench.mjs` | pass |
 | JavaScript syntax, all shared and pilot modules | `node --check` loop | pass |
 | Inline script syntax, tracker/logbook/weather/pilot/landing | extracted blocks + `node --check` | pass |
 | ES module import graph | resolver script | 0 missing files |
