@@ -327,6 +327,20 @@ function stopBridge() {
 // A packaged build asks GitHub for the latest release shortly after the window
 // appears, downloads in the background and installs the new version when the
 // user quits. Development runs and unpacked builds never check.
+//
+// Settings can ask for a check on demand (no six-hour wait) and, once a build
+// is downloaded, restart straight into it instead of waiting for a manual quit.
+const updateState = { downloadedVersion: '' };
+
+function updateStatus() {
+  return {
+    supported: Boolean(app.isPackaged && autoUpdater),
+    currentVersion: app.getVersion(),
+    downloaded: Boolean(updateState.downloadedVersion),
+    version: updateState.downloadedVersion || app.getVersion(),
+  };
+}
+
 function startAutoUpdate() {
   if (!app.isPackaged || !autoUpdater) return;
   autoUpdater.autoDownload = true;
@@ -334,7 +348,10 @@ function startAutoUpdate() {
   autoUpdater.allowPrerelease = false;
   autoUpdater.on('error', error => note(`Update check failed: ${error && error.message ? error.message : error}`));
   autoUpdater.on('update-available', info => note(`Update ${info.version} is available; downloading in the background.`));
-  autoUpdater.on('update-downloaded', info => note(`Update ${info.version} downloaded; it installs when Stratos quits.`));
+  autoUpdater.on('update-downloaded', info => {
+    updateState.downloadedVersion = info && info.version ? info.version : 'next';
+    note(`Update ${updateState.downloadedVersion} downloaded; it installs when Stratos quits or you press Restart to update.`);
+  });
   const check = () => {
     autoUpdater.checkForUpdates().catch(error => note(`Update check failed: ${error && error.message ? error.message : error}`));
   };
@@ -458,6 +475,31 @@ ipcMain.handle('bridge:stop', async () => {
 });
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('bridge:diagnostics', () => diagnostics());
+ipcMain.handle('updater:status', () => updateStatus());
+ipcMain.handle('updater:check', async () => {
+  if (!app.isPackaged || !autoUpdater) return { ...updateStatus(), available: false, supported: false };
+  if (updateState.downloadedVersion) return { ...updateStatus(), available: true };
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    const version = result && result.updateInfo ? result.updateInfo.version : '';
+    const available = Boolean(version) && version !== app.getVersion();
+    if (!available) note(`Stratos ${app.getVersion()} is the latest version.`);
+    return { ...updateStatus(), available, version: version || app.getVersion() };
+  } catch (error) {
+    const message = error && error.message ? error.message : String(error);
+    note(`Update check failed: ${message}`);
+    return { ...updateStatus(), available: false, error: message };
+  }
+});
+ipcMain.handle('updater:install', () => {
+  if (!app.isPackaged || !autoUpdater || !updateState.downloadedVersion) {
+    return { ok: false, message: 'No downloaded update is ready to install yet.' };
+  }
+  note('Restarting to install the downloaded update.');
+  // Defer the restart so this reply reaches the renderer before the app quits.
+  setImmediate(() => autoUpdater.quitAndInstall());
+  return { ok: true };
+});
 
 // ── App lifecycle ────────────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock();

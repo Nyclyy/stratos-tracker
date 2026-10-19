@@ -12,12 +12,17 @@ function installDom() {
   ]) {
     Object.defineProperty(globalThis, key, { value, configurable: true });
   }
-  globalThis.localStorage = {
-    store: new Map(),
-    getItem(key) { return this.store.get(key) ?? null; },
-    setItem(key, value) { this.store.set(key, String(value)); },
-    removeItem(key) { this.store.delete(key); },
-  };
+  // Node 22+ exposes `localStorage` as a non-writable global, so a plain
+  // assignment throws; define it the same way as navigator and location above.
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      store: new Map(),
+      getItem(key) { return this.store.get(key) ?? null; },
+      setItem(key, value) { this.store.set(key, String(value)); },
+      removeItem(key) { this.store.delete(key); },
+    },
+  });
   globalThis.HTMLElement = window.HTMLElement;
   globalThis.Event = window.Event;
   globalThis.CustomEvent = window.CustomEvent;
@@ -77,6 +82,88 @@ test('settings page renders bridge and phone sections', async () => {
   assert.match(root.textContent, /Simulator bridge/);
   assert.match(root.textContent, /Phone access/);
   assert.match(root.textContent, /Resource profile/);
+});
+
+const settingsHealth = () => ({
+  version: '2.1.12', uptimeSeconds: 120, simulator: { connected: false, source: '' },
+  xplane: { ready: true }, msfs: { available: false }, ports: { udp: 49003 },
+  airports: 100, faaCharts: 10, logbook: { flights: 0, hours: 0 },
+  dataDir: '/tmp', identity: { aircraft: '', registration: '', callsign: '' },
+});
+
+const mountSettings = async desktop => {
+  installDom();
+  // Always assign: linkedom windows share state, so a stub from an earlier test
+  // would otherwise leak into this one.
+  window.stratosDesktop = desktop || null;
+  const { mount } = await import('../app/js/pilot/settings.js');
+  const root = document.getElementById('view');
+  await mount(root, { health: settingsHealth(), async reload() {} });
+  return root;
+};
+
+const clickUpdate = async button => {
+  button.dispatchEvent(new window.Event('click', { bubbles: true }));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  return document.getElementById('toast')?.textContent || '';
+};
+
+// These dispatch real bubbled clicks, so a listener that re-renders the page
+// mid-dispatch would hang the runner; the timeout turns that into a clean fail.
+test('a click on the settings page does not re-render it through the theme listener', { timeout: 10000 }, async () => {
+  const root = await mountSettings(null);
+  const card = root.querySelector('.card');
+  assert.ok(card, 'the settings page rendered a card');
+  card.dispatchEvent(new window.Event('click', { bubbles: true }));
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(root.querySelector('.card'), card, 'a click elsewhere is not treated as a theme change');
+});
+
+test('the theme buttons still switch the theme', { timeout: 10000 }, async () => {
+  await mountSettings(null);
+  const day = document.querySelector('button[data-theme="day"]');
+  assert.ok(day, 'the day theme button exists');
+  day.dispatchEvent(new window.Event('click', { bubbles: true }));
+  assert.equal(document.documentElement.dataset.theme, 'day', 'the theme button still applies its theme');
+});
+
+test('the Settings update button asks the desktop updater and reports a download', { timeout: 10000 }, async () => {
+  const calls = [];
+  await mountSettings({
+    async getUpdateStatus() { calls.push('status'); return { supported: true, currentVersion: '2.1.12', downloaded: false, version: '2.1.12' }; },
+    async checkForUpdates() { calls.push('check'); return { supported: true, currentVersion: '2.1.12', downloaded: false, available: true, version: '2.1.13' }; },
+    async installUpdate() { calls.push('install'); return { ok: true }; },
+  });
+  const button = document.getElementById('check-update');
+  assert.ok(button, 'the update button exists');
+  const message = await clickUpdate(button);
+  assert.ok(calls.includes('check'), 'the click checks the desktop updater, not the service worker');
+  assert.equal(calls.filter(name => name === 'check').length, 1, 'the button asks for exactly one check');
+  assert.ok(!calls.includes('install'), 'nothing is installed before a build has downloaded');
+  assert.match(message, /Downloading Stratos v2\.1\.13 in the background/, 'a found update is reported honestly');
+  assert.match(message, /installs when you quit or press Restart to update/, 'the app says an update only needs a quit');
+});
+
+test('a downloaded update becomes a restart-to-install button', { timeout: 10000 }, async () => {
+  const calls = [];
+  await mountSettings({
+    async getUpdateStatus() { calls.push('status'); return { supported: true, currentVersion: '2.1.12', downloaded: true, version: '2.1.13' }; },
+    async checkForUpdates() { calls.push('check'); return { supported: true, downloaded: true, version: '2.1.13' }; },
+    async installUpdate() { calls.push('install'); return { ok: true }; },
+  });
+  const button = document.getElementById('check-update');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(button.textContent, 'Restart to update to v2.1.13', 'the button names the ready update');
+  const message = await clickUpdate(button);
+  assert.ok(calls.includes('install'), 'the click installs the downloaded update');
+  assert.match(message, /Restarting to install the update/);
+});
+
+test('without the desktop bridge the button still refreshes the service worker', { timeout: 10000 }, async () => {
+  await mountSettings(null);
+  const button = document.getElementById('check-update');
+  const message = await clickUpdate(button);
+  assert.match(message, /No service worker is active on this page/, 'the browser fallback is unchanged');
 });
 
 test('dashboard layout helpers clamp moves and reject bad stored data', async () => {

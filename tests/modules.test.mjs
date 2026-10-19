@@ -105,6 +105,20 @@ test('a packaged build can update itself from the GitHub releases', () => {
   assert.match(main, /require\('electron-updater'\)/, 'the main process loads the updater');
   assert.match(main, /if \(!app\.isPackaged \|\| !autoUpdater\) return;/, 'development runs never check for updates');
   assert.match(main, /autoUpdater\.autoInstallOnAppQuit = true;/, 'a downloaded update installs when the app quits');
+  assert.match(main, /ipcMain\.handle\('updater:check'/, 'the renderer can ask for an update check on demand');
+  assert.match(main, /ipcMain\.handle\('updater:install'/, 'the renderer can install a downloaded update');
+  assert.match(main, /autoUpdater\.quitAndInstall\(\)/, 'installing restarts straight into the new build');
+
+  const preload = read('electron-preload.cjs');
+  for (const channel of ['updater:status', 'updater:check', 'updater:install']) {
+    assert.ok(preload.includes(channel), `the preload exposes ${channel}`);
+  }
+  assert.match(main, /ipcMain\.handle\('updater:status'/, 'the cached update state is readable without a network call');
+
+  // The Settings button must not claim a browser-only update path inside the app.
+  const settings = read('app/js/pilot/settings.js');
+  assert.match(settings, /desktop\?\.checkForUpdates/, 'the Check for updates button drives the desktop updater');
+  assert.match(settings, /desktop\.installUpdate\(\)/, 'a ready update can be installed from Settings');
 
   const config = read('electron-builder.config.cjs');
   assert.match(config, /provider: 'github'/, 'the packaged app-update.yml points at GitHub');

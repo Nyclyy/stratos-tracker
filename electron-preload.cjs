@@ -8,6 +8,9 @@ contextBridge.exposeInMainWorld('stratosDesktop', {
   stopBridge: () => ipcRenderer.invoke('bridge:stop'),
   getDiagnostics: () => ipcRenderer.invoke('bridge:diagnostics'),
   getVersion: () => ipcRenderer.invoke('app:version'),
+  getUpdateStatus: () => ipcRenderer.invoke('updater:status'),
+  checkForUpdates: () => ipcRenderer.invoke('updater:check'),
+  installUpdate: () => ipcRenderer.invoke('updater:install'),
   onStatus: callback => {
     if (typeof callback !== 'function') return () => {};
     const listener = (event, status) => callback(status);

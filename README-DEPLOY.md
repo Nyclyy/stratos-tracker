@@ -90,6 +90,8 @@ The installer is not code-signed. Windows SmartScreen will warn; choose **More i
 
 From 2.1.12 onwards a packaged Windows build updates itself. Eight seconds after the window appears, and every six hours after that, `electron-main.cjs` asks GitHub for the latest release through `electron-updater`. A newer installer is downloaded in the background and installed when Stratos quits; the next launch is the new version. Development runs and unpacked builds skip the check (`app.isPackaged`).
 
+You do not have to wait for the six-hour tick or for a quit. **Settings → Check for updates** now drives the real updater inside the desktop app: it checks immediately, says either “you are on the latest version” or “downloading v2.1.13”, and once the download finishes the same button becomes **Restart to update to v2.1.13** and restarts straight into the new build via `quitAndInstall()`. The preload exposes `getUpdateStatus` (cached, no network), `checkForUpdates` and `installUpdate`; the main process answers on `updater:status`, `updater:check` and `updater:install`. In a plain browser the same button still refreshes the service worker, as before.
+
 What makes this work:
 
 - `electron-updater` is a **runtime** dependency (`dependencies`, not `devDependencies`), so it is packed into the asar.

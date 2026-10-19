@@ -222,7 +222,10 @@ export async function mount(root, ctx) {
       </div>
     `;
 
-    document.querySelectorAll('[data-theme]').forEach(button => button.addEventListener('click', () => {
+    // Narrow to the theme buttons: <html data-theme="…"> also matches a bare
+    // [data-theme] selector, which made every click in Settings fall through to
+    // the document element and re-render the whole page.
+    document.querySelectorAll('button[data-theme]').forEach(button => button.addEventListener('click', () => {
       setTheme(button.dataset.theme);
       render();
     }));
@@ -331,8 +334,46 @@ export async function mount(root, ctx) {
         toast(`Import failed: ${error.message}`, 'bad');
       }
     });
-    document.getElementById('check-update')?.addEventListener('click', async () => {
+    // Inside the desktop app the same button drives the real updater: it checks
+    // on demand and, once a build is downloaded, restarts straight into it
+    // instead of waiting for the next quit. In the browser it still refreshes
+    // the service worker.
+    const updateButton = document.getElementById('check-update');
+    const labelUpdateButton = status => {
+      if (!updateButton || !status?.downloaded) return;
+      updateButton.textContent = `Restart to update to v${status.version}`;
+    };
+    if (desktop?.getUpdateStatus) {
+      desktop.getUpdateStatus()
+        .then(status => { if (status?.supported) labelUpdateButton(status); })
+        .catch(() => { /* the button still checks on demand */ });
+    }
+    updateButton?.addEventListener('click', async () => {
       try {
+        if (desktop?.checkForUpdates) {
+          const status = await desktop.getUpdateStatus();
+          if (status?.downloaded && desktop.installUpdate) {
+            await desktop.installUpdate();
+            toast('Restarting to install the update…');
+            return;
+          }
+          const result = await desktop.checkForUpdates();
+          if (!result?.supported) {
+            toast('Automatic updates apply to the installed Windows app, not this browser build.');
+            return;
+          }
+          if (result.downloaded) {
+            labelUpdateButton(result);
+            toast(`Stratos v${result.version} is ready. Restart to install it.`, 'good');
+            return;
+          }
+          if (result.available) {
+            toast(`Downloading Stratos v${result.version} in the background. It installs when you quit or press Restart to update.`, 'good');
+            return;
+          }
+          toast(`Stratos v${result.currentVersion} is the latest version.`, 'good');
+          return;
+        }
         const registration = await navigator.serviceWorker?.getRegistration();
         if (!registration) { toast('No service worker is active on this page.'); return; }
         await registration.update();
