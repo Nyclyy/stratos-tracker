@@ -464,6 +464,7 @@ $('#bZi').onclick=()=>{V.in=null;setFol(false);V.anchor={sx:W/2,sy:H/2,geo:[V.lo
 $('#bZo').onclick=()=>{V.in=null;setFol(false);V.anchor={sx:W/2,sy:H/2,geo:[V.lon,V.lat]};V.tz=Math.max(2.5,(V.tz==null?V.z:V.tz)-.7)};
 function setFol(v){V.fol=v;$('#bFol').classList.toggle('on',v)}
 function askSimbriefId(){return new Promise(res=>{const b=document.createElement('div');b.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999';b.innerHTML='<form style="background:#111a24;color:#e6edf4;padding:18px;border-radius:10px;min-width:280px;font:14px system-ui"><div style="margin-bottom:10px">Enter your SimBrief Username or Pilot ID</div><input name="v" autocomplete="off" style="width:100%;box-sizing:border-box;padding:6px"><div style="margin-top:12px;text-align:right"><button type="button" data-c>Cancel</button> <button type="submit">OK</button></div></form>';document.body.appendChild(b);const done=v=>{b.remove();res(v)};b.querySelector('form').onsubmit=e=>{e.preventDefault();done(b.querySelector('input').value.trim()||null)};b.querySelector('[data-c]').onclick=()=>done(null);b.querySelector('input').focus();});}
+function placeTod(){const ti=route.findIndex(p=>p.id=='TOD');if(ti<0||route.length<2)return;const dst=route[route.length-1],drop=route[ti].elev-(dst.elev||0);if(!(drop>0))return;const want=drop/318,pts=route.filter((_,i)=>i!==ti);let acc=0;for(let j=pts.length-1;j>0;j--){const seg=dist(pts[j-1],pts[j]);if(acc+seg>=want){const f=seg?(want-acc)/seg:0;route[ti]={...route[ti],lat:pts[j].lat+(pts[j-1].lat-pts[j].lat)*f,lon:pts[j].lon+(pts[j-1].lon-pts[j].lon)*f};return}acc+=seg}}
 async function importSB(){
   const id=await askSimbriefId();
   if(!id)return;
@@ -485,6 +486,7 @@ async function importSB(){
       elev:parseFloat(w.altitude_feet||0),
       k:w.type=='apt'?'apt':w.type=='vor'||w.type=='ndb'?'nav':'fix'
     })).filter(w=>!isNaN(w.lat)&&!isNaN(w.lon));
+    placeTod();
     save();trav=0;panel='route';render();
     if(route.length){V.lon=route[0].lon;V.lat=route[0].lat;V.tz=null;setFol(false)}
     alert('SimBrief plan loaded: '+(imported.origin||'')+' → '+(imported.destination||'')+' ('+route.length+' waypoints)');
