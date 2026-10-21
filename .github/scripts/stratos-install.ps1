@@ -11,7 +11,10 @@ function Get-StratosInstall {
     if (-not (Test-Path $root)) { continue }
     foreach ($key in Get-ChildItem $root -ErrorAction SilentlyContinue) {
       $props = Get-ItemProperty $key.PSPath -ErrorAction SilentlyContinue
-      if ($props.DisplayName -eq 'Stratos') { return $props }
+      # electron-builder's uninstallDisplayName defaults to "<productName> <version>",
+      # so an installed Stratos is listed as "Stratos 2.1.14" and an exact match on
+      # "Stratos" never finds it. DisplayVersion is still the plain version.
+      if ($props.DisplayName -eq 'Stratos' -or $props.DisplayName -like 'Stratos ?*') { return $props }
     }
   }
   return $null
@@ -27,6 +30,8 @@ function Get-StratosExe {
   }
   $candidates += (Join-Path $env:LOCALAPPDATA 'Programs\stratos\Stratos.exe')
   $candidates += (Join-Path $env:LOCALAPPDATA 'Programs\Stratos\Stratos.exe')
+  # The name comes from the app id used by electron-builder, so accept both.
+  $candidates += (Join-Path $env:LOCALAPPDATA 'Programs\stratos-desktop\Stratos.exe')
   $candidates += (Join-Path $env:ProgramFiles 'Stratos\Stratos.exe')
   foreach ($candidate in $candidates) {
     if ($candidate -and (Test-Path $candidate)) { return $candidate }

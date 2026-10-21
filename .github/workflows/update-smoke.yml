@@ -125,13 +125,39 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "The installer exited with $($process.ExitCode)." }
           Write-Host "Installed $env:FROM_VERSION silently."
 
+      # The installer runs the app when it finishes, and Electron takes a
+      # single-instance lock. The smoke run needs that lock for itself, and the
+      # next installer needs the files unlocked, so close what the installer
+      # opened before going further.
+      - name: Stop the app the installer launched
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Get-Process -Name 'Stratos', 'stratos-bridge' -ErrorAction SilentlyContinue | Stop-Process -Force
+          $deadline = (Get-Date).AddSeconds(30)
+          $left = @()
+          do {
+            Start-Sleep -Seconds 2
+            $left = @(Get-Process -Name 'Stratos', 'stratos-bridge' -ErrorAction SilentlyContinue)
+          } while ($left.Count -and (Get-Date) -lt $deadline)
+          if ($left.Count) { throw "Stratos is still running: $($left.Id -join ', ')" }
+          Write-Host 'Closed the app the installer started.'
+
+      # The uninstall entry appears as "Stratos 2.1.14" (electron-builder appends
+      # the version) and can lag the installer slightly, so wait for it rather
+      # than reading once.
       - name: Confirm the installed version is the older release
         id: installed
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           . ./.github/scripts/stratos-install.ps1
-          $app = Get-StratosInstall
+          $deadline = (Get-Date).AddMinutes(2)
+          do {
+            $app = Get-StratosInstall
+            if ($app -and $app.DisplayVersion -eq $env:FROM_VERSION) { break }
+            Start-Sleep -Seconds 3
+          } while ((Get-Date) -lt $deadline)
           if (-not $app) { throw 'Stratos is not listed in the uninstall registry after installation.' }
           $exe = Get-StratosExe $app
           $fileVersion = (Get-Item $exe).VersionInfo.ProductVersion
@@ -187,6 +213,9 @@ jobs:
             throw "The updated exe reports $fileVersion, expected $env:TO_VERSION."
           }
           Write-Host "Update confirmed: registry $($app.DisplayVersion), exe $fileVersion."
+          # Leave the runner quiet: the updated app was started by the installer
+          # and has nothing left to prove.
+          Get-Process -Name 'Stratos', 'stratos-bridge' -ErrorAction SilentlyContinue | Stop-Process -Force
 
       - name: Upload the update receipt
         if: always()
