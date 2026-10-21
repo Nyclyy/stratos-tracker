@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 import {
   activateServiceWorker,
@@ -32,6 +36,10 @@ import {
   emptyManifest,
   validateManifest as validateReleaseManifest,
   renderMarkdown,
+  validateCurated,
+  validateCuratedFile,
+  curatedRelease,
+  loadCurated,
 } from '../scripts/release-notes.mjs';
 
 class MemoryStorage {
@@ -359,6 +367,86 @@ test('merging a release keeps history sorted and latest pointing at the newest s
   const markdown = renderMarkdown(manifest.latest);
   assert.match(markdown, /## Stratos 2\.1\.14/);
   assert.match(markdown, /### New features/);
+});
+
+function curatedFile(entries) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stratos-curated-'));
+  const file = path.join(dir, 'curated.json');
+  fs.writeFileSync(file, JSON.stringify(entries));
+  return file;
+}
+
+test('curated notes replace generated ones and keep the manifest shape', () => {
+  const file = curatedFile({
+    '2.1.14': {
+      summary: 'A written summary.',
+      changelog: { features: ['A real feature.'], fixes: ['A real fix.'], other: 'not an array' },
+    },
+  });
+  // The malformed category is reported instead of being dropped silently.
+  const problems = validateCurated(loadCurated(file)['2.1.14'], '2.1.14');
+  assert.ok(problems.some(problem => problem.includes('other must be an array')), problems.join('; '));
+  assert.throws(() => curatedRelease('2.1.14', file), /other must be an array/);
+
+  const good = curatedFile({
+    '2.1.14': { summary: 'A written summary.', changelog: { features: ['A real feature.'], fixes: ['A real fix.'] } },
+  });
+  const release = curatedRelease('2.1.14', good);
+  assert.equal(release.summary, 'A written summary.');
+  assert.deepEqual(release.changelog.features, ['A real feature.']);
+  assert.deepEqual(release.changelog.ui, [], 'every category exists so the interface never reads undefined');
+  assert.equal(curatedRelease('2.1.13', good), null, 'a version with no written notes falls back to the commits');
+});
+
+test('a curated entry with no summary still gets one, and an empty entry is refused', () => {
+  const file = curatedFile({ '2.2.0': { changelog: { features: ['Two new pages.'] } } });
+  const release = curatedRelease('v2.2.0', file);
+  assert.equal(release.summary, '1 new feature.', 'the generated summary is used when none was written');
+
+  const empty = curatedFile({ '2.2.1': { changelog: { features: [] } } });
+  assert.throws(() => curatedRelease('2.2.1', empty), /changelog is empty/);
+});
+
+test('a mistyped category or version is a build failure, not a silently dropped line', () => {
+  const file = curatedFile({
+    'not-a-version': { changelog: { features: ['Something.'] } },
+    '2.1.14': { changelog: { feature: ['Wrong key.'] } },
+  });
+  const problems = validateCuratedFile(file);
+  assert.ok(problems.some(problem => problem.includes('is not a version')), problems.join('; '));
+  assert.ok(problems.some(problem => problem.includes('"feature" is not a category')), problems.join('; '));
+});
+
+test('the checked-in curated notes are valid and cover the release they describe', () => {
+  const file = fileURLToPath(new URL('../release-notes/curated.json', import.meta.url));
+  assert.deepEqual(validateCuratedFile(file), []);
+  const all = loadCurated(file);
+  const manifest = JSON.parse(fs.readFileSync(new URL('../app/releases.json', import.meta.url), 'utf8'));
+  for (const [version, entry] of Object.entries(all)) {
+    const known = manifest.releases.find(item => item.version === version);
+    assert.ok(known, `curated notes for ${version} have no release in the manifest yet`);
+    assert.ok(entry.changelog && Object.values(entry.changelog).some(list => list.length), `${version} lists no changes`);
+  }
+});
+
+test('generating a release with curated notes writes them and refuses a broken file', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stratos-generate-'));
+  const curated = path.join(dir, 'curated.json');
+  const manifest = path.join(dir, 'releases.json');
+  fs.writeFileSync(manifest, JSON.stringify(emptyManifest()));
+  fs.writeFileSync(curated, JSON.stringify({
+    '2.3.0': { summary: 'Hand written.', changelog: { features: ['Only real work.'], other: [] } },
+  }));
+  const script = fileURLToPath(new URL('../scripts/release-notes.mjs', import.meta.url));
+  const output = execFileSync(process.execPath, [script, '--version', '2.3.0', '--curated', curated, '--manifest', manifest, '--date', '2026-01-02'], { encoding: 'utf8' });
+  assert.match(output, /using curated notes for 2\.3\.0/);
+  const written = JSON.parse(fs.readFileSync(manifest, 'utf8'));
+  assert.equal(written.latest.summary, 'Hand written.');
+  assert.deepEqual(written.latest.changelog.features, ['Only real work.']);
+
+  fs.writeFileSync(curated, JSON.stringify({ '2.3.1': { changelog: { features: 'not-an-array' } } }));
+  assert.throws(() => execFileSync(process.execPath, [script, '--version', '2.3.1', '--curated', curated, '--manifest', manifest], { encoding: 'utf8', stdio: 'pipe' }), /Command failed|invalid curated/);
+  assert.equal(JSON.parse(fs.readFileSync(manifest, 'utf8')).latest.version, '2.3.0', 'a broken file changes nothing');
 });
 
 test('the checked-in release manifest is valid and its latest entry matches the app version', () => {

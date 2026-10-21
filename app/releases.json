@@ -3,37 +3,75 @@
   "product": "stratos",
   "source": "https://github.com/Nyclyy/stratos-tracker",
   "latest": {
-    "version": "2.1.14",
-    "releasedAt": "2026-10-20",
+    "version": "2.1.15",
+    "releasedAt": "2026-10-21",
     "severity": "normal",
-    "summary": "1 change outside the main categories.",
+    "summary": "Release notes written for readers, and every release now proves its own Windows update path.",
     "changelog": {
-      "features": [],
-      "improvements": [],
+      "features": [
+        "Release notes can be written by hand for a version and are validated against the same schema the app reads, so an update describes what actually changed instead of repeating commit subjects."
+      ],
+      "improvements": [
+        "Every published release now runs the Windows update test automatically: it installs the previous build, lets it update itself to the new one, and checks the installed version.",
+        "The release manifest also carries the hand-written notes for older versions, so a build that skips several releases still shows the full history."
+      ],
       "fixes": [],
       "performance": [],
       "ui": [],
       "compatibility": [],
-      "other": [
-        "Make the chart browser check runnable from a fresh checkout."
-      ]
+      "other": []
     }
   },
   "releases": [
     {
-      "version": "2.1.14",
-      "releasedAt": "2026-10-20",
+      "version": "2.1.15",
+      "releasedAt": "2026-10-21",
       "severity": "normal",
-      "summary": "1 change outside the main categories.",
+      "summary": "Release notes written for readers, and every release now proves its own Windows update path.",
       "changelog": {
-        "features": [],
-        "improvements": [],
+        "features": [
+          "Release notes can be written by hand for a version and are validated against the same schema the app reads, so an update describes what actually changed instead of repeating commit subjects."
+        ],
+        "improvements": [
+          "Every published release now runs the Windows update test automatically: it installs the previous build, lets it update itself to the new one, and checks the installed version.",
+          "The release manifest also carries the hand-written notes for older versions, so a build that skips several releases still shows the full history."
+        ],
         "fixes": [],
         "performance": [],
         "ui": [],
         "compatibility": [],
+        "other": []
+      }
+    },
+    {
+      "version": "2.1.14",
+      "releasedAt": "2026-10-20",
+      "severity": "normal",
+      "summary": "Stratos updates itself, plans around real winds, and carries aircraft checklists to a paired phone.",
+      "changelog": {
+        "features": [
+          "Stratos updates itself: the app reads the published release manifest, names what changed, verifies the download against the published checksum and restarts into the new build.",
+          "Route weather in the planner: surface observations for the airports on the route, and winds aloft from the NOAA Aviation Weather Center worked into each leg's winds and cruise temperature.",
+          "Aircraft checklists with per-flight progress, using the same profile and the same ticks on the desktop app and a paired phone.",
+          "Phone pairing shows a QR code in Settings, so a phone opens the bridge URL without typing it."
+        ],
+        "improvements": [
+          "The update centre in Settings reports the installed build, the latest release, the last check and the full release history, with a changelog viewer for every version.",
+          "The chart browser asks a provider registry for each region and says which publisher would be needed, instead of substituting a diagram Stratos has no right to display.",
+          "A paired phone can revoke its own access, and Settings can revoke one phone or all of them."
+        ],
+        "fixes": [
+          "The sticky pilot sub-navigation no longer lets the page heading show through its tabs.",
+          "Long bridge values and data paths wrap instead of widening Settings on a phone."
+        ],
+        "performance": [],
+        "ui": [
+          "Settings groups the update state, release history and simulator details into one page that fits a phone at 390 px."
+        ],
+        "compatibility": [],
         "other": [
-          "Make the chart browser check runnable from a fresh checkout."
+          "The release workflow generates the manifest from the tagged commits, publishes the notes as the release body, and reads the published assets back to verify them.",
+          "The chart browser check creates its screenshot folder, so it runs from a fresh checkout."
         ]
       }
     },

@@ -106,13 +106,26 @@ node scripts/release-notes.mjs --check        # validate the checked-in manifest
 
 Commit subjects are classified by their conventional-commit type (`feat`, `fix`, `perf`, `style`/`ui`, `refactor`, `docs`, `chore`, …) and, when there is no type, by conservative keywords. Merge commits and version bumps are skipped. Anything doubtful goes under **Other changes** rather than being guessed into a feature. The categories are New features, Improvements, Bug fixes, Performance, Interface, Compatibility and important notices, and Other changes. History is retained (30 releases), so the Update centre can show older notes.
 
+A commit subject is not a changelog. When a version needs notes written for a person — a squashed release, a change whose subject says nothing, a feature that took several commits — add it to **`release-notes/curated.json`**:
+
+```json
+{
+  "2.1.15": {
+    "summary": "One line for the dialog.",
+    "changelog": { "features": ["What a pilot can now do."], "fixes": ["What stopped being wrong."] }
+  }
+}
+```
+
+The generator prefers a curated entry for the version it is building and falls back to the commits for every other version; `--no-curated` ignores the file. Curated entries are validated as strictly as generated ones — unknown categories, empty lines, a missing changelog or a key that is not a version fail `--check` and the release build, so a typo cannot quietly delete a line from the update dialog. A curated entry may be added for a version that is already released; the next build's manifest then carries the better notes for it.
+
 Severity is a published fact, not a nag screen:
 
 - `normal` — optional; **Remind me later** is offered and a dismissal is remembered for that build;
 - `important` — still optional, but a dismissal from an earlier, less serious copy of the same release no longer suppresses the prompt;
 - `critical` — requires `--reason`; the dialog explains why. It is only treated as *required* when a real `minimumSupported` version excludes this install or the reason is supplied. There is no hidden kill switch.
 
-Do not hand-edit `app/releases.json` into an inconsistent state: `--check` enforces valid semantic versions, unique releases, a `latest` that really is the newest stable release, ISO dates and a reason on critical entries. The workflow regenerates the manifest at tag time, so notes reflect what is actually committed. The GitHub Action needs only the default `GITHUB_TOKEN` with `contents: write`; no extra secrets are required for the manifest.
+Do not hand-edit `app/releases.json` into an inconsistent state: `--check` enforces valid semantic versions, unique releases, a `latest` that really is the newest stable release, ISO dates and a reason on critical entries, and validates every curated entry. The workflow regenerates the manifest at tag time, so notes reflect what is actually committed. The GitHub Action needs only the default `GITHUB_TOKEN` with `contents: write`; no extra secrets are required for the manifest.
 
 ### Automatic updates
 
@@ -135,7 +148,7 @@ Limits worth stating: this only updates installs created by the NSIS installer o
 
 ### Verifying an update end to end
 
-`.github/workflows/update-smoke.yml` is a manual Windows workflow that proves the real update path with two published releases. Run it with no inputs to test the newest stable release against the one before it, or set `from_version` and `to_version` explicitly. It:
+`.github/workflows/update-smoke.yml` proves the real update path with two published releases. It runs **by itself after every successful Windows release build** (`workflow_run` on *Build Windows installer*, skipping failed builds and non-tag runs), testing the newest stable release against the one before it. `workflow_dispatch` remains for checking a specific pair: set `from_version` and `to_version`, or leave them empty for the newest pair. It:
 
 1. downloads both installers from the published GitHub releases;
 2. installs the older one silently (`/S`) and asserts that the uninstall registry and the exe's product version report that build;
@@ -146,7 +159,7 @@ Limits worth stating: this only updates installs created by the NSIS installer o
 
 The smoke flag exists in every packaged build but does nothing unless `app.isPackaged` is true and the flag is present; it starts no bridge and no window. It proves the download was verified and the installed version changed. It does not exercise the GUI — the Settings/Update centre confirmation is covered by the browser and DOM tests.
 
-Both releases must understand the smoke flag, which first ships in 2.1.14 — so the first usable pair is 2.1.14 → 2.1.15. The workflow refuses an older `from_version` instead of hanging on a build that ignores the flag. It is dispatch-only rather than automatic so a runner network failure cannot block a release; run it after publishing, or before announcing a release.
+Both releases must understand the smoke flag, which first ships in 2.1.14 — so the first usable pair is 2.1.14 → 2.1.15, which is exactly what the automatic run tests on the 2.1.15 release. The workflow refuses an older `from_version` instead of hanging on a build that ignores the flag. The automatic run starts only after the release has been published, so it can never block the upload; a red smoke run after a green release means the artifacts are live but their update path is unproven, and that is worth treating as a blocker on announcing the version.
 
 ### Bridge lifecycle in the desktop app
 

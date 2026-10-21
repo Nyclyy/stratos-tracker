@@ -34,7 +34,10 @@ export const SEVERITIES = ['normal', 'important', 'critical'];
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const MANIFEST = path.join(ROOT, 'app', 'releases.json');
+const CURATED = path.join(ROOT, 'release-notes', 'curated.json');
 const MAX_RELEASES = 30;
+const MAX_SUMMARY = 400;
+const MAX_ITEM = 220;
 
 /* ── Version comparison ─────────────────────────────────────────────── */
 
@@ -240,6 +243,93 @@ export function validateManifest(manifest) {
   return problems;
 }
 
+/* ── Hand-written notes ─────────────────────────────────────────────── */
+/* Commit subjects are honest but terse, and a release can land as one squashed
+   commit whose subject says almost nothing. release-notes/curated.json lets a
+   release carry notes written for the people reading them. The file is held to
+   the same schema as a generated entry, so a typo fails the build instead of
+   quietly dropping a line from the update dialog. */
+
+/** Read the curated file; a missing file simply means nothing was written. */
+export function loadCurated(file = CURATED) {
+  try {
+    const raw = fs.readFileSync(file, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('the file must contain an object keyed by version');
+    }
+    return parsed;
+  } catch (error) {
+    if (error && error.code === 'ENOENT') return {};
+    throw new Error(`${file} could not be read: ${error.message}`);
+  }
+}
+
+/** Every problem with one curated entry, so --check can report all of them. */
+export function validateCurated(entry, version = '') {
+  const where = version ? `curated notes for ${version}` : 'curated notes';
+  const problems = [];
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [`${where}: must be an object`];
+  if (entry.summary !== undefined) {
+    if (typeof entry.summary !== 'string' || !entry.summary.trim()) problems.push(`${where}: summary must be a non-empty string`);
+    else if (entry.summary.length > MAX_SUMMARY) problems.push(`${where}: summary is longer than ${MAX_SUMMARY} characters`);
+  }
+  const changelog = entry.changelog;
+  if (!changelog || typeof changelog !== 'object' || Array.isArray(changelog)) {
+    problems.push(`${where}: changelog must be an object of category arrays`);
+    return problems;
+  }
+  let items = 0;
+  for (const [key, value] of Object.entries(changelog)) {
+    if (!CATEGORIES.includes(key)) {
+      problems.push(`${where}: "${key}" is not a category (use ${CATEGORIES.join(', ')})`);
+    } else if (!Array.isArray(value)) {
+      problems.push(`${where}: ${key} must be an array`);
+    } else {
+      for (const item of value) {
+        if (typeof item !== 'string' || !item.trim()) problems.push(`${where}: ${key} contains an empty line`);
+        else if (item.trim().length > MAX_ITEM) problems.push(`${where}: ${key} has a line longer than ${MAX_ITEM} characters`);
+        else items += 1;
+      }
+    }
+  }
+  if (!items) problems.push(`${where}: the changelog is empty`);
+  return problems;
+}
+
+/** Every problem in the whole curated file. */
+export function validateCuratedFile(file = CURATED) {
+  let all = {};
+  try {
+    all = loadCurated(file);
+  } catch (error) {
+    return [error.message];
+  }
+  const problems = [];
+  for (const [version, entry] of Object.entries(all)) {
+    if (!parseVersion(version)) problems.push(`curated notes key "${version}" is not a version`);
+    problems.push(...validateCurated(entry, version));
+  }
+  return problems;
+}
+
+/** The curated entry for a version in manifest shape, or null when none exists. */
+export function curatedRelease(version, file = CURATED) {
+  const wanted = String(version || '').replace(/^v/i, '');
+  const entry = loadCurated(file)[wanted];
+  if (!entry) return null;
+  const problems = validateCurated(entry, wanted);
+  if (problems.length) throw new Error(problems.join('\n'));
+  const changelog = Object.fromEntries(CATEGORIES.map(key => [
+    key,
+    (entry.changelog[key] || []).map(item => item.trim()),
+  ]));
+  return {
+    summary: entry.summary ? entry.summary.trim() : summarize(changelog),
+    changelog,
+  };
+}
+
 export function renderMarkdown(release) {
   const lines = [`## Stratos ${release.version}`, '', `Released ${release.releasedAt}. ${release.summary || ''}`.trim()];
   if (release.severity === 'critical') lines.push('', `> **Important:** ${release.reason}`);
@@ -285,17 +375,20 @@ function main() {
   if (has('check')) {
     const file = arg('manifest', MANIFEST);
     const problems = validateManifest(readManifest(file));
-    if (problems.length) {
-      console.error(`release manifest is invalid:\n${problems.map(problem => `  - ${problem}`).join('\n')}`);
+    const curatedProblems = validateCuratedFile(arg('curated', CURATED));
+    if (problems.length || curatedProblems.length) {
+      const all = [...problems, ...curatedProblems];
+      console.error(`release notes are invalid:\n${all.map(problem => `  - ${problem}`).join('\n')}`);
       process.exit(1);
     }
     console.log(`release manifest is valid (${readManifest(file).releases.length} releases)`);
+    console.log(`curated notes are valid (${Object.keys(loadCurated(arg('curated', CURATED))).length} versions)`);
     return;
   }
 
   const version = arg('version').replace(/^v/i, '');
   if (!parseVersion(version)) {
-    console.error('usage: release-notes.mjs --version X.Y.Z [--from TAG] [--to REF] [--severity normal|important|critical] [--reason TEXT] [--markdown FILE]');
+    console.error('usage: release-notes.mjs --version X.Y.Z [--from TAG] [--to REF] [--severity normal|important|critical] [--reason TEXT] [--markdown FILE] [--curated FILE] [--no-curated]');
     process.exit(2);
   }
   const severity = arg('severity', 'normal');
@@ -314,7 +407,17 @@ function main() {
   })();
   const to = arg('to', 'HEAD');
   const commits = commitsBetween(from && from !== `v${version}` ? from : '', to);
-  const changelog = buildChangelog(commits);
+  let curated = null;
+  if (!has('no-curated')) {
+    try {
+      curated = curatedRelease(version, arg('curated', CURATED));
+    } catch (error) {
+      console.error(`refusing to use invalid curated notes:\n${error.message}`);
+      process.exit(1);
+    }
+    if (curated) console.log(`using curated notes for ${version}`);
+  }
+  const changelog = curated ? curated.changelog : buildChangelog(commits);
 
   const existing = readManifest(arg('manifest', MANIFEST));
   const previous = existing.releases?.find(item => item.version === version) || {};
@@ -323,7 +426,7 @@ function main() {
     version,
     releasedAt: arg('date', new Date().toISOString().slice(0, 10)),
     severity,
-    summary: summarize(changelog),
+    summary: curated ? curated.summary : summarize(changelog),
     changelog,
   };
   if (reason) release.reason = reason;

@@ -3,9 +3,18 @@ name: Windows update smoke test
 # Proves the real update path with two published releases, on a real Windows
 # installation: install `from_version`, let the installed app find and verify
 # `to_version` through electron-updater, then confirm the installed version
-# actually changed. It runs only on demand because it publishes nothing itself
-# and consumes a Windows runner for several minutes.
+# actually changed. It publishes nothing itself.
+#
+# It runs by itself after every successful Windows release build, so a published
+# version cannot sit there with an unproven updater. `workflow_run` is used
+# rather than a job inside the release workflow because a release build needs
+# its own assets to exist before this test can download and install them, and
+# because the test consumes a second Windows runner. workflow_dispatch remains
+# for checking an arbitrary pair by hand.
 on:
+  workflow_run:
+    workflows: ['Build Windows installer']
+    types: [completed]
   workflow_dispatch:
     inputs:
       from_version:
@@ -26,6 +35,12 @@ concurrency:
 
 jobs:
   update:
+    # A release build that failed has no assets to update to, and a dispatch run
+    # without a tag is not a release; neither should spend a Windows runner.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
     runs-on: windows-latest
     timeout-minutes: 25
     env:
@@ -38,6 +53,10 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          # Run the checker from the release that was just built, not from
+          # whatever the default branch has moved on to.
+          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
