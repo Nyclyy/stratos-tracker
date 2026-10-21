@@ -3,26 +3,54 @@
   "product": "stratos",
   "source": "https://github.com/Nyclyy/stratos-tracker",
   "latest": {
-    "version": "2.1.15",
+    "version": "2.1.16",
     "releasedAt": "2026-10-21",
     "severity": "normal",
-    "summary": "Release notes written for readers, and every release now proves its own Windows update path.",
+    "summary": "The flight plan now lives on the Flight Deck map.",
     "changelog": {
       "features": [
-        "Release notes can be written by hand for a version and are validated against the same schema the app reads, so an update describes what actually changed instead of repeating commit subjects."
+        "The planned route draws on the Flight Deck map as soon as it exists, fitted into view and labelled, instead of appearing only on a separate planning map.",
+        "The route has its own layer toggle, so it can be hidden while keeping airports, navaids and traffic on screen."
       ],
       "improvements": [
-        "Every published release now runs the Windows update test automatically: it installs the previous build, lets it update itself to the new one, and checks the installed version.",
-        "The release manifest also carries the hand-written notes for older versions, so a build that skips several releases still shows the full history."
+        "The map and the planner share one active route: adding or clearing waypoints on the map updates the plan, and a route edited in the planner appears on the map without pressing Send to map."
       ],
-      "fixes": [],
+      "fixes": [
+        "A route opened on the map is zoomed to fit, so it no longer loads correctly and still sits off the edge of the last view."
+      ],
       "performance": [],
-      "ui": [],
+      "ui": [
+        "The planner button is now Show on Flight Deck, because the route is already on the map."
+      ],
       "compatibility": [],
       "other": []
     }
   },
   "releases": [
+    {
+      "version": "2.1.16",
+      "releasedAt": "2026-10-21",
+      "severity": "normal",
+      "summary": "The flight plan now lives on the Flight Deck map.",
+      "changelog": {
+        "features": [
+          "The planned route draws on the Flight Deck map as soon as it exists, fitted into view and labelled, instead of appearing only on a separate planning map.",
+          "The route has its own layer toggle, so it can be hidden while keeping airports, navaids and traffic on screen."
+        ],
+        "improvements": [
+          "The map and the planner share one active route: adding or clearing waypoints on the map updates the plan, and a route edited in the planner appears on the map without pressing Send to map."
+        ],
+        "fixes": [
+          "A route opened on the map is zoomed to fit, so it no longer loads correctly and still sits off the edge of the last view."
+        ],
+        "performance": [],
+        "ui": [
+          "The planner button is now Show on Flight Deck, because the route is already on the map."
+        ],
+        "compatibility": [],
+        "other": []
+      }
+    },
     {
       "version": "2.1.15",
       "releasedAt": "2026-10-21",

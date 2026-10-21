@@ -43,6 +43,24 @@ module.exports = {
     artifactName: 'Stratos-Setup.exe',
     icon: 'app/icon-512.png',
   },
+  // macOS: a DMG for people installing by hand and a ZIP for electron-updater,
+  // which swaps the app bundle in place. The architecture is chosen on the
+  // command line (--arm64 or --x64) so each runner builds only its own binary.
+  mac: {
+    target: ['dmg', 'zip'],
+    category: 'public.app-category.travel',
+    icon: 'app/icon-512.png',
+    artifactName: 'Stratos-${version}-mac-${arch}.${ext}',
+    hardenedRuntime: true,
+  },
+  // Linux: a self-updating AppImage. electron-updater replaces the file it was
+  // launched from, so only the AppImage target is needed.
+  linux: {
+    target: ['AppImage'],
+    category: 'Utility',
+    icon: 'app/icon-512.png',
+    artifactName: 'Stratos-${version}-linux-x64.${ext}',
+  },
   nsis: {
     oneClick: true,
     perMachine: false,

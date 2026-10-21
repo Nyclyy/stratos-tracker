@@ -2,6 +2,10 @@
 
 Date: 2026-10-19. Environment: Linux x64 cloud VM, Node v24.21.0, Python 3 (FreeStyle build), Chromium 156 via Playwright (headless, software rasterisation, private library prefix). No simulator, iPhone, Windows host or Vercel account was available.
 
+## 2026-10-21 — route on the main Flight Deck map (2.1.16)
+
+The planner writes `stratos.activeRoute` on every edit and the Flight Deck map reads it, so the route draws there without pressing a button. On load the map fits the route into view and keeps it updated when the planner changes it in another page. A Layers toggle (Route) hides and shows it. Checks: `npm test` 172/172 pass; `npm run test:py` passes. Chromium 1440x900 on a local static server, with a stored KSFO→KLAX route: the map fitted both airports, drew the dashed route with labels, and the screenshot is saved as `artifacts/route-main-map-2116.png`. The Windows installer was not rebuilt in this session.
+
 ## 2026-10-20 — route planner, checklists and LAN phone pairing (Windows 11 x64)
 
 Environment: Windows 11 10.0.26300, Node v26.8.1, Python 3.15.0, Stratos bridge 2.1.14 with a temporary data directory, and Chromium previews at 1440x900 and 390x844. MSFS was installed on the host but no flight was running, so no live simulator telemetry was used. The current totals are **166 JavaScript tests** (`npm test`, including the route planner, checklist, update and update-interface suites) and **31 Python tests** (`npm run test:py`, including pairing persistence and revocation). Both pass. The Windows installer was rebuilt (90 MB).
@@ -196,4 +200,4 @@ npm install --no-save playwright && npx playwright install chromium
 node scripts/chart-check.mjs
 ```
 
-For a Windows installer, run the “Build Windows installer” workflow and check the “Verify installer and write checksum” step. Do not treat a started workflow as a built installer.
+For a Windows installer, run the “Release” workflow (`.github/workflows/release.yml`) and check its “Build Windows installer” job, the “Check the build output” step and the “Publish release” job. Do not treat a started workflow as a built installer.

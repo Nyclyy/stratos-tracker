@@ -371,6 +371,23 @@ function commitsBetween(from, to) {
   });
 }
 
+/** Read `{ platform: { url, sha256, size } }` and refuse anything the app would ignore. */
+export function readDownloads(file) {
+  const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`${file} must contain an object keyed by platform`);
+  }
+  const problems = [];
+  for (const [platform, entry] of Object.entries(parsed)) {
+    if (!/^[a-z0-9-]+$/.test(platform)) problems.push(`platform "${platform}" must be a lowercase key`);
+    if (!/^https:\/\//.test(String(entry?.url || ''))) problems.push(`${platform}: url must be https`);
+    if (!/^[a-f0-9]{64}$/i.test(String(entry?.sha256 || ''))) problems.push(`${platform}: sha256 must be 64 hex characters`);
+    if (!(Number(entry?.size) > 0)) problems.push(`${platform}: size must be a positive number`);
+  }
+  if (problems.length) throw new Error(problems.join('\n'));
+  return parsed;
+}
+
 function main() {
   if (has('check')) {
     const file = arg('manifest', MANIFEST);
@@ -442,6 +459,27 @@ function main() {
         sha256: arg('sha256'),
         size: Number(arg('size', '0')) || null,
       },
+    };
+  }
+
+  // Every platform's installer is recorded here, so the app can offer the right
+  // download on Windows, macOS and Linux alike.
+  const downloadsFile = arg('downloads-file');
+  if (downloadsFile) {
+    let entries;
+    try {
+      entries = readDownloads(downloadsFile);
+    } catch (error) {
+      console.error(`refusing to use invalid downloads:\n${error.message}`);
+      process.exit(1);
+    }
+    release.downloads = {
+      ...(release.downloads || {}),
+      ...Object.fromEntries(Object.entries(entries).map(([platform, entry]) => [platform, {
+        url: entry.url,
+        sha256: entry.sha256.toLowerCase(),
+        size: Number(entry.size),
+      }])),
     };
   }
 

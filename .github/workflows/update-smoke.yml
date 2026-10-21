@@ -5,15 +5,15 @@ name: Windows update smoke test
 # `to_version` through electron-updater, then confirm the installed version
 # actually changed. It publishes nothing itself.
 #
-# It runs by itself after every successful Windows release build, so a published
-# version cannot sit there with an unproven updater. `workflow_run` is used
-# rather than a job inside the release workflow because a release build needs
-# its own assets to exist before this test can download and install them, and
-# because the test consumes a second Windows runner. workflow_dispatch remains
-# for checking an arbitrary pair by hand.
+# It runs by itself after every Release run, but only once that run's "Publish
+# release" job has succeeded, so a version that is live cannot sit there with an
+# unproven updater. `workflow_run` is used rather than a job inside the release
+# workflow because this test needs the public assets to exist before it can
+# download and install them, and because it consumes a second Windows runner.
+# workflow_dispatch remains for checking an arbitrary pair by hand.
 on:
   workflow_run:
-    workflows: ['Build Windows installer']
+    workflows: ['Release']
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -34,13 +34,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  gate:
+    # Only a Release run whose "Publish release" job succeeded has a live version
+    # to test. A run that skipped publishing (no version bump) or failed to build
+    # has nothing to update to, so it must not spend a Windows runner.
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    outputs:
+      published: ${{ steps.check.outputs.published }}
+    steps:
+      - name: Check that the release was published
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$CONCLUSION" != success ]; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::The release run did not succeed; nothing to smoke-test."
+            exit 0
+          fi
+          JOBS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs" --paginate \
+            --jq '.jobs[] | select(.name == "Publish release" and .conclusion == "success") | .name')
+          if [ -n "$JOBS" ]; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::This release run did not publish a version; nothing to smoke-test."
+          fi
+
   update:
-    # A release build that failed has no assets to update to, and a dispatch run
-    # without a tag is not a release; neither should spend a Windows runner.
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       startsWith(github.event.workflow_run.head_branch, 'v'))
+    needs: gate
+    if: needs.gate.outputs.published == 'true'
     runs-on: windows-latest
     timeout-minutes: 25
     env:
@@ -56,7 +89,7 @@ jobs:
         with:
           # Run the checker from the release that was just built, not from
           # whatever the default branch has moved on to.
-          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

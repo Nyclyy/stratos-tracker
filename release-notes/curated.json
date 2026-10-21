@@ -28,6 +28,27 @@
       ]
     }
   },
+  "2.1.16": {
+    "summary": "The flight plan now lives on the Flight Deck map.",
+    "changelog": {
+      "features": [
+        "The planned route draws on the Flight Deck map as soon as it exists, fitted into view and labelled, instead of appearing only on a separate planning map.",
+        "The route has its own layer toggle, so it can be hidden while keeping airports, navaids and traffic on screen."
+      ],
+      "improvements": [
+        "The map and the planner share one active route: adding or clearing waypoints on the map updates the plan, and a route edited in the planner appears on the map without pressing Send to map."
+      ],
+      "fixes": [
+        "A route opened on the map is zoomed to fit, so it no longer loads correctly and still sits off the edge of the last view."
+      ],
+      "performance": [],
+      "ui": [
+        "The planner button is now Show on Flight Deck, because the route is already on the map."
+      ],
+      "compatibility": [],
+      "other": []
+    }
+  },
   "2.1.15": {
     "summary": "Release notes written for readers, and every release now proves its own Windows update path.",
     "changelog": {

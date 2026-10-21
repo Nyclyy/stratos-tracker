@@ -6,7 +6,7 @@ import {
   legDetails, routeProgress, setWaypointPosition,
 } from '../lib/planner.js';
 import { BUNDLED_NAVAIDS } from '../data/airports.js';
-import { fetchSimbriefPlan } from '../lib/simbrief.js';
+import { fetchSimbriefPlan, loadSimbriefId, saveSimbriefId } from '../lib/simbrief.js';
 import { formatLatLon } from '../lib/geo.js';
 import { MiniMap } from '../minimap.js';
 import { esc, fmtDate, fmtDateTime, num, tag, toast, downloadText, pickFile, askText } from '../ui.js';
@@ -299,6 +299,17 @@ export async function mount(root, ctx) {
     return point.name && point.name !== point.id ? `${point.id} · ${point.name}` : point.id;
   }
 
+  // SimBrief gives each fix its planned altitude in `elev`; airports carry field elevation.
+  function altitudeText(point, profilePoint) {
+    if (point.constraintAlt) return restrictionText(point, profilePoint);
+    if (Number(point.elev) > 0) {
+      return point.kind === 'apt'
+        ? `${num(point.elev)} ft <span class="muted">(field elevation)</span>`
+        : `${num(point.elev)} ft <span class="muted">(planned altitude in the imported plan)</span>`;
+    }
+    return restrictionText(point, profilePoint);
+  }
+
   function restrictionText(point, profilePoint) {
     if (point.constraintAlt) {
       return `${num(point.constraintAlt)} ft <span class="muted">(in the imported plan)</span>`;
@@ -344,6 +355,7 @@ export async function mount(root, ctx) {
     const legs = currentLegs();
     const inLeg = legs[index - 1];
     const outLeg = legs[index];
+    const along = legs.slice(0, index).reduce((sum, leg) => sum + leg.distanceNm, 0);
     const adjacent = [
       inLeg ? `<li><button class="plan-link" data-leg="${inLeg.index - 1}">From ${esc(inLeg.from.id)}</button> · ${num(inLeg.distanceNm, 1)} nm · ${courseText(inLeg.trueCourse)} T</li>` : '',
       outLeg ? `<li><button class="plan-link" data-leg="${outLeg.index - 1}">To ${esc(outLeg.to.id)}</button> · ${num(outLeg.distanceNm, 1)} nm · ${courseText(outLeg.trueCourse)} T</li>` : '',
@@ -356,7 +368,10 @@ export async function mount(root, ctx) {
       <dl class="plan-kv">
         <div><dt>Identifier</dt><dd class="mono">${esc(point.id)}</dd></div>
         <div><dt>Coordinates</dt><dd class="mono">${formatLatLon(point.lat, point.lon)}</dd></div>
-        <div><dt>Altitude</dt><dd>${restrictionText(point, profilePoint)}</dd></div>
+        <div><dt>Altitude</dt><dd>${altitudeText(point, profilePoint)}</dd></div>
+        <div><dt>Distance from departure</dt><dd>${num(along, 1)} nm</dd></div>
+        <div><dt>Distance from previous</dt><dd>${inLeg ? `${num(inLeg.distanceNm, 1)} nm` : '—'}</dd></div>
+        <div><dt>Distance to next</dt><dd>${outLeg ? `${num(outLeg.distanceNm, 1)} nm` : '—'}</dd></div>
         <div><dt>Type</dt><dd>${esc(point.kind === 'apt' ? 'Airport' : point.kind === 'nav' ? 'Navaid' : 'Waypoint')}</dd></div>
       </dl>
       ${adjacent ? `<div class="plan-adjacent"><span class="plan-eyebrow">Connected legs</span><ul>${adjacent}</ul></div>` : ''}
@@ -716,11 +731,21 @@ export async function mount(root, ctx) {
     }
   }
 
+  // The ID is asked for once and then remembered; 'SimBrief ID' changes it.
+  async function changeSimbriefId() {
+    const entered = await askText('SimBrief ID', 'SimBrief username or Pilot ID (remembered for next time)', 'e.g. pilot123 or 123456');
+    if (!entered) return null;
+    saveSimbriefId(localStorage, entered);
+    toast('SimBrief ID saved.', 'good');
+    return entered;
+  }
+
   async function importSimbrief() {
-    const entered = await askText('Import SimBrief', 'SimBrief username or Pilot ID', 'e.g. pilot123 or 123456');
+    const entered = loadSimbriefId(localStorage) || await changeSimbriefId();
     if (!entered) return;
     try {
       const plan = await fetchSimbriefPlan(entered);
+      saveSimbriefId(localStorage, entered);
       const { origin, destination, fixes, general } = plan;
       const imported = fixes.map((fix, index) => ({
         id: String(fix.ident || `WP${index + 1}`).toUpperCase(),
@@ -758,7 +783,7 @@ export async function mount(root, ctx) {
     try {
       localStorage.setItem('dl.route', JSON.stringify(mapRoute));
       localStorage.setItem('stratos.activeRoute', JSON.stringify({ id: currentId, name, points, dirty }));
-      toast('Route sent to the map.', 'good');
+      toast('Opening the Flight Deck map.', 'good');
       setTimeout(() => { location.href = 'index.html'; }, 450);
     } catch (_) {
       toast('This browser refused local storage.', 'bad');
@@ -830,7 +855,7 @@ export async function mount(root, ctx) {
           <div class="plan-bar-actions">
             <button class="plan-btn" id="plan-undo" ${undoStack.length ? '' : 'disabled'} title="Undo the last change (Ctrl+Z)">Undo</button>
             <button class="plan-btn primary" id="save-route">Save</button>
-            <button class="plan-btn" id="send-map" ${points.length < 2 ? 'disabled' : ''}>Send to map</button>
+            <button class="plan-btn" id="send-map" ${points.length < 2 ? 'disabled' : ''}>Show on Flight Deck</button>
           </div>
         </header>
 
@@ -849,7 +874,7 @@ export async function mount(root, ctx) {
               <span>Search an airport in the plan panel to set a departure, then add a destination. Tap a leg for course and time; drag a waypoint to move it.</span>
               <button class="plan-btn" id="plan-empty-add">Add departure</button>
             </div>` : ''}
-            <div class="plan-map-hint">Tap a leg or waypoint for details · drag a waypoint to move it</div>
+            <div class="plan-map-hint">Tap a leg or waypoint for details · drag a waypoint to move it · this route is already on the Flight Deck map</div>
           </div>
 
           <aside class="plan-side" id="plan-side" aria-label="Flight plan">
@@ -868,6 +893,7 @@ export async function mount(root, ctx) {
                   <input class="input" id="route-add" placeholder="KSFO, SFO, or 37.62,-122.38" autocomplete="off" spellcheck="false"></label>
                 <div class="plan-btn-row">
                   <button class="plan-btn" id="import-simbrief">SimBrief</button>
+                  <button class="plan-btn" id="change-simbrief">SimBrief ID</button>
                   <button class="plan-btn" id="import-file">Import file</button>
                 </div>
                 ${validation.errors.length ? `<div class="notice bad" style="margin-top:10px"><div><strong>${validation.errors.length} problem${validation.errors.length === 1 ? '' : 's'}.</strong><br>${validation.errors.map(e => esc(e.message)).join('<br>')}</div></div>` : ''}
@@ -987,6 +1013,7 @@ export async function mount(root, ctx) {
     document.getElementById('save-route')?.addEventListener('click', saveCurrent);
     document.getElementById('send-map')?.addEventListener('click', sendToMap);
     document.getElementById('import-simbrief')?.addEventListener('click', importSimbrief);
+    document.getElementById('change-simbrief')?.addEventListener('click', changeSimbriefId);
     document.getElementById('import-file')?.addEventListener('click', importFile);
 
     document.getElementById('route-weather-refresh')?.addEventListener('click', () => {

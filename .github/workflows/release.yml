@@ -1,0 +1,434 @@
+name: Release
+
+# One pipeline releases Stratos. It runs when:
+#   - package.json gains a version on main that has no published release yet
+#     (an automatic release on a version bump),
+#   - a v* tag is pushed, or
+#   - it is started by hand, which releases the version in package.json.
+#
+# Tests run first. Windows, macOS (arm64 and x64) and Linux are then built in
+# parallel, and only one job, "Publish release", creates the release. That job
+# uploads everything as a draft, checks the draft against the published rules
+# (scripts/check-release.mjs), and only then makes it public. A failed platform
+# build therefore never leaves a half-published version behind.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      severity:
+        description: 'Update severity published in the manifest'
+        type: choice
+        options: [normal, important, critical]
+        default: normal
+      reason:
+        description: 'Why a critical update is required (required for critical)'
+        type: string
+        required: false
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Decide whether to release
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.decide.outputs.release }}
+      version: ${{ steps.decide.outputs.version }}
+      tag: ${{ steps.decide.outputs.tag }}
+      severity: ${{ steps.decide.outputs.severity }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          # The version-bump check reads package.json from the commit that came
+          # before the push, so the full history is needed.
+          fetch-depth: 0
+
+      - name: Decide
+        id: decide
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          INPUT_SEVERITY: ${{ github.event.inputs.severity }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          case "$GITHUB_REF" in
+            refs/tags/v*)
+              TRIGGER=tag
+              VERSION="${GITHUB_REF_NAME#v}" ;;
+            refs/heads/main)
+              if [ "$EVENT_NAME" = workflow_dispatch ]; then TRIGGER=dispatch; else TRIGGER=main; fi
+              VERSION=$(node -p "require('./package.json').version") ;;
+            *)
+              echo "::error::Releases are cut from main or a v* tag, not from $GITHUB_REF"
+              exit 1 ;;
+          esac
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::$VERSION is not a plain X.Y.Z version"
+            exit 1
+          fi
+          TAG="v$VERSION"
+
+          # A draft left by an earlier failed run is replaced; a published release
+          # is never rebuilt.
+          STATE=none
+          if gh release view "$TAG" --json isDraft >/dev/null 2>&1; then
+            if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = true ]; then STATE=draft; else STATE=published; fi
+          fi
+
+          RELEASE=true
+          REASON=""
+          if [ "$STATE" = published ]; then
+            RELEASE=false
+            REASON="$TAG is already published"
+            if [ "$TRIGGER" = dispatch ]; then
+              echo "::error::$REASON; bump package.json before releasing"
+              exit 1
+            fi
+          elif [ "$TRIGGER" = main ]; then
+            # A push to main releases only when this push changed the version.
+            PREV=""
+            if [ "$BEFORE" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+              PREV=$(git show "$BEFORE:package.json" | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version" || true)
+            fi
+            if [ "$PREV" = "$VERSION" ]; then
+              RELEASE=false
+              REASON="package.json still says $VERSION; nothing to release"
+            fi
+          fi
+
+          {
+            echo "release=$RELEASE"
+            echo "version=$VERSION"
+            echo "tag=$TAG"
+            echo "severity=${INPUT_SEVERITY:-normal}"
+          } >> "$GITHUB_OUTPUT"
+          echo "- $TAG ($TRIGGER): release=$RELEASE ${REASON}" >> "$GITHUB_STEP_SUMMARY"
+
+  test:
+    name: Run tests
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Run JavaScript and relay tests
+        run: npm test
+
+      - name: Run bridge tests
+        run: python -m unittest -v tests.test_bridge
+
+      - name: Run bridge + relay integration test
+        run: npm run test:integration
+
+  build-windows:
+    name: Build Windows installer
+    needs: [plan, test]
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      # Stamp the release version into the app and the bridge so the installed
+      # build reports the version being released.
+      - name: Stamp the release version
+        run: |
+          npm version --no-git-tag-version --allow-same-version "$VERSION" --silent
+          python scripts/stamp-version.py "$VERSION"
+
+      - name: Build standalone simulator bridge
+        run: |
+          python -m pip install --disable-pip-version-check pyinstaller
+          pyinstaller --noconfirm --clean --onefile --name stratos-bridge --distpath bridge-dist --workpath build/pyinstaller --specpath build stratos_bridge.py
+          test -f bridge-dist/stratos-bridge.exe || { echo "::error::PyInstaller did not produce stratos-bridge.exe"; exit 1; }
+
+      - name: Build Windows installer
+        run: npm run dist:win
+
+      - name: Check the build output
+        run: |
+          set -euo pipefail
+          test -s dist/Stratos-Setup.exe || { echo "::error::electron-builder did not produce Stratos-Setup.exe"; exit 1; }
+          test -s dist/latest.yml || { echo "::error::electron-builder did not produce latest.yml; automatic updates would be broken"; exit 1; }
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: |
+            dist/Stratos-Setup.exe
+            dist/latest.yml
+            dist/*.blockmap
+          retention-days: 7
+
+  build-mac:
+    name: Build macOS ${{ matrix.arch }}
+    needs: [plan, test]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-14
+          - arch: x64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Stamp the release version
+        run: |
+          npm version --no-git-tag-version --allow-same-version "$VERSION" --silent
+          python scripts/stamp-version.py "$VERSION"
+
+      - name: Build standalone simulator bridge
+        run: |
+          python -m pip install --disable-pip-version-check pyinstaller
+          pyinstaller --noconfirm --clean --onefile --name stratos-bridge --distpath bridge-dist --workpath build/pyinstaller --specpath build stratos_bridge.py
+          test -f bridge-dist/stratos-bridge || { echo "::error::PyInstaller did not produce stratos-bridge"; exit 1; }
+
+      - name: Build macOS app
+        run: npm run dist:mac -- --${{ matrix.arch }}
+
+      # Every Mac runner writes the same feed name, so each one keeps its own
+      # copy; the publish job merges them so both architectures are offered.
+      - name: Name this architecture's update feed and check the output
+        run: |
+          set -euo pipefail
+          mv dist/latest-mac.yml "dist/latest-mac-${{ matrix.arch }}.yml"
+          test -s "dist/Stratos-${VERSION}-mac-${{ matrix.arch }}.dmg" || { echo "::error::the DMG is missing"; exit 1; }
+          test -s "dist/Stratos-${VERSION}-mac-${{ matrix.arch }}.zip" || { echo "::error::the update ZIP is missing"; exit 1; }
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-mac-${{ matrix.arch }}
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.blockmap
+            dist/latest-mac-${{ matrix.arch }}.yml
+          retention-days: 7
+
+  build-linux:
+    name: Build Linux AppImage
+    needs: [plan, test]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Stamp the release version
+        run: |
+          npm version --no-git-tag-version --allow-same-version "$VERSION" --silent
+          python scripts/stamp-version.py "$VERSION"
+
+      - name: Build standalone simulator bridge
+        run: |
+          python -m pip install --disable-pip-version-check pyinstaller
+          pyinstaller --noconfirm --clean --onefile --name stratos-bridge --distpath bridge-dist --workpath build/pyinstaller --specpath build stratos_bridge.py
+          test -f bridge-dist/stratos-bridge || { echo "::error::PyInstaller did not produce stratos-bridge"; exit 1; }
+
+      - name: Build Linux AppImage
+        run: npm run dist:linux
+
+      - name: Check the build output
+        run: |
+          set -euo pipefail
+          test -s "dist/Stratos-${VERSION}-linux-x64.AppImage" || { echo "::error::the AppImage is missing"; exit 1; }
+          test -s dist/latest-linux.yml || { echo "::error::electron-builder did not produce latest-linux.yml"; exit 1; }
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: |
+            dist/*.AppImage
+            dist/latest-linux.yml
+            dist/*.blockmap
+          retention-days: 7
+
+  publish:
+    # The update-smoke workflow looks for a successful job with this exact name.
+    name: Publish release
+    needs: [plan, build-windows, build-mac, build-linux]
+    if: needs.plan.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      TAG: ${{ needs.plan.outputs.tag }}
+      SEVERITY: ${{ needs.plan.outputs.severity }}
+      REASON: ${{ github.event.inputs.reason }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          # The changelog is built from the commits between the previous tag and
+          # this one, so the runner needs the tags and their history.
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Collect every platform's build output
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      # electron-updater reads one latest-mac.yml. Both architectures must be in
+      # it, or one group of Macs would never be offered the update.
+      - name: Merge the macOS update feeds
+        run: node scripts/merge-update-feeds.mjs dist/latest-mac.yml dist/latest-mac-arm64.yml dist/latest-mac-x64.yml
+
+      - name: Write the checksum and the download table
+        run: |
+          set -euo pipefail
+          for name in Stratos-Setup.exe "Stratos-${VERSION}-mac-arm64.dmg" "Stratos-${VERSION}-mac-x64.dmg" "Stratos-${VERSION}-linux-x64.AppImage"; do
+            test -s "dist/$name" || { echo "::error::$name is missing from the build output"; exit 1; }
+          done
+          (cd dist && sha256sum Stratos-Setup.exe > Stratos-Setup.exe.sha256)
+          add() {
+            jq -n --arg key "$1" \
+              --arg url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/$2" \
+              --arg sha "$(sha256sum "dist/$2" | cut -d' ' -f1)" \
+              --argjson size "$(stat -c%s "dist/$2")" \
+              '{($key): {url: $url, sha256: $sha, size: $size}}' >> dist/downloads.jsonl
+          }
+          : > dist/downloads.jsonl
+          add windows Stratos-Setup.exe
+          add mac-arm64 "Stratos-${VERSION}-mac-arm64.dmg"
+          add mac-x64 "Stratos-${VERSION}-mac-x64.dmg"
+          add linux-x64 "Stratos-${VERSION}-linux-x64.AppImage"
+          jq -s add dist/downloads.jsonl > dist/downloads.json
+          cat dist/downloads.json
+
+      # The notes and manifest are generated from the commits being released, so
+      # they describe what is actually in this build. The committed manifest is
+      # only read for its history; the release gets a copy.
+      - name: Write the release notes and manifest
+        run: |
+          set -euo pipefail
+          PREVIOUS=$(git describe --tags --abbrev=0 "$GITHUB_SHA^" 2>/dev/null || true)
+          cp app/releases.json dist/releases.json
+          ARGS=(--version "$VERSION" --severity "$SEVERITY" --markdown dist/release-notes.md --manifest dist/releases.json --downloads-file dist/downloads.json)
+          if [ -n "$PREVIOUS" ]; then ARGS+=(--from "$PREVIOUS"); fi
+          if [ "$SEVERITY" = critical ]; then ARGS+=(--reason "$REASON"); fi
+          node scripts/release-notes.mjs "${ARGS[@]}"
+          node scripts/release-notes.mjs --check --manifest dist/releases.json
+
+      # A draft is invisible to users, so everything can be checked before the
+      # release goes live. An earlier draft for this tag is replaced.
+      - name: Create the draft release
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" != true ]; then
+              echo "::error::$TAG was published while this run was building"
+              exit 1
+            fi
+            gh release delete "$TAG" --yes
+          fi
+          gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Stratos $VERSION" --notes-file dist/release-notes.md \
+            dist/Stratos-Setup.exe dist/Stratos-Setup.exe.sha256 \
+            dist/latest.yml dist/latest-mac.yml dist/latest-linux.yml \
+            dist/releases.json dist/release-notes.md \
+            dist/*.dmg dist/*.zip dist/*.AppImage dist/*.blockmap
+
+      - name: Check the draft against every platform
+        run: node scripts/check-release.mjs "$VERSION" --draft
+
+      - name: Publish and confirm the live release
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" --draft=false
+          node scripts/check-release.mjs "$VERSION"
+          echo "- Published $TAG" >> "$GITHUB_STEP_SUMMARY"

@@ -123,3 +123,24 @@ test('drag: an invalid position or index is ignored', () => {
   assert.deepEqual(setWaypointPosition(route, 9, { lat: 10, lon: 10 }), route);
   assert.deepEqual(setWaypointPosition(route, 0, null), route);
 });
+
+/* The planner and the Flight Deck map are two pages, so the only thing that
+   can keep them in step is the stored active route. These checks read the two
+   files instead of a browser: if either side renames the key or stops writing
+   it, the route silently disappears from the map again. */
+test('the planner and the main map share one active route', async () => {
+  const fs = await import('node:fs');
+  const read = file => fs.readFileSync(new URL(`../app/${file}`, import.meta.url), 'utf8');
+  const planner = read('js/pilot/routes.js');
+  const map = read('index.html');
+  const set = "localStorage.setItem('stratos.activeRoute'";
+  const get = "localStorage.getItem('stratos.activeRoute'";
+
+  assert.ok(planner.includes(set), 'the planner persists the active route');
+  assert.ok(map.includes(get), 'the map reads the planner route');
+  assert.ok(map.includes(set), 'route edits on the map are mirrored back');
+  assert.ok(map.includes('function fitRoute('), 'a loaded route is brought into view');
+  assert.ok(map.includes('data-l="rte"'), 'the route has a layer toggle');
+  assert.ok(map.includes('refreshRoute'), 'a route edited in the other page is picked up');
+  assert.ok(map.includes('L.rte'), 'the route layer can be switched off');
+});

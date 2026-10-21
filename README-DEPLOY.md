@@ -75,19 +75,16 @@ What gets packaged:
 
 ### GitHub Actions release
 
-`.github/workflows/release-windows.yml` runs on a tag (`v*`), or manually with a severity (`normal`, `important`, `critical`) and, for a critical release, the reason users will be shown. It:
+`.github/workflows/release.yml` is the only release pipeline. It runs by itself when `package.json` gains a version on `main` that has no published release yet, when a `v*` tag is pushed, or when started by hand (**Run workflow**, with a severity — `normal`, `important` or `critical` — and, for a critical release, the reason users will be shown). A run for a version that is already published never rebuilds it: a push stops quietly, and a manual run fails with a message to bump the version. A push to `main` that does not change the version does nothing. It:
 
-1. installs Node 22 and Python 3.12;
-2. runs `npm ci`, the JavaScript/relay suites, the Python bridge tests and the bridge + relay integration test;
-3. builds `stratos-bridge.exe` with PyInstaller;
-4. builds the installer with electron-builder;
-5. verifies the installer exists, is larger than 30 MB and has a `latest.yml`, then writes `Stratos-Setup.exe.sha256`;
-6. generates the release notes and the update manifest from the tagged commits (see below), with the installer URL, size and checksum recorded;
-7. uploads the installer, checksum, `latest.yml`, blockmaps, `releases.json` and `release-notes.md` as a workflow artifact;
-8. publishes those files to the GitHub Release, using the categorised markdown as the release body;
-9. a separate `verify-release` job reads the published release back and fails if the manifest, checksum or installer disagree.
+1. decides from the version, the tag and any existing release whether to release; a draft left by an earlier failed run is replaced;
+2. runs `npm ci`, the JavaScript/relay suites, the Python bridge tests and the bridge + relay integration test on Windows;
+3. builds the Windows installer, the macOS DMG and ZIP for arm64 and x64, and the Linux AppImage in parallel. Each platform builds `stratos-bridge` with PyInstaller, so the installed app does not require Python, and checks that its installer and update feed exist;
+4. merges the two macOS update feeds into one `latest-mac.yml`, so both architectures are offered updates; writes `Stratos-Setup.exe.sha256` and the download table; and generates the release notes and manifest from the tagged commits (see below);
+5. creates the release as a **draft** with every asset, verifies the draft with `scripts/check-release.mjs --draft`, and only then publishes it and checks the live release. A failed build or check leaves no public release.
 
-A workflow that merely starts is not a successful build. Check the job log for the “Verify installer” and “Generate release notes” steps, then confirm the release has all six assets. `npm run release:check` runs the same published-release check from a terminal (add `--deep` to download the installer and read its embedded version resource).
+The last job is named **Publish release**; the update smoke test waits for it (see below). A workflow that merely starts is not a successful build. Check the job log for the “Check the build output” and “Check the draft against every platform” steps, then confirm the release has every asset. `npm run release:check` runs the same published-release check from a terminal (add `--deep` to download the installer and read its embedded version resource).
+
 
 The installer is not code-signed. Windows SmartScreen will warn on the first install; choose **More info → Run anyway**. To sign it, set `CSC_LINK` (a base64 certificate or path to a `.pfx`) and `CSC_KEY_PASSWORD` as repository secrets; electron-builder picks them up without any config change, and the private key must never be committed. Without them, updates are still verified against the SHA-512 in `latest.yml` and the SHA-256 published beside the installer.
 
@@ -125,7 +122,7 @@ Severity is a published fact, not a nag screen:
 - `important` — still optional, but a dismissal from an earlier, less serious copy of the same release no longer suppresses the prompt;
 - `critical` — requires `--reason`; the dialog explains why. It is only treated as *required* when a real `minimumSupported` version excludes this install or the reason is supplied. There is no hidden kill switch.
 
-Do not hand-edit `app/releases.json` into an inconsistent state: `--check` enforces valid semantic versions, unique releases, a `latest` that really is the newest stable release, ISO dates and a reason on critical entries, and validates every curated entry. The workflow regenerates the manifest at tag time, so notes reflect what is actually committed. The GitHub Action needs only the default `GITHUB_TOKEN` with `contents: write`; no extra secrets are required for the manifest.
+Do not hand-edit `app/releases.json` into an inconsistent state: `--check` enforces valid semantic versions, unique releases, a `latest` that really is the newest stable release, ISO dates and a reason on critical entries, and validates every curated entry. The release workflow regenerates the manifest at release time, so notes reflect what is actually committed. The GitHub Action needs only the default `GITHUB_TOKEN` with `contents: write`; no extra secrets are required for the manifest.
 
 ### Automatic updates
 
@@ -148,7 +145,7 @@ Limits worth stating: this only updates installs created by the NSIS installer o
 
 ### Verifying an update end to end
 
-`.github/workflows/update-smoke.yml` proves the real update path with two published releases. It runs **by itself after every successful Windows release build** (`workflow_run` on *Build Windows installer*, skipping failed builds and non-tag runs), testing the newest stable release against the one before it. `workflow_dispatch` remains for checking a specific pair: set `from_version` and `to_version`, or leave them empty for the newest pair. It:
+`.github/workflows/update-smoke.yml` proves the real update path with two published releases. It runs **by itself after every *Release* run whose *Publish release* job succeeded** (`workflow_run` on *Release*; runs that published nothing or failed do not start it), testing the newest stable release against the one before it. `workflow_dispatch` remains for checking a specific pair: set `from_version` and `to_version`, or leave them empty for the newest pair. It:
 
 1. downloads both installers from the published GitHub releases;
 2. installs the older one silently (`/S`) and asserts that the uninstall registry and the exe's product version report that build;

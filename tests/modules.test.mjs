@@ -92,7 +92,7 @@ test('the shipped version is stamped the same in the app, the bridge and the pac
   }
   // The tag now matches the committed version, so the build's stamp must accept
   // an unchanged version instead of failing the release.
-  assert.match(read('.github/workflows/release-windows.yml'), /--allow-same-version/);
+  assert.match(read('.github/workflows/release.yml'), /--allow-same-version/);
 });
 
 test('a packaged build can update itself from the GitHub releases', () => {
@@ -108,6 +108,8 @@ test('a packaged build can update itself from the GitHub releases', () => {
   assert.match(main, /ipcMain\.handle\('updater:check'/, 'the renderer can ask for an update check on demand');
   assert.match(main, /ipcMain\.handle\('updater:install'/, 'the renderer can install a downloaded update');
   assert.match(main, /autoUpdater\.quitAndInstall\(\)/, 'installing restarts straight into the new build');
+  assert.match(main, /autoUpdater\.quitAndInstall\(true, true\)/, 'a download left from an earlier session is applied at launch, silently, with a relaunch');
+  assert.match(main, /!sawDownloadThisRun && Date\.now\(\) - launchedAt < LAUNCH_WINDOW_MS/, 'launch-time apply is limited to the first minutes of a session');
 
   const preload = read('electron-preload.cjs');
   for (const channel of ['updater:status', 'updater:check', 'updater:install']) {
@@ -131,14 +133,18 @@ test('a packaged build can update itself from the GitHub releases', () => {
   assert.match(config, /provider: 'github'/, 'the packaged app-update.yml points at GitHub');
   assert.match(config, /repo: 'stratos-tracker'/, 'the update provider names this repository');
 
-  const workflow = read('.github/workflows/release-windows.yml');
+  const workflow = read('.github/workflows/release.yml');
   assert.match(workflow, /dist\/latest\.yml/, 'the release ships the updater manifest');
   assert.match(workflow, /blockmap/, 'differential update blocks are published too');
   assert.match(workflow, /did not produce latest\.yml/, 'a release without the manifest fails instead of shipping');
   assert.match(workflow, /release-notes\.mjs --version|release-notes\.mjs \"\$\{ARGS/, 'the release generates its own notes and manifest');
   assert.match(workflow, /dist\/releases\.json/, 'the release manifest is attached to the release');
-  assert.match(workflow, /verify-release/, 'a published release is verified after upload');
-  assert.match(workflow, /body_path: dist\/release-notes\.md/, 'the release page uses the categorised changelog');
+  assert.match(workflow, /check-release\.mjs "\$VERSION" --draft/, 'the draft is verified against every platform before it goes live');
+  assert.match(workflow, /--draft --target/, 'the release is created as a draft and only published after checks');
+  assert.match(workflow, /gh release edit "\$TAG" --draft=false/, 'the draft is published only after the draft check passes');
+  assert.match(workflow, /name: Publish release/, 'the update smoke test gates on the publish job by name');
+  assert.match(read('.github/workflows/update-smoke.yml'), /'Release'/, 'the update smoke test runs after the Release workflow');
+  assert.match(workflow, /--notes-file dist\/release-notes\.md/, 'the release page uses the categorised changelog');
 });
 
 test('bridge runtime state cannot be committed again', () => {

@@ -586,7 +586,7 @@ export function initAppUpdates({ desktop = null, installedVersion = APP_VERSION,
       state.setProgress({
         percent: 100,
         label: `Stratos ${event.version || ''} is downloaded and verified`.trim(),
-        note: 'It installs when Stratos quits, or press Restart to update in Settings → Updates.',
+        note: 'It installs when Stratos quits or next opens, or press Restart to update in Settings → Updates.',
       });
     } else if (event.state === 'error') {
       state.setProgress({

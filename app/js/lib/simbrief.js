@@ -1,5 +1,25 @@
 const SIMBRIEF_URL = 'https://www.simbrief.com/api/xml.fetcher.php';
 
+// The Username / Pilot ID is saved once, so the planner and the Flight Deck
+// import without asking again. Both pages read and write this same key.
+export const SIMBRIEF_ID_KEY = 'stratos.simbriefId';
+
+export function loadSimbriefId(storage) {
+  try {
+    return String((storage && storage.getItem(SIMBRIEF_ID_KEY)) || '').trim();
+  } catch (_) {
+    return '';
+  }
+}
+
+export function saveSimbriefId(storage, entered) {
+  const id = String(entered || '').trim();
+  if (!id) return;
+  try {
+    if (storage) storage.setItem(SIMBRIEF_ID_KEY, id);
+  } catch (_) { /* storage unavailable: the ID is simply asked for again */ }
+}
+
 export function simbriefQuery(entered) {
   const id = String(entered || '').trim();
   return /^\d+$/.test(id) ? `userid=${encodeURIComponent(id)}` : `username=${encodeURIComponent(id)}`;
@@ -31,7 +51,9 @@ export async function fetchSimbriefPlan(entered) {
   const query = simbriefQuery(entered);
   const response = await fetch(`${SIMBRIEF_URL}?${query}&json=v2`);
   if (response.status === 400) {
-    throw new Error('SimBrief did not recognise that username or Pilot ID, or there is no flight plan saved for it. Check the number in SimBrief account settings and make sure you generated a plan.');
+    const error = new Error('SimBrief did not recognise that username or Pilot ID, or there is no flight plan saved for it. Check the number in SimBrief account settings and make sure you generated a plan.');
+    error.status = 400;
+    throw error;
   }
   if (!response.ok) throw new Error(`SimBrief returned HTTP ${response.status}.`);
   const data = await response.json();

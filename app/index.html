@@ -188,7 +188,7 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 #tabs .tab.act{box-shadow:none}
 #tabs .tab.act::before{left:-5px;top:8px;bottom:8px;width:2px;border-radius:0 2px 2px 0;background:var(--acc);box-shadow:none}
 }
-</style><link rel="stylesheet" href="shell.css"></head><body><div class="app-shell">
+.fs-body{padding:4px 0 2px}.fs-sec{border-top:1px solid color-mix(in srgb,var(--coast) 30%,transparent);padding:4px 0}.fs-sec>summary{cursor:pointer;font-weight:700;padding:4px 0;list-style:none}.fs-sec>summary::-webkit-details-marker{display:none}.fs-sec>summary::before{content:'\25B8  '}.fs-sec[open]>summary::before{content:'\25BE  '}.fs-t{width:100%;border-collapse:collapse;font-size:13px}.fs-t td,.fs-t th{padding:3px 4px;text-align:left;vertical-align:top}.fs-route{font-size:12px}.fs-link{background:none;border:0;padding:0;color:inherit;text-decoration:underline;cursor:pointer;font:inherit}.fs-src{font-size:10px;opacity:.6;margin-left:4px}.fs-warn{color:#e0a030}.fs-on td{background:rgba(127,127,127,.15)}.fs-wx{border-top:1px solid rgba(127,127,127,.2);padding:6px 0;font-size:13px}.fs-metar{display:block;white-space:pre-wrap;font-size:11px;word-break:break-all}</style><link rel="stylesheet" href="shell.css"></head><body><div class="app-shell">
 <header id="appbar" class="tb" data-title="Flight Deck" data-context="Live Map"></header>
 <nav id="tabs" aria-label="Sections"><button class="tab" id="bMap" data-group="Flight Operations" data-label="Flight Deck"><b>&#8982;</b><span>Flight Deck</span></button><a class="tab" href="discover.html" data-group="Flight Operations" data-label="Route Discovery"><b>&#10022;</b><span>Route Discovery</span></a><button class="tab" id="bLive" data-group="Flight Operations" data-label="Live Tracking"><b>&#9673;</b><span>Live Tracking</span></button><button class="tab" id="bRoute" data-group="Flight Operations" data-label="Flight Planning"><b>&#8599;</b><span>Flight Planning</span></button><button class="tab" id="bCh" data-group="Flight Operations" data-label="Charts"><b>&#9707;</b><span>Charts</span></button><a class="tab" href="logbook.html" data-group="Flight Operations" data-label="Flight Logbook"><b>&#9776;</b><span>Flight Logbook</span></a><button class="tab" id="bWx" data-group="Flight Intelligence" data-label="Weather"><b>&#9729;</b><span>Weather</span></button><a class="tab" href="pilot.html#airports" data-group="Flight Intelligence" data-label="Airports"><b>&#9678;</b><span>Airports</span></a><a class="tab" href="pilot.html#career" data-group="Flight Intelligence" data-label="Flight Statistics"><b>&#9733;</b><span>Flight Statistics</span></a><button class="tab" id="bData" data-group="Application" data-label="Data &amp; Performance"><b>&#9636;</b><span>Data &amp; Performance</span></button><a class="tab" href="pilot.html#settings" data-group="Application" data-label="Settings"><b>&#9881;</b><span>Settings</span></a><button class="tab rail-toggle" data-rail-toggle type="button" title="Collapse sidebar" aria-label="Collapse sidebar"><b>&#8249;</b><span>Collapse</span></button></nav>
 <div class="app-main">
@@ -205,7 +205,7 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 <div id="online" class="box"><b id="olPlace">–</b><span id="olCount">–</span></div>
 <div id="fab"><button id="bTheme" class="fab" title="Theme">Day</button>
 <button id="bLay" class="fab" title="Layers">&#9776;</button><button id="bPlan" class="fab" title="Add waypoints">&#9998;</button><button id="bFol" class="fab" title="Follow aircraft">&#9992;</button><button id="bZi" class="fab" title="Zoom in">+</button><button id="bZo" class="fab" title="Zoom out">−</button>
-</div><div id="lay"><b>Map layers</b><button data-l="apt" class="on">Airports</button><button data-l="nav" class="on">Navaids</button><button data-l="trf" class="on">Traffic</button><button data-l="trl">All trails</button><button data-l="grid">Grid</button><b>Map style</b><div id="ms"></div></div>
+</div><div id="lay"><b>Map layers</b><button data-l="apt" class="on">Airports</button><button data-l="nav" class="on">Navaids</button><button data-l="trf" class="on">Traffic</button><button data-l="trl">All trails</button><button data-l="rte" class="on">Route</button><button data-l="grid">Grid</button><b>Map style</b><div id="ms"></div></div>
 
 <div id="cv"><div class="cvh"><button id="cvx" aria-label="Back">&#8592;</button><div class="cvt"><b id="cvi"></b><span id="cvn"></span><span id="cvm"></span></div><button id="cvf">Fit</button></div><div class="seg" id="cvs"></div></div><div id="ci"></div>
 <div id="chart"></div>
@@ -403,7 +403,7 @@ const RL={KSFO:[11870,8650],KOAK:[10520],KSJC:[11000],KSAC:[8600],KRNO:[11002],K
 function pairs(a){const o=[];a.rw.forEach(n=>{if(!o.some(p=>p[0]==n||p[1]==n))o.push([n,(n+17)%36+1])});return o}
 function liveOk(){return live.on&&live.d&&live.d.lat!=null&&live.d.age<3&&performance.now()-live.at<3000}
 const cv=$('#map'),cx=cv.getContext('2d');let W,H,dpr,C={};
-const V={lon:-119.5,lat:38.8,z:6,fol:false},L={apt:1,nav:1,trf:1,grid:0,style:(function(){try{return localStorage.getItem('dl.style')||'sat'}catch(e){return'sat'}})()};
+const V={lon:-119.5,lat:38.8,z:6,fol:false},L={apt:1,nav:1,trf:1,grid:0,rte:1,style:(function(){try{return localStorage.getItem('dl.style')||'sat'}catch(e){return'sat'}})()};
 let plan=false,panel=null,sel=null,route=[],trav=0,own={lat:0,lon:0,hdg:0,alt:0,vs:0};
 const byId=id=>A.find(a=>a.id==id)||N.find(a=>a.id==id);
 const wp=o=>({id:o.id,name:o.name,lat:o.lat,lon:o.lon,k:o.k||'fix',elev:o.elev||0});
@@ -422,10 +422,58 @@ function size(){dpr=devicePixelRatio||1;W=cv.clientWidth;H=cv.clientHeight;cv.wi
 /* traffic (simulated) */
 const T=[],WT={n:0,src:'',busy:0,fail:0,last:'',okAt:0};
 /* route */
-function save(){try{localStorage.setItem('dl.route',JSON.stringify(route))}catch(e){}}
-function load(){try{const r=JSON.parse(localStorage.getItem('dl.route'));if(r&&r.length){route=r;return true}}catch(e){}return false}
-function defRoute(){route=[]}
-load();
+/* The planner (pilot.html#routes) owns the route and writes stratos.activeRoute
+   on every edit. The map reads that, so a route appears here without anyone
+   pressing "Send to map"; dl.route stays as the fallback written by older builds
+   and by the map's own quick planning panel. */
+function save(){try{localStorage.setItem('dl.route',JSON.stringify(route));mirrorRoute()}catch(e){}}
+function mirrorRoute(){try{
+  const a=JSON.parse(localStorage.getItem('stratos.activeRoute')||'null')||{};
+  localStorage.setItem('stratos.activeRoute',JSON.stringify({...a,points:route.map(p=>({id:p.id,name:p.name||p.id,lat:p.lat,lon:p.lon,kind:p.k||'fix',elev:Number(p.elev)||0}))}));
+}catch(e){}}
+function load(){
+  try{const a=JSON.parse(localStorage.getItem('stratos.activeRoute')||'null');
+    if(a&&Array.isArray(a.points)){
+      route=a.points.map(p=>({id:p.id,name:p.name||p.id,lat:+p.lat,lon:+p.lon,k:p.kind||p.k||'fix',elev:Number(p.elev)||0}));
+      return true;
+    }
+  }catch(e){}
+  try{const r=JSON.parse(localStorage.getItem('dl.route'));if(r&&r.length){route=r;return true}}catch(e){}
+  return false
+}
+/* Zoom and centre so the whole route is on screen; a route planned in another
+   page used to load correctly and still be invisible because the map stayed
+   wherever it was last left. */
+function fitRoute(){
+  if(route.length<2||!W||!H)return false;
+  // Normalised Web Mercator (0..1 across the world), so the same numbers work at
+  // every zoom level.
+  const pts=route.map(p=>{const q=wpx(p.lon,p.lat,0);return[q[0]/SZ,q[1]/SZ]});
+  const X=pts.map(p=>p[0]),Y=pts.map(p=>p[1]);
+  const minX=Math.min(...X),maxX=Math.max(...X),minY=Math.min(...Y),maxY=Math.max(...Y);
+  if(maxX-minX<=0&&maxY-minY<=0)return false;
+  let z=1;
+  for(let t=12;t>=1;t--){const k=SZ*2**t;if((maxX-minX)*k<=W*.82&&(maxY-minY)*k<=H*.72){z=t;break}}
+  V.lon=(minX+maxX)/2*360-180;
+  V.lat=Math.atan(Math.sinh(Math.PI-2*Math.PI*((minY+maxY)/2)))/R;
+  V.z=z;V.tz=null;V.in=null;setFol(false);
+  return true;
+}
+function defRoute(){route=[];save()}
+load();if(route.length>1)fitRoute();
+/* Another page edited the route: show that, without fighting the pilot's view. */
+function refreshRoute(fit){
+  const before=JSON.stringify(route);
+  if(!load())return;
+  if(JSON.stringify(route)===before)return;
+  trav=0;
+  if(fit&&route.length>1)fitRoute();
+  if(panel=='route')render();
+}
+addEventListener('storage',e=>{if(!e.key||e.key=='stratos.activeRoute'||e.key=='dl.route')refreshRoute(false)});
+addEventListener('focus',()=>refreshRoute(true));
+addEventListener('pageshow',()=>refreshRoute(true));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshRoute(false)});
 function addWp(o){route.push(wp(o));save();panel='route';trav=Math.min(trav,total());render()}
 /* own-ship sim */
 function pos(d){const l=legs();let i=0;while(i<l.length-1&&d>l[i]){d-=l[i];i++}if(!route[i+1])return{lat:V.lat,lon:V.lon,hdg:0};const a=route[i],b=route[i+1],h=brg(a,b);return{...fwd(a,h,Math.min(d,l[i])),hdg:h}}
@@ -447,8 +495,8 @@ if(L.apt)A.forEach(a=>{if(CH.on&&a!==CH.a)return;const[x,y]=sc(a.lon,a.lat);if(a
 if(V.z>8.5)drawReal(a,x,y);else a.det=false;if(0)pairs(a).forEach(pr=>{const n=pr[0],h=n*10,p=ppn(a.lat)*1.4,dx=Math.sin(h*R)*p,dy=-Math.cos(h*R)*p;cx.strokeStyle=C.ap;cx.lineWidth=Math.max(3,p/9);cx.lineCap='butt';cx.beginPath();cx.moveTo(x-dx,y-dy);cx.lineTo(x+dx,y+dy);cx.stroke()});
 cx.beginPath();cx.arc(x,y,a.det?0:V.z>8.5?3:5,0,7);cx.fillStyle=C.land;cx.fill();cx.strokeStyle=C.ap;cx.lineWidth=2.2;cx.stroke();
 if(V.z>(a.x?7:4.8)){cx.font='bold 12px sans-serif';if(SAT()){cx.lineWidth=3;cx.strokeStyle=DKM()?'rgba(0,0,0,.7)':'rgba(255,255,255,.85)';cx.strokeText(a.id,x+9,y-6)}cx.fillStyle=SAT()?(DKM()?'#fff':'#111'):C.txt;cx.fillText(a.id,x+9,y-6)}});
-if(route.length&&!CH.on){cx.strokeStyle=C.route;cx.lineWidth=3;cx.setLineDash([9,5]);cx.beginPath();route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke();cx.setLineDash([]);if(liveOk()&&route.length>1){const pr=routeProg(),pts=[route[0]];let acc=0;for(let i=0;i<route.length-1;i++){acc+=dist(route[i],route[i+1]);if(acc<pr)pts.push(route[i+1])}pts.push(pos(pr));cx.strokeStyle=C.route;cx.lineWidth=5;cx.beginPath();pts.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke()}
-route.forEach(p=>{const[x,y]=sc(p.lon,p.lat),big=/^(TOC|TOD)$/.test(p.id),s=big?16:8;cx.fillStyle=C.route;cx.fillRect(x-s/2,y-s/2,s,s);if(big){cx.font='bold 14px sans-serif';cx.lineWidth=3;cx.strokeStyle='rgba(0,0,0,.75)';cx.strokeText(p.id,x+11,y+18);cx.fillStyle='#fff';cx.fillText(p.id,x+11,y+18)}else{cx.fillStyle=C.txt;cx.font='11px sans-serif';cx.fillText(p.id,x+7,y+14)}})}
+if(route.length&&!CH.on&&L.rte){cx.strokeStyle=C.route;cx.lineWidth=3;cx.setLineDash([9,5]);cx.beginPath();route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke();cx.setLineDash([]);if(liveOk()&&route.length>1){const pr=routeProg(),pts=[route[0]];let acc=0;for(let i=0;i<route.length-1;i++){acc+=dist(route[i],route[i+1]);if(acc<pr)pts.push(route[i+1])}pts.push(pos(pr));cx.strokeStyle=C.route;cx.lineWidth=5;cx.beginPath();pts.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke()}
+route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat),big=/^(TOC|TOD)$/.test(p.id),s=big?16:(i===0||i===route.length-1)?11:8;cx.fillStyle=C.route;cx.fillRect(x-s/2,y-s/2,s,s);if(big){cx.font='bold 14px sans-serif';cx.lineWidth=3;cx.strokeStyle='rgba(0,0,0,.75)';cx.strokeText(p.id,x+11,y+18);cx.fillStyle='#fff';cx.fillText(p.id,x+11,y+18)}else if(V.z>=4||i===0||i===route.length-1){cx.font='11px sans-serif';cx.lineWidth=3;cx.strokeStyle='rgba(0,0,0,.7)';cx.strokeText(p.id,x+7,y+14);cx.fillStyle=C.route;cx.fillText(p.id,x+7,y+14)}})}
 trails();if(L.trf&&!CH.on)T.forEach(a=>{const[x,y]=sc(a.lon,a.lat);cx.save();cx.translate(x,y);cx.rotate(a.hdg*R);cx.strokeStyle=C.trf;cx.lineWidth=2;cx.beginPath();PL.forEach((p,i)=>i?cx.lineTo(p[0]*.7,p[1]*.7):cx.moveTo(p[0]*.7,p[1]*.7));cx.closePath();cx.fillStyle=C.trf;cx.fill();cx.restore();if(V.z>6){cx.fillStyle=C.trf;cx.font='10px sans-serif';cx.fillText(a.id+' '+Math.round(a.alt/100),x+9,y+3)}});
 if(liveOk()){const[x,y]=sc(own.lon,own.lat);cx.save();cx.translate(x,y);cx.rotate(own.hdg*R);cx.beginPath();cx.arc(0,0,15,0,7);cx.strokeStyle=C.own;cx.globalAlpha=.4;cx.lineWidth=1.5;cx.stroke();cx.globalAlpha=1;cx.beginPath();PL.forEach((p,i)=>i?cx.lineTo(p[0]*1.15,p[1]*1.15):cx.moveTo(p[0]*1.15,p[1]*1.15));cx.closePath();cx.fillStyle=C.own;cx.fill();cx.strokeStyle=C.land;cx.lineWidth=1.5;cx.stroke();cx.restore()}
 if(CH.on)chartFx();if(sel&&!CH.on){const q=sel.k=='own'?own:sel,[x,y]=sc(q.lon,q.lat);cx.strokeStyle=C.txt;cx.lineWidth=2;cx.beginPath();cx.arc(x,y,16+(tk?3*Math.sin(performance.now()/260):0),0,7);cx.stroke()}}
@@ -491,18 +539,21 @@ function loadDescentRate(){
 }
 loadDescentRate();
 function placeTod(){const ti=route.findIndex(p=>p.id=='TOD');if(ti<0||route.length<2)return;const dst=route[route.length-1],drop=route[ti].elev-(dst.elev||0);if(!(drop>0))return;const want=drop/DESC_FT_PER_NM,pts=route.filter((_,i)=>i!==ti);let acc=0;for(let j=pts.length-1;j>0;j--){const seg=dist(pts[j-1],pts[j]);if(acc+seg>=want){const f=seg?(want-acc)/seg:0;const tod={...route[ti],lat:pts[j].lat+(pts[j-1].lat-pts[j].lat)*f,lon:pts[j].lon+(pts[j-1].lon-pts[j].lon)*f};route=pts.slice(0,j).concat([tod],pts.slice(j));return}acc+=seg}}
+/* The SimBrief ID is remembered (stratos.simbriefId); it is asked for only when missing. Change it with the SimBrief ID button. */
+async function changeSB(){const v=await askSimbriefId();if(v){localStorage.setItem('stratos.simbriefId',v);alert('SimBrief ID saved.')}}
 async function importSB(){
-  const id=await askSimbriefId();
-  if(!id)return;
+  let id=(localStorage.getItem('stratos.simbriefId')||'').trim();
+  if(!id){id=await askSimbriefId();if(!id)return;localStorage.setItem('stratos.simbriefId',id)}
   try{
     const q=/^\d+$/.test(id)?`userid=${encodeURIComponent(id)}`:`username=${encodeURIComponent(id)}`;
     const r=await fetch(`https://www.simbrief.com/api/xml.fetcher.php?${q}&json=v2`);
-    if(r.status===400)throw new Error('SimBrief did not recognise that username or Pilot ID, or there is no flight plan saved for it. Check the number in SimBrief account settings and make sure you generated a plan.');
+        if(r.status===400)throw new Error('SimBrief did not recognise that username or Pilot ID, or there is no flight plan saved for it. Check the number in SimBrief account settings and make sure you generated a plan.');
     if(!r.ok)throw new Error('SimBrief returned HTTP '+r.status);
     const d=await r.json();
     let fp=d.navlog&&Array.isArray(d.navlog.fix)?d.navlog.fix:[];
     if(!fp.length){const x=await fetch(`https://www.simbrief.com/api/xml.fetcher.php?${q}`);if(x.ok){const doc=new DOMParser().parseFromString(await x.text(),'text/xml');fp=Array.from(doc.querySelectorAll('navlog > fix')).map(f=>{const t=n=>(f.querySelector(n)?.textContent||'').trim();return{ident:t('ident'),name:t('name'),pos_lat:t('pos_lat'),pos_long:t('pos_long'),altitude_feet:t('altitude_feet'),type:t('type')}})}}
     if(!fp.length){const st=d.fetch&&d.fetch.status?' SimBrief said: '+d.fetch.status+'.':'';throw new Error('No waypoints found in the SimBrief plan.'+st+' Response fields: '+(Object.keys(d).join(', ')||'none')+'.')}
+    localStorage.setItem('stratos.simbriefId',id);try{if(window.FP)FP.saveOfp(localStorage,FP.parseOfp(d),id)}catch(_){}
     const imported={origin:d.origin&&d.origin.icao_code,destination:d.destination&&d.destination.icao_code};
     route=fp.map((w,i)=>({
       id:w.ident||('WP'+(i+1)),
@@ -533,20 +584,29 @@ $('#q').oninput=e=>{const q=e.target.value.trim().toLowerCase(),r=$('#res');if(!
 const m=[...A,...N].filter(o=>o.id.toLowerCase().includes(q)||o.name.toLowerCase().includes(q)).sort((a,b)=>b.id.toLowerCase().startsWith(q)-a.id.toLowerCase().startsWith(q)).slice(0,8);
 r.innerHTML=m.map(o=>`<div data-id="${esc(o.id)}" data-k="${esc(o.k)}"><b>${esc(o.id)}</b> ${esc(o.name)} <span class="m">${o.k=='apt'?'airport':esc(o.type||'')}</span></div>`).join('')||'<div class="m">No match in bundled data</div>';r.style.display='block'};
 $('#res').onclick=e=>{const d=e.target.closest('[data-id]');if(!d)return;const o=[...A,...N].find(x=>x.id==d.dataset.id&&x.k==d.dataset.k);setFol(false);V.lon=o.lon;V.lat=o.lat;V.tz=null;V.z=o.k=='apt'?11.5:9;sel=o;panel='sel';$('#res').style.display='none';$('#q').value='';render();if(o.k=='apt')openCharts(o)};
+/* flight summary: built from the route and the saved SimBrief plan (flightpanel.js) */
+function fsumHtml(){const stored=window.FP?FP.loadOfp(localStorage):null;const metars={};A.forEach(a=>{if(a.metar&&a.mt)metars[a.id]={metar:a.metar,fetchedAt:a.mt,source:'METAR'}});const position=liveOk()?{lat:own.lat,lon:own.lon}:null;const body=window.FP?FP.flightSummaryHtml({route,ofp:stored?stored.ofp:null,cruiseKts:CRUISE,weightUnit:'kg',metars,position}):'<div class="m">The summary is still loading. Try again in a moment.</div>';return'<h3>Flight summary</h3>'+body+'<div class="row"><button onclick="fsRefresh()">Refresh OFP</button><button onclick="panel=\'route\';render()">Back to route</button></div>'}
+async function fsRefresh(){await importSB();panel='fsum';render()}
+function fsFocus(id){const p=route.find(x=>x.id==id)||[...A,...N].find(x=>x.id==id);if(!p)return;setFol(false);V.lon=p.lon;V.lat=p.lat;V.tz=null;if(p.k=='apt')V.z=Math.max(V.z,11.5);if(innerWidth<768)panel=null;render()}
+$('#sheet').addEventListener('click',e=>{const b=e.target.closest('[data-fs-focus]');if(b)fsFocus(b.dataset.fsFocus)});
 /* panels */
 function wind(m){const r=m.match(/(\d{3}|VRB)(\d{2,3})(G(\d{2,3}))?KT/);return r?{d:r[1]=='VRB'?null:+r[1],s:+r[2],g:r[4]?+r[4]:0}:null}
 function rwTable(a){const w=wind(a.metar);if(!w)return'<div class="m">No wind data without a live METAR.</div>';if(w.d==null)return'<div class="m">Variable wind – no component.</div>';const sp=Math.max(w.s,w.g);let h='<table><tr><th>Runway</th><th>Head/tail</th><th>Cross</th></tr>';
 pairs(a).forEach(pr=>pr.forEach(r=>{const an=(w.d-r*10)*R,hw=Math.round(sp*Math.cos(an)),xw=Math.round(sp*Math.sin(an));h+=`<tr><td>${String(r).padStart(2,'0')}</td><td>${Math.abs(hw)} kt ${hw>=0?'head':'tail'}</td><td>${Math.abs(xw)} kt ${xw>0?'from R':xw<0?'from L':''}</td></tr>`}));return h+'</table>'}
+let wpIdx=null;
+function wpSel(i){wpIdx=wpIdx===i?null:i;render()}
+function wpFocus(i){const p=route[i];if(!p)return;setFol(false);V.lon=p.lon;V.lat=p.lat;V.tz=null;render()}
+function wpDetail(i){const p=route[i];if(!p)return'';const prev=route[i-1],next=route[i+1];let cum=0;for(let j=1;j<=i;j++)cum+=dist(route[j-1],route[j]);const alt=Number(p.elev)||0,planAlt=window.FP&&p.k!='apt'?FP.plannedAltitudeFt((FP.loadOfp(localStorage)||{}).ofp,p.id):null,course=next?brg(p,next):prev?brg(prev,p):null;const rows=[['Altitude',alt>0?Math.round(alt).toLocaleString()+' ft'+(p.k=='apt'?' (field elevation)':' (planned)'):planAlt?Math.round(planAlt).toLocaleString()+' ft (planned, SimBrief)':'Not in the plan'],['From previous',prev?Math.round(dist(prev,p))+' nm':'Departure'],['To next',next?Math.round(dist(p,next))+' nm':'Destination'],['Course'+(next?' to next':''),course==null?'–':String(Math.round(course)).padStart(3,'0')+'°'],['From departure',Math.round(cum)+' nm'],['ETE from departure @ '+CRUISE+' kt',hm(cum/CRUISE)]];return'<div class="wpd"><h3>'+(i+1)+'. '+esc(p.id)+' · '+esc(p.name||p.id)+'</h3><table>'+rows.map(r=>'<tr><td class="m">'+r[0]+'</td><td>'+r[1]+'</td></tr>').join('')+'</table><div class="row"><button onclick="wpFocus('+i+')">Focus on map</button></div></div>'}
 function render(){const s=$('#sheet');tabHi();if(!panel){s.style.display='none';return}s.style.display='block';
-if(panel=='live'){s.innerHTML=liveHtml();return}if(panel=='data'){s.innerHTML=dataHtml();return}if(panel=='wx'){s.innerHTML=wxHtml();return}if(panel=='charts'){s.innerHTML=chHtml();return}if(panel=='sel'&&sel){const o=sel;if(o.k=='trf'||o.k=='own'){s.innerHTML=planeHtml(o);updPl();return}if(o.k=='apt'){getMetar(o);s.innerHTML=aptHtml(o);return}
+if(panel=='fsum'){s.innerHTML=fsumHtml();return}if(panel=='live'){s.innerHTML=liveHtml();return}if(panel=='data'){s.innerHTML=dataHtml();return}if(panel=='wx'){s.innerHTML=wxHtml();return}if(panel=='charts'){s.innerHTML=chHtml();return}if(panel=='sel'&&sel){const o=sel;if(o.k=='trf'||o.k=='own'){s.innerHTML=planeHtml(o);updPl();return}if(o.k=='apt'){getMetar(o);s.innerHTML=aptHtml(o);return}
 if(o.k=='apt')getMetar(o);if(o.k=='apt')s.innerHTML=`<h3>${o.id} · ${o.name}</h3><div class="m">Elev ${o.elev} ft · TWR ${o.twr} · ATIS ${o.atis}</div><div class="m">Runways: ${pairs(o).map(p=>p.map(x=>String(x).padStart(2,'0')).join('/')).join(', ')}</div><code>${o.metar}</code><div class="m">${dec(o.metar)}</div><div class="m">${mAge(o)}</div><div class="m">Real-time reports from AviationWeather.gov via the bridge. Wind uses gusts.</div><div class="m">${o.rws?'':'Unverified placeholder data. Import the data pack (Data tab) for real runways, frequencies and layout.<br>'}${o.lat.toFixed(3)}, ${o.lon.toFixed(3)}${liveOk()?' - '+Math.round(dist(own,o))+' nm from you':''}</div>${rwTable(o)}<div class="row"><button onclick="openChart(sel)">Layout</button><button onclick="chSel=sel;panel='charts';render()">Charts</button><button onclick="addSel()">Add to route</button><button onclick="chartMap()">Zoom in</button></div>`;
 else if(o.k=='nav')s.innerHTML=`<h3>${o.id} · ${o.name}</h3><div class="m">${o.type} · ${o.freq} · ${o.lat.toFixed(3)}, ${o.lon.toFixed(3)}</div><div class="row"><button onclick="addSel()">Add to route</button></div>`;
 else s.innerHTML=`<h3>${o.id}</h3><div class="m">Alt ${Math.round(o.alt/10)*10} ft · ${o.gs?o.gs+' kt · ':''}HDG ${String(Math.round(o.hdg)).padStart(3,'0')}°</div>`;return}
 const t=total();s.innerHTML=`<h3>Flight plan</h3><div class="m">${route.length?route.map(p=>p.id).join(' → '):'Empty'} · ${t.toFixed(0)} nm · ${hm(t/CRUISE)} @ ${CRUISE} kt</div>
-<table>${route.map((p,i)=>`<tr><td>${i+1}</td><td>${p.id}</td><td class="m">${p.name}</td><td>${i?Math.round(dist(route[i-1],p))+' nm':''}</td><td><button onclick="rm(${i})" aria-label="Remove">✕</button></td></tr>`).join('')}</table>
+<table>${route.map((p,i)=>`<tr onclick="wpSel(${i})" style="cursor:pointer;${wpIdx===i?'background:rgba(127,127,127,.18)':''}"><td>${i+1}</td><td>${p.id}</td><td class="m">${p.name}</td><td>${i?Math.round(dist(route[i-1],p))+' nm':''}</td><td><button onclick="event.stopPropagation();rm(${i})" aria-label="Remove">✕</button></td></tr>`).join('')}</table>${wpIdx!=null?wpDetail(wpIdx):''}
 <div class="m">${plan?'Plan mode on: tap map, airports or navaids to add waypoints.':'Turn on Plan, then tap the map to add waypoints.'}</div>
 <div class="m">Descent planned at <b>${DESC_FT_PER_NM} ft/nm</b> — ${DESC_SRC=='sim'?'measured from your simulator flights':'default planning value (no measured descent yet)'}</div>
-<div class="row"><button onclick="importSB()">Import SimBrief</button><button onclick="defRoute();save();render()">Reset</button><button onclick="route=[];save();trav=0;render()">Clear</button><button onclick="exp('pln')">MSFS .PLN</button><button onclick="exp('fms')">X-Plane .FMS</button></div><div id="ex"></div>`}
+<div class="row"><button onclick="importSB()">Import SimBrief</button><button onclick="panel='fsum';render()">Flight summary</button><button onclick="changeSB()">SimBrief ID</button><button onclick="defRoute();save();render()">Reset</button><button onclick="route=[];save();trav=0;render()">Clear</button><button onclick="exp('pln')">MSFS .PLN</button><button onclick="exp('fms')">X-Plane .FMS</button></div><div id="ex"></div>`}
 const pad=n=>String(n).padStart(2,'0');
 function openChart(a){sel=a;getMetar(a);getFaa(a);const pr=pairs(a),ln=RL[a.id]||[],mx=Math.max(...pr.map((p,i)=>ln[i]||8000)),k=230/mx,w=wind(a.metar);
 let s=`<svg viewBox="0 0 600 600" role="img" aria-label="${a.id} airport diagram"><rect width="600" height="600" rx="12" fill="${C.land}" stroke="${C.coast}"/>`;
@@ -1015,5 +1075,9 @@ try{if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').t
 <script type="module">
   import { mountShell } from './js/shell.js';
   mountShell({ page: 'home' });
+</script>
+<script type="module">
+  import * as FP from './js/flightpanel.js';
+  window.FP = FP;
 </script>
 </body></html>

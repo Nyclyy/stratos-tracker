@@ -17,6 +17,9 @@ const BRIDGE_HOST = '127.0.0.1';
 const MAX_RESTARTS = 6;
 const LOG_LIMIT = 120;
 const UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+// A verified update that was already downloaded is applied only during the first
+// minutes after launch, so a running session is never restarted by a later check.
+const LAUNCH_WINDOW_MS = 10 * 60 * 1000;
 
 let mainWindow = null;
 let bridgeChild = null;
@@ -433,6 +436,10 @@ function startAutoUpdate() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.allowPrerelease = false;
+  const launchedAt = Date.now();
+  // Set by any real download this run; a verified update found without one was
+  // downloaded by an earlier session and is still in the updater's cache.
+  let sawDownloadThisRun = false;
   autoUpdater.on('checking-for-update', () => {
     // A new check clears the previous download error, so a transient failure is
     // not shown forever.
@@ -462,6 +469,7 @@ function startAutoUpdate() {
     broadcastUpdate({ state: 'current' });
   });
   autoUpdater.on('download-progress', progress => {
+    sawDownloadThisRun = true;
     const percent = Number(progress && progress.percent);
     updateState.progress = {
       state: 'downloading',
@@ -480,7 +488,17 @@ function startAutoUpdate() {
     updateState.verified = true;
     updateState.lastCheckedAt = new Date().toISOString();
     updateState.progress = { state: 'downloaded', percent: 100, version: updateState.downloadedVersion };
-    note(`Update ${updateState.downloadedVersion} downloaded and verified; it installs when Stratos quits or you press Restart to update.`);
+    if (!sawDownloadThisRun && Date.now() - launchedAt < LAUNCH_WINDOW_MS) {
+      // Apply on this launch: restart straight onto the new version, no prompt.
+      note(`Update ${updateState.downloadedVersion} was downloaded before this launch; applying it now.`);
+      setTimeout(() => {
+        try { autoUpdater.quitAndInstall(true, true); } catch (error) {
+          note(`Could not apply the update at launch: ${error && error.message ? error.message : error}`);
+        }
+      }, 1500);
+      return;
+    }
+    note(`Update ${updateState.downloadedVersion} downloaded and verified; it installs when Stratos quits, the next time it opens, or when you press Restart to update.`);
     broadcastUpdate({ state: 'downloaded', version: updateState.downloadedVersion });
   });
   const check = () => {

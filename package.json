@@ -1,6 +1,6 @@
 {
   "name": "stratos-desktop",
-  "version": "2.1.15",
+  "version": "2.1.16",
   "description": "Stratos flight simulation companion: map, logbook, replay, landing analytics and secure phone access",
   "main": "electron-main.cjs",
   "author": "Stratos",
@@ -8,16 +8,19 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "test": "node --test tests/lib.test.mjs tests/charts.test.mjs tests/modules.test.mjs tests/ui.test.mjs tests/discover.test.mjs tests/relay.test.mjs tests/routeweather.test.mjs tests/minimap.test.mjs tests/windsaloft.test.mjs tests/routeplan.test.mjs tests/checklists.test.mjs tests/updates.test.mjs tests/updateui.test.mjs",
+    "test": "node --test tests/lib.test.mjs tests/charts.test.mjs tests/modules.test.mjs tests/ui.test.mjs tests/discover.test.mjs tests/relay.test.mjs tests/routeweather.test.mjs tests/minimap.test.mjs tests/windsaloft.test.mjs tests/routeplan.test.mjs tests/checklists.test.mjs tests/updates.test.mjs tests/updateui.test.mjs tests/feeds.test.mjs",
     "release:notes": "node scripts/release-notes.mjs",
     "release:check": "node scripts/release-notes.mjs --check && node scripts/check-release.mjs",
     "test:py": "python3 -m unittest -v tests.test_bridge",
     "dist:win": "electron-builder --config electron-builder.config.cjs --win nsis --publish never",
+    "dist:mac": "electron-builder --config electron-builder.config.cjs --mac dmg zip --publish never",
+    "dist:linux": "electron-builder --config electron-builder.config.cjs --linux AppImage --x64 --publish never",
     "test:integration": "node --test tests/integration.test.mjs"
   },
   "devDependencies": {
     "electron": "^37.2.0",
     "electron-builder": "^26.0.12",
+    "js-yaml": "^4.3.2",
     "linkedom": "^0.18.12"
   },
   "engines": {

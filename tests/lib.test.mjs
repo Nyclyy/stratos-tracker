@@ -18,6 +18,15 @@ import {
 } from '../app/js/lib/planner.js';
 import { parseTelemetry, getResourceProfile, RESOURCE_MODES } from '../app/js/lib/telemetry.js';
 import { fetchSimbriefPlan, simbriefQuery } from '../app/js/lib/simbrief.js';
+import { plannedAltitudeFt } from '../app/js/flightpanel.js';
+
+test('waypoint altitude comes from the saved SimBrief plan by identifier', () => {
+  const ofp = { fixes: [{ ident: 'ABC', altFt: 34000 }, { ident: 'XYZ', altFt: 0 }] };
+  assert.equal(plannedAltitudeFt(ofp, 'abc'), 34000);
+  assert.equal(plannedAltitudeFt(ofp, 'XYZ'), null);
+  assert.equal(plannedAltitudeFt(ofp, 'NOPE'), null);
+  assert.equal(plannedAltitudeFt(null, 'ABC'), null);
+});
 
 const KSFO = { lat: 37.6188, lon: -122.3754 };
 const KLAX = { lat: 33.9425, lon: -118.4081 };
