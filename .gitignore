@@ -13,6 +13,8 @@ Thumbs.db
 
 # Bridge runtime state written into the data dir on first launch
 bridge_token.txt
+phone_pairs.json
+phone_pairs.json.tmp
 # Cached FAA chart documents (public-domain PDFs, still runtime state)
 charts/
 airports_cache*.json
@@ -24,6 +26,9 @@ tiles/
 # Local preview server state
 preview.log
 preview.pid
+
+# Browser-check screenshots and throwaway scripts (scripts/chart-check.mjs writes here)
+artifacts/
 
 # Natural Earth source vectors: rebuild with scripts/build-world.mjs --download
 tmp-natural-earth/

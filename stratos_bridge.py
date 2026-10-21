@@ -21,6 +21,7 @@ Standard library only. Python 3.8+.
 
 import csv
 import datetime
+import hashlib
 import hmac
 import io
 import json
@@ -57,7 +58,10 @@ from bridge_logbook_addon import (
 
 UDP_PORT = int(os.environ.get("STRATOS_UDP_PORT", "49003"))
 HTTP_PORT = int(os.environ.get("STRATOS_HTTP_PORT", "8765"))
-HOST = os.environ.get("STRATOS_HOST", "127.0.0.1")
+# The phone pairs over the local network, so the bridge listens on the LAN by
+# default. Every non-loopback request still needs the access token: pairing is
+# the only unauthenticated route and it only accepts a short-lived token.
+HOST = os.environ.get("STRATOS_HOST", "0.0.0.0")
 UDP_HOST = os.environ.get("STRATOS_UDP_HOST", "0.0.0.0")
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get("STRATOS_DATA_DIR", HERE)
@@ -65,6 +69,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 APP_DIR = os.path.join(HERE, "app")
 STATIC_DIR = APP_DIR if os.path.isdir(APP_DIR) else HERE
 TOKEN_FILE = os.path.join(DATA_DIR, "bridge_token.txt")
+PHONE_PAIRS_FILE = os.path.join(DATA_DIR, "phone_pairs.json")
 RELAY_FILE = os.path.join(DATA_DIR, "relay.json")
 AIRCRAFT_FILE = os.path.join(DATA_DIR, "aircraft.json")
 LOG_FILE = os.path.join(DATA_DIR, "stratos_bridge.log")
@@ -112,6 +117,15 @@ def log(message):
 
 
 # ── Token / auth ────────────────────────────────────────────────────
+def write_token(token):
+    try:
+        fd = os.open(TOKEN_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(token)
+    except OSError as exc:
+        log("Could not persist the access token: %s" % exc)
+
+
 def load_token():
     env = os.environ.get("STRATOS_BRIDGE_TOKEN", "").strip()
     if env:
@@ -124,16 +138,277 @@ def load_token():
     except OSError:
         pass
     token = secrets.token_urlsafe(24)
-    try:
-        fd = os.open(TOKEN_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(token)
-    except OSError as exc:
-        log("Could not persist the access token: %s" % exc)
+    write_token(token)
     return token
 
 
 TOKEN = load_token()
+TOKEN_LOCK = threading.Lock()
+
+
+def rotate_bridge_token():
+    """Replace the shared access token.
+
+    Phones paired after 2.1.14 hold their own random secret, but a phone paired
+    with the older shared token must lose access when the user forgets every
+    phone. Rotating the shared token does that; loopback requests and the
+    desktop app are unaffected.
+    """
+    global TOKEN
+    token = secrets.token_urlsafe(24)
+    with TOKEN_LOCK:
+        write_token(token)
+        TOKEN = token
+    return token
+
+
+# ── Phone pairing ──────────────────────────────────────────────────
+# A pairing token lives for two minutes, is single use, and is exchanged for the
+# bridge access cookie. It is never written to the log or the data folder.
+PAIR_TTL_SECONDS = 120
+PAIR_LOCK = threading.Lock()
+PAIR_SESSIONS = {}
+PAIR_ATTEMPTS = {}
+# id -> {id, hash (sha256 of the phone secret), label, createdAt}. The secret
+# itself is only ever returned to the phone that claimed it, in an HttpOnly
+# cookie, and is never written to disk in usable form.
+PAIR_CLIENTS = {}
+PAIR_LAST = {"claimedAt": 0, "client": ""}
+
+
+def _phone_client_public(record):
+    return {
+        "id": record.get("id", ""),
+        "label": record.get("label") or "Phone",
+        "pairedAt": int(record.get("createdAt") or 0),
+    }
+
+
+def save_phone_clients():
+    """Persist hashes so a bridge restart does not unpair a phone."""
+    with PAIR_LOCK:
+        records = [dict(record) for record in PAIR_CLIENTS.values()]
+    payload = json.dumps({"clients": records}, separators=(",", ":")).encode("utf-8")
+    temporary = PHONE_PAIRS_FILE + ".tmp"
+    try:
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(payload)
+        os.replace(temporary, PHONE_PAIRS_FILE)
+    except OSError as exc:
+        log("Could not persist phone pairings: %s" % exc)
+
+
+def load_phone_clients():
+    try:
+        with open(PHONE_PAIRS_FILE, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError):
+        return
+    records = {}
+    for record in data.get("clients", []) if isinstance(data, dict) else []:
+        if not isinstance(record, dict):
+            continue
+        client_id = str(record.get("id", ""))
+        digest = str(record.get("hash", ""))
+        if not re.fullmatch(r"[0-9a-f]{12,32}", client_id) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            continue
+        records[client_id] = {
+            "id": client_id,
+            "hash": digest,
+            "label": str(record.get("label") or "Phone")[:48],
+            "createdAt": int(record.get("createdAt") or 0),
+        }
+    with PAIR_LOCK:
+        PAIR_CLIENTS.update(records)
+
+
+def phone_digest(secret):
+    return hashlib.sha256(str(secret or "").encode("utf-8")).hexdigest()
+
+
+def pair_client(address=""):
+    """Issue a per-phone secret. Returns (secret, public record)."""
+    secret = secrets.token_urlsafe(32)
+    digest = phone_digest(secret)
+    now = int(time.time() * 1000)
+    record = {
+        "id": digest[:12],
+        "hash": digest,
+        "label": (address or "Phone")[:48],
+        "createdAt": now,
+    }
+    with PAIR_LOCK:
+        PAIR_CLIENTS[record["id"]] = record
+        PAIR_LAST["claimedAt"] = now
+        PAIR_LAST["client"] = address
+    save_phone_clients()
+    return secret, _phone_client_public(record)
+
+
+def verify_phone_secret(secret):
+    if not secret:
+        return False
+    digest = phone_digest(secret)
+    with PAIR_LOCK:
+        hashes = [record.get("hash", "") for record in PAIR_CLIENTS.values()]
+    return any(hmac.compare_digest(digest, candidate) for candidate in hashes)
+
+
+def phone_client_for_secret(secret):
+    if not secret:
+        return None
+    digest = phone_digest(secret)
+    with PAIR_LOCK:
+        for client_id, record in PAIR_CLIENTS.items():
+            if hmac.compare_digest(digest, record.get("hash", "")):
+                return client_id
+    return None
+
+
+def revoke_phone_client(client_id):
+    with PAIR_LOCK:
+        removed = PAIR_CLIENTS.pop(str(client_id or ""), None)
+    if removed:
+        save_phone_clients()
+    return bool(removed)
+
+
+def revoke_phone_client_for_secret(secret):
+    client_id = phone_client_for_secret(secret)
+    return revoke_phone_client(client_id) if client_id else False
+
+
+load_phone_clients()
+
+def pair_clean(now=None):
+    now = now or time.time()
+    with PAIR_LOCK:
+        for token in [key for key, session in PAIR_SESSIONS.items() if session["expires"] < now]:
+            PAIR_SESSIONS.pop(token, None)
+        for address in list(PAIR_ATTEMPTS):
+            PAIR_ATTEMPTS[address] = [stamp for stamp in PAIR_ATTEMPTS[address] if now - stamp < 180]
+            if not PAIR_ATTEMPTS[address]:
+                PAIR_ATTEMPTS.pop(address, None)
+
+
+def create_pair_session():
+    pair_clean()
+    token = secrets.token_urlsafe(32)
+    code = "%06d" % secrets.randbelow(1000000)
+    expires = time.time() + PAIR_TTL_SECONDS
+    with PAIR_LOCK:
+        PAIR_SESSIONS[token] = {"code": code, "expires": expires, "used": False}
+    host = lan_ip()
+    return {
+        "token": token,
+        "code": code,
+        "expiresAt": int(expires * 1000),
+        "ttlSeconds": PAIR_TTL_SECONDS,
+        "url": "http://%s:%d/pair?t=%s" % (host, HTTP_PORT, token),
+        "lanIp": host,
+        "lanEnabled": HOST not in ("127.0.0.1", "localhost"),
+    }
+
+
+def claim_pair(value):
+    """Consume a pairing token or code. Returns True when it was valid."""
+    pair_clean()
+    value = (value or "").strip()
+    if not value:
+        return False
+    now = time.time()
+    with PAIR_LOCK:
+        match = None
+        for token, session in PAIR_SESSIONS.items():
+            if session["expires"] < now or session["used"]:
+                continue
+            if hmac.compare_digest(value, token) or hmac.compare_digest(value, session["code"]):
+                match = token
+                break
+        if not match:
+            return False
+        PAIR_SESSIONS[match]["used"] = True
+        PAIR_LAST["claimedAt"] = int(now * 1000)
+        return True
+
+
+def pair_status():
+    pair_clean()
+    with PAIR_LOCK:
+        active = [session for session in PAIR_SESSIONS.values() if not session["used"]]
+        devices = sorted((_phone_client_public(record) for record in PAIR_CLIENTS.values()),
+                         key=lambda item: item["pairedAt"], reverse=True)
+        return {
+            "lanEnabled": HOST not in ("127.0.0.1", "localhost"),
+            "lanIp": lan_ip(),
+            "activeCodes": len(active),
+            "claimedAt": PAIR_LAST["claimedAt"],
+            "clients": len(PAIR_CLIENTS),
+            # Addresses and timestamps only: never a secret or its hash.
+            "devices": devices,
+        }
+
+
+def revoke_pairs():
+    with PAIR_LOCK:
+        PAIR_SESSIONS.clear()
+        PAIR_CLIENTS.clear()
+        PAIR_LAST["claimedAt"] = 0
+        PAIR_LAST["client"] = ""
+    save_phone_clients()
+    # Invalidates phones that paired before per-phone secrets existed.
+    rotate_bridge_token()
+
+
+# ── Checklist state shared with the paired phone ───────────────────
+# Kept in memory: a checklist belongs to the flight in progress, not a database.
+CHECKLIST_LOCK = threading.RLock()
+CHECKLIST_STATE = {}
+
+
+def checklist_snapshot():
+    with CHECKLIST_LOCK:
+        if not CHECKLIST_STATE:
+            return None
+        state = dict(CHECKLIST_STATE)
+        state["checks"] = dict(state.get("checks") or {})
+        return state
+
+
+def save_checklist(payload):
+    """Store a checklist state after validation. Older revisions are ignored."""
+    if not isinstance(payload, dict):
+        return None
+    checks = payload.get("checks")
+    clean = {}
+    if isinstance(checks, dict):
+        for key, value in list(checks.items())[:4000]:
+            if isinstance(key, str) and len(key) <= 80 and value is True:
+                clean[key] = True
+    try:
+        revision = int(payload.get("revision") or 0)
+    except (TypeError, ValueError):
+        revision = 0
+    try:
+        updated = int(payload.get("updatedAt") or 0)
+    except (TypeError, ValueError):
+        updated = 0
+    state = {
+        "profileKey": str(payload.get("profileKey") or "")[:60] or None,
+        "flightKey": str(payload.get("flightKey") or "")[:120] or None,
+        "activeSection": str(payload.get("activeSection") or "")[:60] or None,
+        "checks": clean,
+        "revision": max(0, revision),
+        "updatedAt": updated or int(time.time() * 1000),
+    }
+    with CHECKLIST_LOCK:
+        current = CHECKLIST_STATE
+        if current and current.get("flightKey") == state["flightKey"]:
+            if state["revision"] < int(current.get("revision") or 0):
+                return checklist_snapshot()
+        CHECKLIST_STATE.update(state)
+        return checklist_snapshot()
 
 
 def load_aircraft_identity():
@@ -688,7 +963,7 @@ UNLOCK_HTML = """<!doctype html>
 <style>
 :root{color-scheme:dark}body{margin:0;min-height:100vh;display:grid;place-items:center;
 background:#08151d;color:#e7f0f2;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;padding:24px}
-.card{max-width:420px;width:100%;background:#142b36;border:1px solid #294754;border-radius:18px;padding:26px}
+.card{box-sizing:border-box;max-width:420px;width:100%;background:#142b36;border:1px solid #294754;border-radius:18px;padding:26px}
 h1{font-size:20px;margin:0 0 6px}p{color:#91a8b1;margin:0 0 16px;font-size:14px}
 input{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1px solid #294754;
 background:#0b1b24;color:#e7f0f2;font:inherit;font-size:16px;margin-bottom:12px}
@@ -697,10 +972,32 @@ button{width:100%;padding:12px;border:0;border-radius:12px;background:#79c9bb;co
 </style></head><body><form class="card" method="post" action="/unlock">
 <h1>Stratos bridge</h1>
 <p>This bridge is on your local network. Enter the access token shown in Stratos → Settings → Simulator bridge.</p>
-%s
-<input name="token" type="password" autocomplete="current-password" placeholder="Bridge access token" required autofocus>
+{{ERROR}}<input name="token" type="password" autocomplete="current-password" placeholder="Bridge access token" required autofocus>
 <button type="submit">Unlock</button>
 <p class="hint">The token is stored on the PC running the bridge, in <code>bridge_token.txt</code>. It is never sent anywhere else.</p>
+</form></body></html>"""
+
+PAIR_HTML = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<title>Stratos — pair this phone</title>
+<style>
+:root{color-scheme:dark}body{margin:0;min-height:100vh;display:grid;place-items:center;
+background:#08151d;color:#e7f0f2;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;padding:24px}
+.card{box-sizing:border-box;max-width:420px;width:100%;background:#142b36;border:1px solid #294754;border-radius:18px;padding:26px}
+h1{font-size:20px;margin:0 0 6px}p{color:#91a8b1;margin:0 0 16px;font-size:14px}
+input{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1px solid #294754;
+background:#0b1b24;color:#e7f0f2;font:inherit;font-size:20px;letter-spacing:.3em;text-align:center;margin-bottom:12px}
+button{width:100%;padding:12px;border:0;border-radius:12px;background:#79c9bb;color:#04212b;font:inherit;font-weight:700;font-size:15px}
+.err{color:#f17b89;font-size:13px;margin:0 0 12px}.hint{font-size:12px;color:#6f858e;margin-top:14px}
+</style></head><body><form class="card" method="get" action="/pair">
+<h1>Pair this phone</h1>
+<p>Scan the QR code shown in Stratos on the PC, or type the six-digit code from that screen.</p>
+{{ERROR}}
+<input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" autofocus>
+<button type="submit">Pair</button>
+<p class="hint">The code expires after two minutes and works once. The phone and the PC must be on the same local network.</p>
 </form></body></html>"""
 
 
@@ -716,25 +1013,37 @@ class Handler(BaseHTTPRequestHandler):
         address = self.client_address[0] if self.client_address else ""
         return address in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
 
-    def remote_token(self):
+    def cookie_value(self, name):
+        cookie = SimpleCookie()
+        try:
+            cookie.load(self.headers.get("Cookie", ""))
+        except Exception:
+            return ""
+        return cookie.get(name).value if cookie.get(name) else ""
+
+    def token_candidates(self):
         parsed = urllib.parse.urlparse(self.path)
         query = urllib.parse.parse_qs(parsed.query)
-        supplied = (query.get("k", [""])[0] or
-                    self.headers.get("X-Stratos-Token", ""))
-        if not supplied:
-            cookie = SimpleCookie()
-            try:
-                cookie.load(self.headers.get("Cookie", ""))
-                supplied = cookie.get("stratos_token").value if cookie.get("stratos_token") else ""
-            except Exception:
-                supplied = ""
-        return supplied
+        values = [query.get("k", [""])[0],
+                  self.headers.get("X-Stratos-Token", ""),
+                  self.cookie_value("stratos_phone"),
+                  self.cookie_value("stratos_token")]
+        seen = []
+        for value in values:
+            if value and value not in seen:
+                seen.append(value)
+        return seen
 
     def authorized(self):
         if self.is_loopback():
             return True
-        supplied = self.remote_token()
-        return bool(supplied) and hmac.compare_digest(supplied, TOKEN)
+        # The shared token still works for a phone unlocked by hand, while a
+        # paired phone presents its own secret in an HttpOnly cookie. Accept
+        # either when a browser happens to hold both cookies.
+        for supplied in self.token_candidates():
+            if hmac.compare_digest(supplied, TOKEN) or verify_phone_secret(supplied):
+                return True
+        return False
 
     def same_origin(self):
         origin = self.headers.get("Origin")
@@ -747,7 +1056,12 @@ class Handler(BaseHTTPRequestHandler):
             return False
 
     def unlock_denied(self, message=""):
-        body = (UNLOCK_HTML % ('<p class="err">%s</p>' % message if message else "")).encode("utf-8")
+        # A phone that was unpaired still carries a phone cookie. Send it back
+        # to pairing instead of asking for a token it has never been shown.
+        if self.cookie_value("stratos_phone"):
+            self.send_pair_error(message or "This phone is no longer paired. Show a new code in Stratos on the PC.")
+            return
+        body = UNLOCK_HTML.replace("{{ERROR}}", '<p class="err">%s</p>' % message if message else "").encode("utf-8")
         self.send_response(401)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
@@ -837,6 +1151,49 @@ class Handler(BaseHTTPRequestHandler):
                         state[key] = value
             self.send_json({"ok": True, "identity": identity})
             return
+        if path == "/checklist":
+            data, error = self.read_json(64 * 1024)
+            if error:
+                self.send_json({"ok": False, "error": error}, 400)
+                return
+            saved = save_checklist(data)
+            if not saved:
+                self.send_json({"ok": False, "error": "Invalid checklist state"}, 400)
+                return
+            self.send_json(saved)
+            return
+        if path == "/pair/revoke":
+            if not self.is_loopback():
+                self.send_json({"ok": False, "error": "Pairing must be managed on the PC"}, 403)
+                return
+            revoke_pairs()
+            self.send_json({"ok": True})
+            return
+        if path == "/pair/forget-client":
+            if not self.is_loopback():
+                self.send_json({"ok": False, "error": "Pairing must be managed on the PC"}, 403)
+                return
+            data, error = self.read_json(4096)
+            if error:
+                self.send_json({"ok": False, "error": error}, 400)
+                return
+            removed = revoke_phone_client(str(data.get("id", "")))
+            self.send_json({"ok": removed, "id": str(data.get("id", ""))})
+            return
+        if path == "/pair/self-revoke":
+            # A paired phone may forget its own PC. The current cookie is gone
+            # afterwards, so a cached tab cannot keep reading telemetry.
+            removed = revoke_phone_client_for_secret(self.cookie_value("stratos_phone"))
+            body = json.dumps({"ok": True, "removed": removed}, separators=(",", ":")).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Set-Cookie", "stratos_phone=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0")
+            self.send_header("Set-Cookie", "stratos_token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if path == "/relay/pair":
             self.handle_relay_pair()
             return
@@ -892,6 +1249,63 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         self.unlock_denied("That token does not match this bridge.")
+
+    def send_pair_error(self, message):
+        body = PAIR_HTML.replace("{{ERROR}}", '<p class="err">%s</p>' % message if message else "").encode("utf-8")
+        self.send_response(401)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def handle_pair_page(self, parsed):
+        query = urllib.parse.parse_qs(parsed.query)
+        supplied = (query.get("t", [""])[0] or query.get("code", [""])[0]).strip()
+        address = self.client_address[0] if self.client_address else "?"
+        now = time.time()
+        with PAIR_LOCK:
+            attempts = [stamp for stamp in PAIR_ATTEMPTS.get(address, []) if now - stamp < 180]
+            PAIR_ATTEMPTS[address] = attempts
+            limited = len(attempts) >= 10
+        if limited:
+            self.send_pair_error("Too many pairing attempts from this device. Wait a few minutes and show a new code on the PC.")
+            return
+        if supplied and claim_pair(supplied):
+            secret, _record = pair_client(address)
+            cookie = SimpleCookie()
+            cookie["stratos_phone"] = secret
+            morsel = cookie["stratos_phone"]
+            morsel["path"] = "/"
+            morsel["httponly"] = True
+            morsel["samesite"] = "Lax"
+            morsel["max-age"] = 2592000
+            self.send_response(303)
+            self.send_header("Location", "/pilot.html#checklists")
+            self.send_header("Set-Cookie", cookie.output(header="").strip())
+            # A phone must never keep the shared token from an earlier unlock.
+            self.send_header("Set-Cookie", "stratos_token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if supplied:
+            with PAIR_LOCK:
+                PAIR_ATTEMPTS.setdefault(address, []).append(now)
+            self.send_pair_error("That pairing code has expired or was already used. Show a new code in Stratos on the PC.")
+            return
+        body = PAIR_HTML.replace("{{ERROR}}", "").encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def handle_relay_devices(self):
         config = load_relay()
@@ -973,8 +1387,25 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
+        # The pairing page carries a single-use token and is the only route a
+        # phone may reach before it holds the access cookie.
+        if path == "/pair":
+            self.handle_pair_page(parsed)
+            return
         if not self.authorized():
             self.unlock_denied()
+            return
+        if path == "/pair/new":
+            if not self.is_loopback():
+                self.send_json({"ok": False, "error": "Pairing must be started on the PC"}, 403)
+                return
+            self.send_json(create_pair_session())
+            return
+        if path == "/pair/status":
+            self.send_json(pair_status())
+            return
+        if path == "/checklist":
+            self.send_json(checklist_snapshot() or {"empty": True})
             return
         if path == "/health":
             self.handle_health()
@@ -1055,6 +1486,7 @@ class Handler(BaseHTTPRequestHandler):
             "faaCharts": len(FAA),
             "logbook": get_stats(),
             "relay": {key: value for key, value in relay_status.items() if key != "token"},
+            "pairing": pair_status(),
             "lanIp": lan_ip(),
             "auth": {"remoteTokenRequired": True},
             "identity": load_aircraft_identity(),
@@ -1077,8 +1509,19 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         last_payload = None
         heartbeat = time.time()
+        last_auth = time.time()
         try:
             while True:
+                # A revoked phone may still hold an open stream. Re-check the
+                # credential periodically so forgetting a phone stops telemetry
+                # within a few seconds, not only on its next reconnect.
+                if time.time() - last_auth > 5:
+                    last_auth = time.time()
+                    if not self.authorized():
+                        # A plain return would keep the HTTP/1.1 socket open and
+                        # the phone would keep reading a stream it may no longer see.
+                        self.close_connection = True
+                        return
                 with state_lock:
                     snapshot = dict(state)
                 snapshot["age"] = round(time.time() - snapshot.get("t", 0), 2) if snapshot.get("t") else None
@@ -1086,6 +1529,11 @@ class Handler(BaseHTTPRequestHandler):
                 current = get_current_flight()
                 if current:
                     snapshot["currentFlight"] = current
+                # A paired phone reads and writes the checklist through this
+                # stream and POST /checklist, so there is no second poll loop.
+                checklist = checklist_snapshot()
+                if checklist:
+                    snapshot["checklist"] = checklist
                 text = json.dumps(snapshot, separators=(",", ":"))
                 now = time.time()
                 if text != last_payload or now - heartbeat > 5:
@@ -1344,12 +1792,19 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def lan_ip():
+    sock = None
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.connect(("10.255.255.255", 1))
         return sock.getsockname()[0]
     except OSError:
         return "127.0.0.1"
+    finally:
+        if sock is not None:
+            try:
+                sock.close()
+            except OSError:
+                pass
 
 
 def startup_recovery():
@@ -1371,6 +1826,15 @@ def shutdown(*_args):
     os._exit(0)
 
 
+class BridgeHTTPServer(ThreadingHTTPServer):
+    # Windows SO_REUSEADDR lets a second process bind the same port, which
+    # leaves two bridges fighting over port 8765 and one of them serving stale
+    # code. Refuse reuse there; keep it on POSIX so a restart is not blocked by
+    # a socket in TIME_WAIT.
+    allow_reuse_address = os.name != "nt"
+    daemon_threads = True
+
+
 def main():
     if "--pack" in sys.argv:
         extra = [item.upper() for item in sys.argv[sys.argv.index("--pack") + 1:]]
@@ -1387,16 +1851,16 @@ def main():
     threading.Thread(target=relay_loop, daemon=True).start()
 
     try:
-        server = ThreadingHTTPServer((HOST, HTTP_PORT), Handler)
+        server = BridgeHTTPServer((HOST, HTTP_PORT), Handler)
     except OSError as exc:
         log("Could not start the bridge on port %d: %s" % (HTTP_PORT, exc))
         log("Another Stratos bridge may already be running. Close it, or set STRATOS_HTTP_PORT.")
         sys.exit(2)
-    server.daemon_threads = True
     print("")
     print("  Stratos bridge is running")
     print("  On this PC:   http://127.0.0.1:%d" % HTTP_PORT)
-    print("  On your LAN:  http://%s:%d  (set STRATOS_HOST=0.0.0.0 to enable; token required)" % (lan_ip(), HTTP_PORT))
+    print("  On your LAN:  http://%s:%d  (token required; pair a phone from Stratos Settings)" % (lan_ip(), HTTP_PORT))
+    print("  Phone QR:     Stratos > Settings > Phone access > Show pairing QR")
     print("  Access token: %s" % TOKEN)
     print("  X-Plane: Settings > Data Output, enable rows 3, 17 and 20 to UDP %s:%d" % (lan_ip(), UDP_PORT))
     print("  MSFS: start a flight (install the connector once with  pip install SimConnect )")

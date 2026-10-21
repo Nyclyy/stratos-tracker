@@ -14,11 +14,13 @@ import sys
 # Each target: file, pattern, replacement template (receives {version}).
 TARGETS = [
     ("bridge_logbook_addon.py", r'(?m)^VERSION = "[^"]*"$', 'VERSION = "{version}"'),
-    (
-        "app/js/pilot/settings.js",
-        r'(<strong>Stratos</strong><span class="tag">)v\d+\.\d+\.\d+(</span>)',
-        r'\g<1>v{version}\g<2>',
-    ),
+    # The web build reports the version from one constant, which Settings, the
+    # About card and the update centre all read.
+    ("app/js/lib/version.js", r"(?m)^export const APP_VERSION = '[^']*';$", "export const APP_VERSION = '{version}';"),
+    # A distinct shell-cache name per release is what tells the service worker
+    # a build is an update rather than a first install, so the waiting worker
+    # can ask before it takes over.
+    ("app/sw.js", r"(?m)^const CACHE = '[^']*';$", "const CACHE = 'stratos-shell-{version}';"),
 ]
 
 

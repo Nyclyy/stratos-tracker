@@ -1,0 +1,209 @@
+{
+  "schemaVersion": 1,
+  "product": "stratos",
+  "source": "https://github.com/Nyclyy/stratos-tracker",
+  "latest": {
+    "version": "2.1.14",
+    "releasedAt": "2026-10-20",
+    "severity": "normal",
+    "summary": "1 change outside the main categories.",
+    "changelog": {
+      "features": [],
+      "improvements": [],
+      "fixes": [],
+      "performance": [],
+      "ui": [],
+      "compatibility": [],
+      "other": [
+        "Make the chart browser check runnable from a fresh checkout."
+      ]
+    }
+  },
+  "releases": [
+    {
+      "version": "2.1.14",
+      "releasedAt": "2026-10-20",
+      "severity": "normal",
+      "summary": "1 change outside the main categories.",
+      "changelog": {
+        "features": [],
+        "improvements": [],
+        "fixes": [],
+        "performance": [],
+        "ui": [],
+        "compatibility": [],
+        "other": [
+          "Make the chart browser check runnable from a fresh checkout."
+        ]
+      }
+    },
+    {
+      "version": "2.1.13",
+      "releasedAt": "2026-10-19",
+      "severity": "normal",
+      "summary": "1 change outside the main categories.",
+      "changelog": {
+        "features": [],
+        "improvements": [],
+        "fixes": [],
+        "performance": [],
+        "ui": [],
+        "compatibility": [],
+        "other": [
+          "Open official charts inside Stratos instead of redirecting to ChartFox."
+        ]
+      }
+    },
+    {
+      "version": "2.1.12",
+      "releasedAt": "2026-10-19",
+      "severity": "normal",
+      "summary": "2 changes outside the main categories.",
+      "changelog": {
+        "features": [],
+        "improvements": [],
+        "fixes": [],
+        "performance": [],
+        "ui": [],
+        "compatibility": [],
+        "other": [
+          "Let Settings check for updates without waiting for a quit.",
+          "Update installed Windows builds from GitHub releases."
+        ]
+      }
+    },
+    {
+      "version": "2.1.11",
+      "releasedAt": "2026-10-19",
+      "severity": "normal",
+      "summary": "1 change outside the main categories.",
+      "changelog": {
+        "features": [],
+        "improvements": [],
+        "fixes": [],
+        "performance": [],
+        "ui": [],
+        "compatibility": [],
+        "other": [
+          "Read the world payload line-ending agnostically in the test."
+        ]
+      }
+    },
+    {
+      "version": "2.1.10",
+      "releasedAt": "2026-10-19",
+      "severity": "normal",
+      "summary": "4 interface changes.",
+      "changelog": {
+        "features": [],
+        "improvements": [],
+        "fixes": [],
+        "performance": [],
+        "ui": [
+          "Let the rail tooltip settle before naming an icon.",
+          "Finish the navigation rail: a labelled sidebar and real keyboard focus.",
+          "Finish the Flight Deck chrome: centred search, honest times, phone fit.",
+          "Ship the Flight Deck chrome and an offline Natural Earth world map."
+        ],
+        "compatibility": [],
+        "other": [
+          "Report the measured spread for the world sheet rebuild."
+        ]
+      }
+    },
+    {
+      "version": "2.1.9",
+      "releasedAt": "2026-10-19",
+      "severity": "normal",
+      "summary": "1 change outside the main categories.",
+      "changelog": {
+        "features": [],
+        "improvements": [],
+        "fixes": [],
+        "performance": [],
+        "ui": [],
+        "compatibility": [],
+        "other": [
+          "Place SimBrief TOD on a 3 degree descent path."
+        ]
+      }
+    },
+    {
+      "version": "2.1.8",
+      "releasedAt": "2026-10-18",
+      "severity": "normal",
+      "summary": "1 new feature, 2 fixes and 1 interface change.",
+      "changelog": {
+        "features": [
+          "Add Route Discovery: pick a mood, get three real routes."
+        ],
+        "improvements": [],
+        "fixes": [
+          "Correct the test counts in the report.",
+          "Fix the collapsed grid and repaint the chrome in midnight navy."
+        ],
+        "performance": [],
+        "ui": [
+          "Drop the unused rail component and the dead nav hook."
+        ],
+        "compatibility": [],
+        "other": []
+      }
+    },
+    {
+      "version": "2.1.7",
+      "releasedAt": "2026-10-18",
+      "severity": "normal",
+      "summary": "1 fix and 2 interface changes.",
+      "changelog": {
+        "features": [],
+        "improvements": [],
+        "fixes": [
+          "Stop the map overlays reserving space for the old bottom tab bar."
+        ],
+        "performance": [],
+        "ui": [
+          "Keep the desktop rail from doubling the top bar's border.",
+          "Move navigation into a real sidebar and unify the bar across pages."
+        ],
+        "compatibility": [],
+        "other": [
+          "Give the map page a status bar and a career strip."
+        ]
+      }
+    },
+    {
+      "version": "2.1.6",
+      "releasedAt": "2026-10-18",
+      "severity": "normal",
+      "summary": "1 new feature, 2 fixes and 3 interface changes.",
+      "changelog": {
+        "features": [
+          "Add a multi-station watchlist to the Weather Center."
+        ],
+        "improvements": [],
+        "fixes": [
+          "Correct the documented bridge data path to stratos-desktop.",
+          "Stop the bridge's pairing token from reaching the repository."
+        ],
+        "performance": [],
+        "ui": [
+          "Make the dashboard customizer reorderable by dragging and harden its saved layout.",
+          "Pin tracker panel surface colours per theme instead of computing them with color-mix.",
+          "Collapse the duplicated design tokens into one system and drop per-frame backdrop blur."
+        ],
+        "compatibility": [],
+        "other": [
+          "Check a published release's installer instead of trusting the upload.",
+          "Let the release stamp accept the version already in the repository.",
+          "Embed the full Weather Center in the map's METAR tab.",
+          "Stamp the release tag into the app and bridge version.",
+          "Name the airport in the Weather Center header and share one station request per search.",
+          "Assert that a saved dashboard order and density survive a reload.",
+          "Define card, tile and table surfaces once and alias the page class names to them.",
+          "Label map route points by name, enlarge TOC/TOD, and move SimBrief import into the Route panel."
+        ]
+      }
+    }
+  ]
+}

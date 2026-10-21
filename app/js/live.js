@@ -5,7 +5,7 @@
    The phone never connects to a simulator, and no command channel exists. */
 
 import { initTheme, esc, fmtDate, fmtTime, num, setTheme, toast, tag } from './ui.js';
-import { defaultBridgeBase, claimRelay, RelayClient, TelemetryClient, bridgeHealth } from './bridge.js';
+import { defaultBridgeBase, claimRelay, RelayClient, TelemetryClient, bridgeHealth, forgetThisPhone } from './bridge.js';
 import { mergeFlights, getFlights } from './lib/store.js';
 import { detectResourceMode, formatAltitude, parseTelemetry } from './lib/telemetry.js';
 import { findAirport } from './data/airports.js';
@@ -27,6 +27,7 @@ let lastState = null;
 let map = null;
 let mapTrack = [];
 let mapKey = '';
+let mapRouteKey = null;
 let lastMapUpdate = 0;
 let lastIngest = 0;
 let knownFlightIds = new Set();
@@ -227,14 +228,28 @@ function stopBridge() {
   telemetryClient = null;
 }
 
+/** Departure and arrival airports of the active flight, as map waypoints. */
+function routeAirports(flight) {
+  if (!flight) return [];
+  const points = [];
+  const dep = flight.depAirport ? findAirport(flight.depAirport) : null;
+  const arr = flight.arrAirport ? findAirport(flight.arrAirport) : null;
+  if (dep) points.push({ lat: dep.lat, lon: dep.lon, id: flight.depAirport });
+  if (arr) points.push({ lat: arr.lat, lon: arr.lon, id: flight.arrAirport });
+  return points;
+}
+
+/** One map for the page's lifetime: each render moves its canvas, keeping tiles and view state. */
 function ensureMap() {
-  const canvas = document.getElementById('live-map');
-  if (!canvas) return null;
-  if (map && map.canvas === canvas) return map;
-  map?.destroy();
-  map = new MiniMap(canvas, { padding: 22 });
-  const points = mapTrack.length ? mapTrack : [{ lat: 0, lon: 0 }];
-  map.setTrack(points);
+  const host = document.getElementById('live-map-host');
+  if (!host) return null;
+  if (!map) {
+    const canvas = document.createElement('canvas');
+    canvas.setAttribute('aria-label', 'Aircraft position');
+    map = new MiniMap(canvas, { padding: 22 });
+    map.setTrack(mapTrack.length ? mapTrack : [{ lat: 0, lon: 0 }]);
+  }
+  map.attach(host);
   return map;
 }
 
@@ -320,7 +335,15 @@ function render() {
       <div class="stat"><span class="stat-label">Vertical speed</span><b class="stat-value">${telemetry ? Math.round(telemetry.vs) : '—'}<small class="muted" style="font-size:12px"> fpm</small></b></div>
     </div>
 
-    <div class="map-wrap live-map" style="margin-top:12px"><canvas id="live-map" aria-label="Aircraft position"></canvas></div>
+    <div class="map-wrap live-map" id="live-map-host" style="margin-top:12px"></div>
+    <div class="row map-controls" role="toolbar" aria-label="Map controls">
+      <button type="button" class="btn small" data-map-action="follow" aria-pressed="${map?.follow ? 'true' : 'false'}">Follow aircraft</button>
+      <button type="button" class="btn small" data-map-action="zoom-in" aria-label="Zoom in">+</button>
+      <button type="button" class="btn small" data-map-action="zoom-out" aria-label="Zoom out">−</button>
+      <button type="button" class="btn small" data-map-action="fit">Fit route</button>
+      <button type="button" class="btn small" data-map-action="route" aria-pressed="${map?.layers?.route !== false ? 'true' : 'false'}">Route</button>
+      <button type="button" class="btn small" data-map-action="track" aria-pressed="${map?.layers?.track !== false ? 'true' : 'false'}">Track</button>
+    </div>
 
     <div class="card" style="margin-top:12px">
       <div class="card-head"><h2>Recent flights</h2><span class="spacer"></span><a class="small" href="logbook.html">Logbook</a></div>
@@ -341,7 +364,7 @@ function render() {
       <p class="muted small" id="connection-note">${esc(bridgeSource ? 'Direct connection to the bridge on your network.' : lastState.name ? `Paired with ${lastState.name}.` : '')}</p>
       <div class="btn-row" style="margin-top:10px">
         <button class="btn small" id="live-refresh">Refresh</button>
-        ${bridgeSource ? '' : '<button class="btn small danger" id="live-disconnect">Disconnect phone</button>'}
+        ${bridgeSource ? '<button class="btn small danger" id="live-forget">Forget this PC</button>' : '<button class="btn small danger" id="live-disconnect">Disconnect phone</button>'}
         <a class="btn small ghost" href="pilot.html#/settings">Settings</a>
       </div>
       <p class="help" style="margin-top:10px">iOS may suspend this web app in the background. Live data resumes when you reopen it. Stratos does not claim background tracking or guaranteed notifications.</p>
@@ -356,8 +379,17 @@ function render() {
   document.getElementById('live-disconnect')?.addEventListener('click', () => {
     if (confirm('Disconnect this phone? It will lose access until paired again.')) disconnect(true);
   });
+  document.getElementById('live-forget')?.addEventListener('click', async () => {
+    if (!confirm('Forget this PC on this phone? You will need to scan a new QR code to reconnect.')) return;
+    try { await forgetThisPhone(defaultBridgeBase()); } catch (_) { /* already unpaired */ }
+    location.href = '/pair';
+  });
 
   const liveMap = ensureMap();
+  if (liveMap && mapRouteKey !== routeKey) {
+    mapRouteKey = routeKey;
+    liveMap.setRoute(routeAirports(flight));
+  }
   if (liveMap && telemetry) {
     const now = performance.now();
     if (now - lastMapUpdate > 900) {
@@ -368,6 +400,22 @@ function render() {
   }
   document.title = flight?.arrAirport ? `Live · ${flight.depAirport || '????'} → ${flight.arrAirport}` : 'Live · Stratos';
 }
+
+// Map controls live in the re-rendered view, so one delegated listener serves every render.
+view.addEventListener('click', event => {
+  const button = event.target.closest?.('[data-map-action]');
+  if (!button || !map) return;
+  switch (button.dataset.mapAction) {
+    case 'follow': map.setFollow(!map.follow); break;
+    case 'zoom-in': map.zoomBy(1); break;
+    case 'zoom-out': map.zoomBy(-1); break;
+    case 'fit': map.setFollow(false); map.resetZoom(); break;
+    case 'route': map.setLayers({ route: !map.layers.route }); break;
+    case 'track': map.setLayers({ track: !map.layers.track }); break;
+    default: return;
+  }
+  render();
+});
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {

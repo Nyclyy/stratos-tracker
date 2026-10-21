@@ -232,7 +232,7 @@
   color: var(--shell-ink); font-size: 10.5px; font-weight: 600;
 }
 .tb-perf:hover { border-color: var(--shell-line-strong); }
-.tb-btn { height: 28px; min-width: 28px; border-radius: 7px; }
+.tb-btn { height: 28px; min-width: 28px; border-radius: 7px; white-space: nowrap; }
 .tb-btn:hover { background: var(--shell-soft); border-color: transparent; }
 .tb-avatar {
   width: 26px; height: 26px; border-radius: 50%;
@@ -546,6 +546,19 @@
   outline-offset: 2px;
 }
 #tabs .tab:focus-visible { outline-offset: -2px; }
+
+/* ── Narrow desktops ───────────────────────────────────────────────
+   The Pilot pages carry six nav links beside the whole action cluster; below
+   1024 px that row is wider than the window and used to widen the page, which
+   put a horizontal scrollbar under every pilot screen. The bar drops the
+   invitation and the resource profile first (both still live in Settings),
+   then the clock once the nav needs the room. */
+@media (max-width: 1024px) {
+  .tb-support, .tb-perf-wrap { display: none; }
+}
+@media (max-width: 800px) {
+  .tb-clock { display: none; }
+}
 
 /* ── Phone ─────────────────────────────────────────────────────────
    The bar keeps the brand, the search and the pilot; Support, the clock, the

@@ -7,6 +7,16 @@ import { parseHTML } from 'linkedom';
 const ROOT = path.resolve(import.meta.dirname, '..');
 const read = file => fs.readFileSync(path.join(ROOT, file), 'utf8');
 
+/** Poll a page state until it settles, so a slow promise is not a flaky test. */
+async function until(check, timeoutMs = 3000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (check()) return;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  throw new Error('timed out waiting for the page state');
+}
+
 const META = `<?xml version="1.0" encoding="utf-8"?>
 <digital_tpp cycle="2610" from_edate="0901Z  10/01/26" to_edate="0901Z  10/29/26">
   <state_code ID="CA" state_fullname="CALIFORNIA">
@@ -102,6 +112,9 @@ test('the metafile becomes a catalogue with real categories and dates', async ()
   assert.equal(ils.approach, 'ILS/LOC');
   assert.deepEqual(ils.runways, ['28L']);
   assert.equal(ils.cycle, '2610');
+  assert.equal(ils.format, 'PDF');
+  assert.equal(ils.retrieval, 'faa-cycle');
+  assert.equal(ils.provider, 'faa-dtpp');
   assert.equal(ils.url, 'https://aeronav.faa.gov/d-tpp/2610/00375IL28L.PDF');
   assert.equal(new Date(ils.amended).toISOString().slice(0, 10), '2019-12-05');
   assert.equal(validityState(ils, Date.UTC(2026, 9, 19)), 'current');
@@ -114,6 +127,174 @@ test('the metafile becomes a catalogue with real categories and dates', async ()
   assert.equal(searchCharts(charts, 'SID').length, 1);
   assert.equal(searchCharts(charts, '').length, 7);
   assert.equal(searchCharts(charts, 'EGLL').length, 0);
+});
+
+test('ILS and LOC approaches are free and every other procedure stays Premium', async () => {
+  const { accessLevel, approachType, canOpenChart, isFreeChart, normaliseCatalogue, parseFaaAirport } =
+    await import('../app/js/lib/charts.js');
+  const charts = normaliseCatalogue({ cycle: '2610', charts: parseFaaAirport(META, 'KSFO').records }, 'KSFO');
+  assert.equal(isFreeChart(charts.find(chart => chart.pdf === '00375IL28L.PDF')), true, 'ILS OR LOC is free');
+  assert.equal(isFreeChart({ category: 'approach', approach: 'LOC', title: 'LOC RWY 10' }), true, 'LOC only is free');
+  assert.equal(isFreeChart({ category: 'approach', approach: 'LOC', title: 'LOC/DME RWY 22L' }), true, 'LOC/DME is free');
+  assert.equal(isFreeChart({ category: 'approach', approach: null, title: 'LOCALIZER RWY 04' }), true, 'a localizer title is free');
+  assert.equal(isFreeChart({ category: 'approach', approach: 'RNAV', title: 'RNAV (GPS) Y RWY 19R' }), false, 'RNAV is not free');
+  assert.equal(isFreeChart({ category: 'approach', approach: 'VOR', title: 'VOR RWY 19R' }), false, 'VOR is not free');
+  assert.equal(isFreeChart(charts.find(chart => chart.category === 'diagram')), false, 'a diagram is not an approach');
+  assert.equal(isFreeChart(charts.find(chart => chart.category === 'sid')), false, 'a SID is not free');
+  assert.equal(isFreeChart({ category: 'approach', approach: null, title: 'ILS PRM RWY 28L' }), true, 'the title is checked when the family is unknown');
+  assert.equal(isFreeChart(null), false);
+
+  assert.equal(approachType('ILS OR LOC RWY 28L'), 'ILS/LOC');
+  assert.equal(approachType('ILS RWY 28L'), 'ILS');
+  assert.equal(approachType('LOC RWY 10'), 'LOC');
+  assert.equal(approachType('VOR OR GPS RWY 13L/R'), 'VOR');
+  assert.equal(approachType('NDB OR GPS RWY 04'), 'NDB');
+  assert.equal(accessLevel({ category: 'diagram', title: 'AIRPORT DIAGRAM' }), 'premium');
+  assert.equal(accessLevel({ category: 'approach', approach: 'LOC', title: 'LOC RWY 10' }), 'free');
+
+  // The one access rule every surface uses: free charts need no licence, all
+  // premium charts need a verified entitlement.
+  const loc = { category: 'approach', approach: 'LOC', title: 'LOC RWY 10' };
+  const diagram = { category: 'diagram', title: 'AIRPORT DIAGRAM' };
+  assert.equal(canOpenChart(loc, false), true);
+  assert.equal(canOpenChart(diagram, false), false);
+  assert.equal(canOpenChart(diagram, true), true);
+});
+
+test('official sources are offered for Canada and Europe, never copied', async () => {
+  const { officialSourcesFor, isListedRegion } = await import('../app/js/lib/chartdir.js');
+  const canada = officialSourcesFor('CYYZ');
+  assert.equal(canada.length, 1, 'NAV CANADA is the only listed source for Canada');
+  assert.equal(canada[0].id, 'navcanada');
+  assert.match(canada[0].url, /^https:\/\/www\.navcanada\.ca\//);
+  assert.match(canada[0].note, /licensed/i);
+
+  assert.deepEqual(officialSourcesFor('EGLL').map(source => source.id), ['nats-uk', 'ead-basic', 'ais-online']);
+  assert.equal(officialSourcesFor('EDDF')[0].id, 'dfs');
+  assert.equal(officialSourcesFor('LFPO')[0].id, 'sia');
+  assert.equal(officialSourcesFor('LIRF')[0].id, 'enav');
+  assert.equal(officialSourcesFor('EBBR')[0].id, 'ead-basic', 'an unlisted European state falls back to EUROCONTROL');
+  assert.deepEqual(officialSourcesFor('YSSY').map(source => source.id), ['airservices-au']);
+  assert.deepEqual(officialSourcesFor('SBGR'), [], 'no source is invented outside the listed regions');
+  assert.equal(isListedRegion('CYYZ'), true);
+  assert.equal(isListedRegion('YSSY'), true);
+  assert.equal(isListedRegion('KSFO'), false);
+
+  // Links, not documents: nothing here may fetch or point at a chart file.
+  const source = read('app/js/lib/chartdir.js');
+  assert.doesNotMatch(source, /aeronav/i);
+  assert.doesNotMatch(source, /\.pdf/i);
+});
+
+test('providers declare what they publish and only the FAA is integrated', async () => {
+  const { CHART_PROVIDERS, availableProviders, chartCoverage, coverageSummary, isFaaIcao } =
+    await import('../app/js/lib/chartproviders.js');
+
+  const us = chartCoverage('KJFK');
+  assert.equal(us.integrated, true);
+  assert.equal(us.country, 'United States');
+  assert.equal(us.provider.id, 'faa-dtpp');
+  assert.match(us.provider.licence, /public domain/i);
+
+  for (const [icao, country, publisher] of [
+    ['CYYZ', 'Canada', 'navcanada'],
+    ['EGLL', 'United Kingdom', 'nats-uk'],
+    ['EDDF', 'Germany', 'dfs'],
+    ['YSSY', 'Australia', 'airservices-au'],
+  ]) {
+    const coverage = chartCoverage(icao);
+    assert.equal(coverage.integrated, false, `${icao} is not integrated`);
+    assert.equal(coverage.country, country);
+    assert.equal(coverage.provider.id, publisher);
+    assert.ok(coverage.sources.some(source => source.id === publisher));
+    assert.match(coverage.message, /redistribution licence/);
+  }
+
+  const belgium = chartCoverage('EBBR');
+  assert.equal(belgium.integrated, false);
+  assert.equal(belgium.country, 'Europe');
+  assert.equal(belgium.provider.id, 'ead-basic');
+  assert.deepEqual(belgium.sources.map(source => source.id), ['ead-basic', 'ais-online']);
+
+  const unknown = chartCoverage('SBGR');
+  assert.equal(unknown.integrated, false);
+  assert.equal(unknown.provider, null);
+  assert.deepEqual(unknown.sources, []);
+  assert.match(coverageSummary(), /United States/);
+  assert.doesNotMatch(coverageSummary(), /worldwide/i);
+  assert.equal(isFaaIcao('PHNL'), true);
+  assert.equal(isFaaIcao('EGLL'), false);
+
+  assert.deepEqual(availableProviders().map(provider => provider.id), ['faa-dtpp']);
+  for (const provider of CHART_PROVIDERS) {
+    assert.ok(provider.id && provider.name && provider.status, 'identity and status are declared');
+    assert.ok(provider.regions.length, `${provider.id} names its regions`);
+    assert.ok(provider.categories.length, `${provider.id} names its categories`);
+    assert.match(provider.format, /PDF/);
+    assert.ok(provider.update && provider.licence && provider.attribution);
+  }
+});
+
+test('a local chart is only accepted with a real PDF header', async () => {
+  const { isPdfBytes } = await import('../app/js/lib/charts.js');
+  const header = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31]);
+  assert.equal(isPdfBytes(header), true);
+  assert.equal(isPdfBytes(header.buffer), true);
+  assert.equal(isPdfBytes(new Uint8Array([0x50, 0x4b, 0x03, 0x04])), false, 'a zip is not a PDF');
+  assert.equal(isPdfBytes(new ArrayBuffer(0)), false);
+});
+
+test('an airport outside FAA coverage points at its publisher instead of inventing charts', async () => {
+  installDom();
+  const { resetEntitlementCache } = await import('../app/js/lib/entitlement.js');
+  resetEntitlementCache();
+  globalThis.stratosDesktop = {
+    getEntitlement: async () => ({ premium: false, verified: true, mode: 'none', reason: 'No licence service is configured.' }),
+  };
+  globalThis.fetch = async () => ({
+    ok: false, status: 404,
+    json: async () => ({ unsupported: true, message: 'No FAA d-TPP charts are published for EGLL.' }),
+  });
+  const { mount } = await import('../app/js/pilot/charts.js');
+  const root = document.getElementById('view');
+  const instance = await mount(root, {
+    params: new URLSearchParams('icao=EGLL'), directory: [], bridgeBase: 'http://127.0.0.1:8765', health: null,
+  });
+  await until(() => root.querySelectorAll('.chart-sources a').length === 3);
+  const names = [...root.querySelectorAll('.chart-sources a b')].map(node => node.textContent);
+  assert.match(names[0], /NATS AIS/);
+  assert.match(names[1], /EAD Basic/);
+  assert.ok(root.querySelector('#chart-open-file'), 'the viewer offers a local PDF');
+  assert.match(root.textContent, /does not hold a redistribution licence/);
+  assert.match(root.textContent, /no integrated charts/);
+  instance.destroy();
+});
+
+test('the bundled viewer carries the helpers the app Chromium lacks', async () => {
+  await import('../app/vendor/pdfjs/compat.mjs');
+  // Electron 37 runs Chromium 138: no typed-array hex/base64 helpers and no
+  // Map upsert, which is exactly what pdf.js 6 calls.
+  assert.equal(new Uint8Array([0, 15, 255]).toHex(), '000fff');
+  assert.deepEqual([...Uint8Array.fromHex('00ff10')], [0, 255, 16]);
+  assert.equal(new Uint8Array([104, 105]).toBase64(), 'aGk=');
+  assert.deepEqual([...Uint8Array.fromBase64('aGk=')], [104, 105]);
+  assert.throws(() => Uint8Array.fromHex('abc'), 'an odd hex string is refused');
+
+  const map = new Map([['a', 1]]);
+  assert.equal(map.getOrInsert('a', 2), 1, 'an existing key keeps its value');
+  assert.equal(map.getOrInsert('b', 2), 2);
+  assert.equal(map.getOrInsertComputed('c', key => key.length), 1);
+  assert.equal(map.getOrInsertComputed('c', () => 99), 1, 'the computed value is stored once');
+  const weak = new WeakMap();
+  const key = {};
+  assert.equal(weak.getOrInsert(key, 'v'), 'v');
+  assert.equal(weak.getOrInsertComputed(key, () => 'other'), 'v');
+
+  const page = read('app/js/pilot/charts.js');
+  assert.match(page, /import\('\.\.\/\.\.\/vendor\/pdfjs\/compat\.mjs'\)[\s\S]{0,120}pdf\.min\.mjs/, 'the shims load before pdf.js');
+  assert.match(page, /workerSrc = new URL\('\.\.\/\.\.\/vendor\/pdfjs\/worker-compat\.mjs'/, 'the worker loads the same shims');
+  const worker = read('app/vendor/pdfjs/worker-compat.mjs');
+  assert.match(worker, /import '\.\/compat\.mjs';\s*import '\.\/pdf\.worker\.min\.mjs';/);
 });
 
 test('a Premium entitlement is only trusted when a trusted channel verifies it', async () => {
@@ -165,6 +346,12 @@ function installDom() {
     setItem(key, value) { this.store.set(key, String(value)); },
     removeItem(key) { this.store.delete(key); },
   };
+  globalThis.sessionStorage = {
+    store: new Map(),
+    getItem(key) { return this.store.get(key) ?? null; },
+    setItem(key, value) { this.store.set(key, String(value)); },
+    removeItem(key) { this.store.delete(key); },
+  };
   globalThis.HTMLElement = window.HTMLElement;
   globalThis.Event = window.Event;
   globalThis.CustomEvent = window.CustomEvent;
@@ -172,7 +359,7 @@ function installDom() {
   return window;
 }
 
-test('a free pilot sees the catalogue and a Premium panel instead of a chart', async () => {
+test('a free pilot lands on an empty viewer, not an unprompted upgrade panel', async () => {
   installDom();
   const { resetEntitlementCache } = await import('../app/js/lib/entitlement.js');
   resetEntitlementCache();
@@ -183,12 +370,189 @@ test('a free pilot sees the catalogue and a Premium panel instead of a chart', a
   const root = document.getElementById('view');
   const instance = await mount(root, { params: new URLSearchParams(''), directory: [], bridgeBase: '', health: null });
   assert.match(root.textContent, /Charts/);
-  assert.match(root.textContent, /Integrated charts/);
-  assert.match(root.textContent, /No licence service is configured/);
+  assert.match(root.textContent, /ILS and LOC approaches open for every pilot/);
   assert.match(root.textContent, /Not for navigation/);
+  assert.equal(root.querySelector('.premium-panel'), null, 'the upgrade dialog needs a selected chart');
   assert.equal(root.querySelector('.chart-page'), null, 'no document is rendered for a free pilot');
   instance.destroy();
   assert.equal(root.innerHTML, '');
+});
+
+test('a free pilot opens an ILS approach but is stopped at every other procedure', async () => {
+  installDom();
+  const { resetEntitlementCache } = await import('../app/js/lib/entitlement.js');
+  resetEntitlementCache();
+  globalThis.stratosDesktop = {
+    getEntitlement: async () => ({ premium: false, verified: true, mode: 'none', reason: 'No licence service is configured.' }),
+  };
+
+  const { parseFaaAirport } = await import('../app/js/lib/charts.js');
+  const records = parseFaaAirport(META, 'KSFO').records;
+  const requested = [];
+  globalThis.fetch = async url => {
+    requested.push(String(url));
+    if (String(url).includes('/charts?icao=')) {
+      return {
+        ok: true, status: 200,
+        json: async () => ({
+          cycle: '2610', effective: Date.UTC(2026, 9, 1, 9, 1), expires: Date.UTC(2026, 9, 29, 9, 1),
+          checkedAt: Date.UTC(2026, 9, 19), source: 'faa-dtpp', sourceName: 'FAA Digital Terminal Procedures',
+          license: 'U.S. Government work — public domain', charts: records,
+        }),
+      };
+    }
+    if (String(url).includes('/chart?')) {
+      return { ok: true, status: 200, arrayBuffer: async () => new ArrayBuffer(4096) };
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+
+  const { mount } = await import('../app/js/pilot/charts.js');
+  const root = document.getElementById('view');
+  const instance = await mount(root, {
+    params: new URLSearchParams('icao=KSFO'), directory: [], bridgeBase: 'http://127.0.0.1:8765', health: null,
+  });
+
+  await until(() => root.querySelectorAll('.chart-row').length === 7);
+  const rows = [...root.querySelectorAll('.chart-row')];
+  const ilsRow = rows.find(row => /ILS OR LOC/.test(row.textContent));
+  const rnavRow = rows.find(row => /RNAV/.test(row.textContent));
+  assert.ok(ilsRow.textContent.includes('Free'), 'the ILS row is labelled free');
+  assert.ok(rnavRow.textContent.includes('Premium'), 'the RNAV row still carries the Premium lock');
+  assert.equal(root.querySelectorAll('.chart-row-lock').length, 6, 'the ILS approach is the only free document in this fixture');
+
+  rnavRow.click();
+  await until(() => Boolean(root.querySelector('.premium-panel')));
+  assert.match(root.textContent, /ILS and LOC approach charts are free/);
+  assert.equal(requested.some(url => url.includes('/chart?')), false, 'a locked chart downloads nothing');
+
+  ilsRow.click();
+  await until(() => requested.some(url => url.includes('/chart?')));
+  assert.equal(root.querySelector('.premium-panel'), null, 'the free chart is not covered by the upgrade panel');
+  instance.destroy();
+});
+
+test('the catalogue labels every row, keeps LOC free, and restores the last chart', async () => {
+  installDom();
+  const { resetEntitlementCache } = await import('../app/js/lib/entitlement.js');
+  resetEntitlementCache();
+  globalThis.stratosDesktop = {
+    getEntitlement: async () => ({ premium: false, verified: true, mode: 'none', reason: 'No licence service is configured.' }),
+  };
+
+  const { parseFaaAirport } = await import('../app/js/lib/charts.js');
+  const records = [
+    ...parseFaaAirport(META, 'KSFO').records,
+    { code: 'IAP', title: 'LOC RWY 19L', pdf: '00375LOC19L.PDF', amended: null, procedure: null },
+  ];
+  const requested = [];
+  globalThis.fetch = async url => {
+    requested.push(String(url));
+    if (String(url).includes('/charts?icao=')) {
+      return {
+        ok: true, status: 200,
+        json: async () => ({
+          cycle: '2610', effective: Date.UTC(2026, 9, 1, 9, 1), expires: Date.UTC(2026, 9, 29, 9, 1),
+          checkedAt: Date.UTC(2026, 9, 19), source: 'faa-dtpp', sourceName: 'FAA Digital Terminal Procedures',
+          license: 'U.S. Government work — public domain', charts: records,
+        }),
+      };
+    }
+    if (String(url).includes('/chart?')) {
+      return { ok: true, status: 200, arrayBuffer: async () => new ArrayBuffer(4096) };
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+
+  const { mount } = await import('../app/js/pilot/charts.js');
+  const root = document.getElementById('view');
+  const directory = [{ id: 'KSFO', name: 'San Francisco Intl' }];
+  const first = await mount(root, {
+    params: new URLSearchParams('icao=KSFO'), directory, bridgeBase: 'http://127.0.0.1:8765', health: null,
+  });
+  await until(() => root.querySelectorAll('.chart-row').length === 8);
+
+  const card = root.querySelector('.chart-airport');
+  assert.match(card.textContent, /KSFO/);
+  assert.match(card.textContent, /San Francisco Intl/);
+  assert.match(card.textContent, /United States/);
+  assert.match(card.textContent, /Instrument approaches/);
+  assert.match(card.textContent, /2 free/);
+  assert.equal(root.querySelectorAll('.chart-access.is-free').length, 2, 'ILS and LOC are labelled Free');
+  assert.equal(root.querySelectorAll('.chart-row-lock').length, 6, 'the other six documents are locked for a free pilot');
+
+  const rows = [...root.querySelectorAll('.chart-row')];
+  const locRow = rows.find(row => /LOC RWY 19L/.test(row.textContent));
+  assert.ok(locRow, 'the LOC row is in the catalogue');
+  assert.match(locRow.textContent, /Free/);
+  locRow.click();
+  await until(() => requested.some(url => url.includes('00375LOC19L.PDF')));
+  assert.equal(root.querySelector('.premium-panel'), null, 'LOC opens without the upgrade dialog');
+
+  const saved = JSON.parse(globalThis.sessionStorage.getItem('stratos.charts.selection'));
+  assert.equal(saved.icao, 'KSFO');
+  assert.match(saved.chartId, /LOC19L/);
+  first.destroy();
+
+  // Returning to the page restores the airport and reopens the last chart.
+  const before = requested.filter(url => url.includes('/chart?')).length;
+  const second = await mount(root, { params: new URLSearchParams(''), directory, bridgeBase: 'http://127.0.0.1:8765', health: null });
+  await until(() => root.querySelectorAll('.chart-row').length === 8);
+  await until(() => requested.filter(url => url.includes('/chart?')).length > before);
+  assert.match(requested.at(-1), /00375LOC19L.PDF/);
+  second.destroy();
+});
+
+test('a verified Premium pilot can open every category with no locks', async () => {
+  installDom();
+  const { resetEntitlementCache } = await import('../app/js/lib/entitlement.js');
+  resetEntitlementCache();
+  globalThis.stratosDesktop = { getEntitlement: async () => ({ premium: true, verified: true, mode: 'licence', plan: 'Premium' }) };
+
+  const { parseFaaAirport } = await import('../app/js/lib/charts.js');
+  const records = parseFaaAirport(META, 'KSFO').records;
+  const requested = [];
+  globalThis.fetch = async url => {
+    requested.push(String(url));
+    if (String(url).includes('/charts?icao=')) {
+      return {
+        ok: true, status: 200,
+        json: async () => ({
+          cycle: '2610', effective: Date.UTC(2026, 9, 1, 9, 1), expires: Date.UTC(2026, 9, 29, 9, 1),
+          checkedAt: Date.UTC(2026, 9, 19), source: 'faa-dtpp', sourceName: 'FAA Digital Terminal Procedures',
+          license: 'U.S. Government work — public domain', charts: records,
+        }),
+      };
+    }
+    if (String(url).includes('/chart?')) {
+      return { ok: true, status: 200, arrayBuffer: async () => new ArrayBuffer(4096) };
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+
+  const { mount } = await import('../app/js/pilot/charts.js');
+  const root = document.getElementById('view');
+  const instance = await mount(root, {
+    params: new URLSearchParams('icao=KSFO'), directory: [], bridgeBase: 'http://127.0.0.1:8765', health: null,
+  });
+  await until(() => root.querySelectorAll('.chart-row').length === 7);
+  assert.equal(root.querySelectorAll('.chart-row-lock').length, 0, 'no Premium row is locked for a licensed pilot');
+  assert.equal(root.querySelectorAll('.chart-access').length, 7, 'every row carries a Free/Premium label');
+
+  // Open the first document in every published category. A Premium licence
+  // must never show the upgrade dialog for any of them.
+  const categories = [...root.querySelectorAll('details.chart-group')].map(group => group.dataset.group);
+  assert.deepEqual(categories, ['diagram', 'sid', 'star', 'approach', 'minimums', 'hotspot']);
+  for (const category of categories) {
+    const before = requested.filter(url => url.includes('/chart?')).length;
+    const row = root.querySelector(`details.chart-group[data-group="${category}"] .chart-row`);
+    assert.ok(row, `${category} has a row`);
+    row.click();
+    await until(() => requested.filter(url => url.includes('/chart?')).length > before);
+    assert.equal(root.querySelector('.premium-panel'), null, `${category} opens without a prompt`);
+  }
+  assert.ok(requested.some(url => url.includes('00375AD.PDF')), 'the diagram document was fetched');
+  instance.destroy();
 });
 
 test('a verified Premium pilot gets the empty viewer ready to open a chart', async () => {
@@ -237,6 +601,8 @@ test('the chart endpoints are narrow and the entitlement check is in the main pr
   const main = read('electron-main.cjs');
   assert.match(main, /ipcMain\.handle\('premium:status'/);
   assert.match(main, /STRATOS_ENTITLEMENT_URL/);
+  assert.match(main, /STRATOS_DEV_PREMIUM/);
+  assert.match(main, /if \(!app\.isPackaged\) \{[\s\S]{0,240}?mode: 'development'/, 'running from source is a labelled development entitlement');
   assert.match(read('electron-preload.cjs'), /getEntitlement: \(\) => ipcRenderer\.invoke\('premium:status'\)/);
 });
 

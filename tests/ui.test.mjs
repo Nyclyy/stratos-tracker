@@ -102,10 +102,33 @@ const mountSettings = async desktop => {
   return root;
 };
 
-const clickUpdate = async button => {
-  button.dispatchEvent(new window.Event('click', { bubbles: true }));
-  await new Promise(resolve => setTimeout(resolve, 0));
-  return document.getElementById('toast')?.textContent || '';
+// The update centre reads the manifest over the network; tests serve one from
+// memory so no suite depends on GitHub being reachable.
+const updateManifest = (version = '2.1.13') => ({
+  schemaVersion: 1,
+  source: 'https://example.test',
+  latest: {
+    version,
+    releasedAt: '2026-10-19',
+    severity: 'normal',
+    summary: '1 fix.',
+    changelog: { features: [], improvements: [], fixes: ['Keep landing rates signed.'], performance: [], ui: [], compatibility: [], other: [] },
+  },
+  releases: [{
+    version,
+    releasedAt: '2026-10-19',
+    severity: 'normal',
+    summary: '1 fix.',
+    changelog: { features: [], improvements: [], fixes: ['Keep landing rates signed.'], performance: [], ui: [], compatibility: [], other: [] },
+  }],
+});
+
+const stubUpdateFetch = (version = '2.1.13') => {
+  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => updateManifest(version) });
+};
+
+const settle = async (turns = 4) => {
+  for (let i = 0; i < turns; i++) await new Promise(resolve => setTimeout(resolve, 0));
 };
 
 // These dispatch real bubbled clicks, so a listener that re-renders the page
@@ -127,43 +150,51 @@ test('the theme buttons still switch the theme', { timeout: 10000 }, async () =>
   assert.equal(document.documentElement.dataset.theme, 'day', 'the theme button still applies its theme');
 });
 
-test('the Settings update button asks the desktop updater and reports a download', { timeout: 10000 }, async () => {
+test('the Settings update centre reports the desktop updater and its real version', { timeout: 10000 }, async () => {
+  stubUpdateFetch('2.1.13');
   const calls = [];
   await mountSettings({
     async getUpdateStatus() { calls.push('status'); return { supported: true, currentVersion: '2.1.12', downloaded: false, version: '2.1.12' }; },
     async checkForUpdates() { calls.push('check'); return { supported: true, currentVersion: '2.1.12', downloaded: false, available: true, version: '2.1.13' }; },
     async installUpdate() { calls.push('install'); return { ok: true }; },
+    onUpdateProgress() { return () => {}; },
   });
-  const button = document.getElementById('check-update');
-  assert.ok(button, 'the update button exists');
-  const message = await clickUpdate(button);
-  assert.ok(calls.includes('check'), 'the click checks the desktop updater, not the service worker');
-  assert.equal(calls.filter(name => name === 'check').length, 1, 'the button asks for exactly one check');
+  await settle();
+  const slot = document.getElementById('updates-slot');
+  assert.ok(slot, 'the update card exists');
+  assert.match(slot.textContent, /v2\.1\.13/, 'the published version is shown');
+  assert.match(slot.textContent, /Installed/, 'the installed build is named');
+  assert.ok(slot.querySelector('[data-check]'), 'there is a check control');
+  assert.ok(calls.includes('check'), 'the centre asks the desktop updater, not the service worker');
   assert.ok(!calls.includes('install'), 'nothing is installed before a build has downloaded');
-  assert.match(message, /Downloading Stratos v2\.1\.13 in the background/, 'a found update is reported honestly');
-  assert.match(message, /installs when you quit or press Restart to update/, 'the app says an update only needs a quit');
 });
 
-test('a downloaded update becomes a restart-to-install button', { timeout: 10000 }, async () => {
+test('a downloaded desktop update becomes a restart-to-install action', { timeout: 10000 }, async () => {
+  stubUpdateFetch('2.1.13');
   const calls = [];
   await mountSettings({
-    async getUpdateStatus() { calls.push('status'); return { supported: true, currentVersion: '2.1.12', downloaded: true, version: '2.1.13' }; },
+    async getUpdateStatus() { calls.push('status'); return { supported: true, currentVersion: '2.1.12', downloaded: true, version: '2.1.13', verified: true }; },
     async checkForUpdates() { calls.push('check'); return { supported: true, downloaded: true, version: '2.1.13' }; },
     async installUpdate() { calls.push('install'); return { ok: true }; },
+    onUpdateProgress() { return () => {}; },
   });
-  const button = document.getElementById('check-update');
-  await new Promise(resolve => setTimeout(resolve, 0));
-  assert.equal(button.textContent, 'Restart to update to v2.1.13', 'the button names the ready update');
-  const message = await clickUpdate(button);
+  await settle();
+  const apply = document.querySelector('[data-apply]');
+  assert.ok(apply, 'the ready update has its own action');
+  assert.match(apply.textContent, /Restart to update/, 'the action names what it will do');
+  apply.dispatchEvent(new window.Event('click', { bubbles: true }));
+  await settle();
   assert.ok(calls.includes('install'), 'the click installs the downloaded update');
-  assert.match(message, /Restarting to install the update/);
 });
 
-test('without the desktop bridge the button still refreshes the service worker', { timeout: 10000 }, async () => {
+test('the browser build checks the manifest and reports the version honestly', { timeout: 10000 }, async () => {
+  stubUpdateFetch('2.1.13');
   await mountSettings(null);
-  const button = document.getElementById('check-update');
-  const message = await clickUpdate(button);
-  assert.match(message, /No service worker is active on this page/, 'the browser fallback is unchanged');
+  await settle();
+  const slot = document.getElementById('updates-slot');
+  assert.ok(slot, 'the update card exists without the desktop bridge');
+  assert.match(slot.textContent, /Latest published/, 'the published version is read from the manifest');
+  assert.doesNotMatch(slot.textContent, /2\.1\.0\b/, 'no invented version is shown');
 });
 
 test('dashboard layout helpers clamp moves and reject bad stored data', async () => {
@@ -555,6 +586,9 @@ test('the rebuilt bar centres its search and the phone row stays inside the view
   const css = fs.readFileSync(new URL('../app/shell.css', import.meta.url), 'utf8');
   assert.match(css, /\.tb--rail \.tb-search \{[^}]*position:\s*absolute;[^}]*left:\s*50%/, 'the rail pages centre the search on the bar');
   assert.match(css, /@media \(max-width: 767px\) \{[^}]*\.tb-support,[^{]*\.tb-clock,[^{]*\.tb-perf-wrap \{ display: none; \}/, 'the phone bar drops the wide controls');
+  assert.match(css, /@media \(max-width: 1024px\) \{[^}]*\.tb-support,[^{]*\.tb-perf-wrap \{ display: none; \}/, 'a narrow desktop drops the invitation and the profile before the row widens the page');
+  assert.match(css, /@media \(max-width: 800px\) \{[^}]*\.tb-clock \{ display: none; \}/, 'the clock goes once the nav needs the room');
+  assert.match(css, /\.tb-btn \{[^}]*white-space: nowrap;/, 'a bar label never wraps into a clipped second line');
   const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
   assert.match(page, /grid-template-columns:minmax\(0,1fr\);grid-template-rows:auto minmax\(0,1fr\) auto/, 'the shell column cannot be widened by its content');
 });
@@ -637,6 +671,8 @@ test('the existing route planner opens a Discover route without a rebuild', asyn
   assert.match(text, /Alpine Escape/, 'the planner shows the handoff name');
   assert.match(text, /LSZH/);
   assert.match(text, /LOWI/);
+  assert.match(text, /Route weather/, 'the planner carries the along-route weather card');
+  assert.match(text, /Weather is not reachable/, 'without a bridge the card says so instead of inventing weather');
   const stored = JSON.parse(localStorage.getItem('stratos.activeRoute'));
   assert.deepEqual(stored.points.map(p => p.id), ['LSZH', 'LOWI'], 'the planner keeps the handed-over waypoints');
 });
@@ -990,4 +1026,23 @@ test('world layer: the tracker offers the style, ships the data and draws names'
   for (const dx of counts.offsets) {
     assert.ok(dx <= 0 && dx >= -2 * panned.M, `blit offset ${dx} keeps the viewport covered`);
   }
+});
+
+test('map tiles need no API key and credit the provider that serves them', async () => {
+  const fs = await import('node:fs');
+  const read = path => fs.readFileSync(new URL(path, import.meta.url), 'utf8');
+  const page = read('../app/index.html');
+  const minimap = read('../app/js/minimap.js');
+  const discover = read('../app/js/discover.js');
+  // CARTO's public raster endpoints answer 200 with an "API KEY REQUIRED"
+  // placeholder tile, which painted a watermark across the Light, Dark,
+  // replay and preview maps. Nothing may send tiles there again.
+  for (const [name, text] of [['the tracker', page], ['the minimap', minimap], ['discover', discover]]) {
+    assert.doesNotMatch(text, /basemaps\.cartocdn\.com/, `${name} must not use a key-requiring tile host`);
+    assert.doesNotMatch(text, /OpenStreetMap contributors, CARTO|© OpenStreetMap contributors · © CARTO/, `${name} must credit the provider it actually uses`);
+  }
+  assert.match(page, /Canvas\/World_Light_Gray_Base\/MapServer\/tile/, 'the Light style uses the key-free Esri gray canvas');
+  assert.match(page, /Canvas\/World_Dark_Gray_Base\/MapServer\/tile/, 'the Dark style uses the key-free Esri gray canvas');
+  assert.match(minimap, /Canvas\/\$\{service\}\/MapServer\/tile/, 'the replay and preview maps use the same key-free tiles');
+  assert.match(minimap, /© Esri, HERE, Garmin · © OpenStreetMap contributors/, 'the minimap credits Esri');
 });

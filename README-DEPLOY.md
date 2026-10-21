@@ -43,10 +43,13 @@ GitHub Pages also works if you deploy the repository root (Settings → Pages �
 1. Deploy over **HTTPS**. Service workers and Home Screen installation do not work over plain HTTP except localhost.
 2. On the iPhone, open `https://your-site/app/` in **Safari**.
 3. Share → **Add to Home Screen** → Add.
-4. Open the installed app. For live simulator data, pair it:
-   - On the PC: Stratos desktop → **Pilot → Settings → Phone access**, enter the relay URL and generate a code.
-   - On the phone: **Live → Relay URL + pairing code → Connect**.
-5. The phone stores only its own read token. **Disconnect phone** revokes that token; **Disconnect relay** removes the whole session.
+4. Open the installed app. For live simulator data, pair it.
+
+   **On the same Wi-Fi (no relay):** on the PC open **Pilot → Settings → Phone access → Show pairing QR**, then scan the code with the iPhone camera. The QR opens `http://<PC-IP>:8765/pair?t=…` on the phone, which exchanges the single-use code for its own HttpOnly cookie and redirects to Checklists. The PC lists each paired phone and can forget one or all; forgetting closes an already-open telemetry stream within about five seconds.
+
+   **From outside the LAN:** enter the relay URL on the PC and generate a code, then use **Live → Relay URL + pairing code → Connect** on the phone. The relay is the only path that works over HTTPS from another network.
+
+5. The phone stores only its own credential. **Disconnect phone / Forget this PC** removes it; **Disconnect relay** removes the whole relay session. Phones on the LAN do not use the relay at all. **Forget all paired phones** on the PC also rotates the shared bridge token, so a browser that unlocked the bridge by hand with the old token must enter the new one from `bridge_token.txt`.
 
 What works offline: the app shell and previously visited pages. What never works offline: live telemetry, weather, traffic and map tiles. The service worker explicitly refuses to cache `/api/*`, `/stream`, `/logbook.json`, `/health`, `/relay/*`, `/metar`, `/weather` and `/tile/*`, so stale data cannot be shown as live.
 
@@ -72,35 +75,78 @@ What gets packaged:
 
 ### GitHub Actions release
 
-`.github/workflows/release-windows.yml` runs on a tag (`v*`) or manually. It:
+`.github/workflows/release-windows.yml` runs on a tag (`v*`), or manually with a severity (`normal`, `important`, `critical`) and, for a critical release, the reason users will be shown. It:
 
 1. installs Node 22 and Python 3.12;
-2. runs `npm ci`, JavaScript/relay tests and Python bridge tests;
+2. runs `npm ci`, the JavaScript/relay suites, the Python bridge tests and the bridge + relay integration test;
 3. builds `stratos-bridge.exe` with PyInstaller;
 4. builds the installer with electron-builder;
-5. verifies the installer exists and is larger than 30 MB, then writes a SHA-256 file;
-6. uploads the installer + checksum as a workflow artifact;
-7. publishes both to the GitHub Release for a tag.
+5. verifies the installer exists, is larger than 30 MB and has a `latest.yml`, then writes `Stratos-Setup.exe.sha256`;
+6. generates the release notes and the update manifest from the tagged commits (see below), with the installer URL, size and checksum recorded;
+7. uploads the installer, checksum, `latest.yml`, blockmaps, `releases.json` and `release-notes.md` as a workflow artifact;
+8. publishes those files to the GitHub Release, using the categorised markdown as the release body;
+9. a separate `verify-release` job reads the published release back and fails if the manifest, checksum or installer disagree.
 
-A workflow that merely starts is not a successful build. Check the job log for the “Verify installer” step and confirm the release has both files.
+A workflow that merely starts is not a successful build. Check the job log for the “Verify installer” and “Generate release notes” steps, then confirm the release has all six assets. `npm run release:check` runs the same published-release check from a terminal (add `--deep` to download the installer and read its embedded version resource).
 
-The installer is not code-signed. Windows SmartScreen will warn; choose **More info → Run anyway**. Code signing requires a certificate you own; do not put one in the repository.
+The installer is not code-signed. Windows SmartScreen will warn on the first install; choose **More info → Run anyway**. To sign it, set `CSC_LINK` (a base64 certificate or path to a `.pfx`) and `CSC_KEY_PASSWORD` as repository secrets; electron-builder picks them up without any config change, and the private key must never be committed. Without them, updates are still verified against the SHA-512 in `latest.yml` and the SHA-256 published beside the installer.
+
+### Release notes and the update manifest
+
+The app must never invent a version or a feature, so both come from one generated file: **`app/releases.json`**. It is the only place a latest version, release date, severity, minimum supported version, download URL and changelog live. The browser fetches it at `releases.json` on the app's own origin and falls back to the `releases.json` asset on the newest GitHub release; the desktop app uses the same notes while `electron-updater` handles the download.
+
+`scripts/release-notes.mjs` builds it from real history:
+
+```bash
+node scripts/release-notes.mjs --version 2.1.15 --from v2.1.14 \
+  --severity important --windows https://github.com/…/Stratos-Setup.exe \
+  --sha256 <hash> --size <bytes> --markdown dist/release-notes.md
+node scripts/release-notes.mjs --check        # validate the checked-in manifest
+```
+
+Commit subjects are classified by their conventional-commit type (`feat`, `fix`, `perf`, `style`/`ui`, `refactor`, `docs`, `chore`, …) and, when there is no type, by conservative keywords. Merge commits and version bumps are skipped. Anything doubtful goes under **Other changes** rather than being guessed into a feature. The categories are New features, Improvements, Bug fixes, Performance, Interface, Compatibility and important notices, and Other changes. History is retained (30 releases), so the Update centre can show older notes.
+
+Severity is a published fact, not a nag screen:
+
+- `normal` — optional; **Remind me later** is offered and a dismissal is remembered for that build;
+- `important` — still optional, but a dismissal from an earlier, less serious copy of the same release no longer suppresses the prompt;
+- `critical` — requires `--reason`; the dialog explains why. It is only treated as *required* when a real `minimumSupported` version excludes this install or the reason is supplied. There is no hidden kill switch.
+
+Do not hand-edit `app/releases.json` into an inconsistent state: `--check` enforces valid semantic versions, unique releases, a `latest` that really is the newest stable release, ISO dates and a reason on critical entries. The workflow regenerates the manifest at tag time, so notes reflect what is actually committed. The GitHub Action needs only the default `GITHUB_TOKEN` with `contents: write`; no extra secrets are required for the manifest.
 
 ### Automatic updates
 
-From 2.1.12 onwards a packaged Windows build updates itself. Eight seconds after the window appears, and every six hours after that, `electron-main.cjs` asks GitHub for the latest release through `electron-updater`. A newer installer is downloaded in the background and installed when Stratos quits; the next launch is the new version. Development runs and unpacked builds skip the check (`app.isPackaged`).
+A packaged Windows build checks the newest stable release eight seconds after the window appears and every six hours after that (`electron-main.cjs`). Development runs and unpacked builds never check (`app.isPackaged`). A newer installer downloads in the background; `electron-updater` verifies it against the SHA-512 in `latest.yml` before emitting `update-downloaded`, and Stratos installs it when it quits.
 
-You do not have to wait for the six-hour tick or for a quit. **Settings → Check for updates** now drives the real updater inside the desktop app: it checks immediately, says either “you are on the latest version” or “downloading v2.1.13”, and once the download finishes the same button becomes **Restart to update to v2.1.13** and restarts straight into the new build via `quitAndInstall()`. The preload exposes `getUpdateStatus` (cached, no network), `checkForUpdates` and `installUpdate`; the main process answers on `updater:status`, `updater:check` and `updater:install`. In a plain browser the same button still refreshes the service worker, as before.
+**Settings → Updates** is the Update centre. It shows the installed version, the latest published version and date, the last successful check, a Check for updates button, live download progress, errors and a retry, every published release with its notes, and a **Restart to update** action once a download is verified. The preload exposes `getUpdateStatus`, `checkForUpdates`, `installUpdate` and `onUpdateProgress`; the main process answers on `updater:status`, `updater:check`, `updater:install` and pushes `updater:event`. The first time a release is offered, the same notes appear in a modal with **Update now**, **Remind me later** and **View full changelog**. Dismissing writes the release version, its severity and a fingerprint of its notes, so the same build is not raised again — but a changed release or a higher severity is.
+
+The website checks the same manifest shortly after load, when the tab returns to the foreground (at most hourly) and every six hours while it stays open; a hidden tab is never polled. The first location tried is `releases.json` on the app's own origin (which is what the web deployment actually serves), with the newest GitHub release asset as the fallback for the packaged app, where a `file://` page cannot read a relative manifest. In a browser or installed iPhone PWA the manifest provides the version and notes, while the service worker provides the update itself. The service worker no longer calls `skipWaiting()` on an update: a new build waits, the page shows “A new Stratos build is ready” (or the modal), and accepting it posts `STRATOS_SKIP_WAITING`, claims the page and reloads once. A first install still takes over immediately. Nothing reloads while a flight is being tracked unless the pilot accepts, and IndexedDB (logbook, routes, settings) is never touched. `app/sw.js` stamps a distinct cache name per release so the browser can tell an update from a first install, and `releases.json` is explicitly never cached.
 
 What makes this work:
 
 - `electron-updater` is a **runtime** dependency (`dependencies`, not `devDependencies`), so it is packed into the asar.
 - `electron-builder.config.cjs` sets a GitHub `publish` provider; that writes `app-update.yml` into `resources/` with the repository and channel.
-- Every release must attach **`latest.yml`** (the manifest with the version and SHA-512) and the **`.blockmap`** for differential downloads, not just `Stratos-Setup.exe`. The workflow verifies `latest.yml` exists before uploading and publishes all of them; a build without the manifest fails instead of shipping an app that cannot update.
-- The installer is still unsigned, so the **first** install of an updater-aware build shows the SmartScreen warning. Updates themselves are verified against the SHA-512 in `latest.yml` and install without the wizard.
-- Never publish the same version twice: `electron-updater` compares the installed version with `latest.yml`, so a rebuilt 2.1.12 will not reach copies that already have 2.1.12. Bump the patch version for every release.
+- Every release must attach **`latest.yml`** (the version and SHA-512), the **`.blockmap`**, **`releases.json`** and the notes. The workflow verifies `latest.yml` and fails rather than shipping an app that cannot update.
+- The version comes from `package.json` and is stamped by `scripts/stamp-version.py` into `app/js/lib/version.js` (what Settings and the About card show), `bridge_logbook_addon.py` and the service-worker cache name. `npm version` and the stamp must agree; `tests/modules.test.mjs` fails if they drift.
+- The installer is unsigned, so the **first** install of an updater-aware build shows the SmartScreen warning. Updates themselves are verified against the SHA-512 in `latest.yml`.
+- Never publish the same version twice: `electron-updater` compares the installed version with `latest.yml`, and the manifest rejects duplicate releases. Bump the patch version for every release; tags are immutable.
 
-Limits worth stating: this only updates installs created by the NSIS installer on Windows. A build started with `npm start`, a portable/unpacked copy, or the browser/PWA version is not touched. The first build that contains the updater has to be installed manually — there is nothing in the older version that could fetch it.
+Limits worth stating: this only updates installs created by the NSIS installer on Windows. A build started with `npm start`, a portable/unpacked copy, or the browser/PWA version is not touched by `electron-updater`; the browser is updated by the service worker. The first build that contains the updater has to be installed manually. The app never claims an installer ran: the Update centre shows the installed version after restart, and that is the confirmation.
+
+### Verifying an update end to end
+
+`.github/workflows/update-smoke.yml` is a manual Windows workflow that proves the real update path with two published releases. Run it with no inputs to test the newest stable release against the one before it, or set `from_version` and `to_version` explicitly. It:
+
+1. downloads both installers from the published GitHub releases;
+2. installs the older one silently (`/S`) and asserts that the uninstall registry and the exe's product version report that build;
+3. launches the installed app with `--update-smoke` — headless, with no window and no simulator bridge;
+4. lets `electron-updater` read the packaged `app-update.yml`, find the newer release, download it and verify it against `latest.yml`; the app writes a JSON receipt and calls `quitAndInstall(true, false)` so the NSIS installer runs silently;
+5. runs `scripts/check-update-smoke.mjs`, which fails unless the receipt names the exact from/to versions, reports `verified: true` and carries no error;
+6. polls the uninstall registry and the exe product version until they report the new release, then uploads the receipt as an artifact.
+
+The smoke flag exists in every packaged build but does nothing unless `app.isPackaged` is true and the flag is present; it starts no bridge and no window. It proves the download was verified and the installed version changed. It does not exercise the GUI — the Settings/Update centre confirmation is covered by the browser and DOM tests.
+
+Both releases must understand the smoke flag, which first ships in 2.1.14 — so the first usable pair is 2.1.14 → 2.1.15. The workflow refuses an older `from_version` instead of hanging on a build that ignores the flag. It is dispatch-only rather than automatic so a runner network failure cannot block a release; run it after publishing, or before announcing a release.
 
 ### Bridge lifecycle in the desktop app
 
@@ -123,7 +169,8 @@ If the port is changed with `STRATOS_HTTP_PORT`, the desktop UI does not know th
 
 - **X-Plane 11/12:** Settings → Data Output, enable rows 3 (speeds), 17 (heading) and 20 (position/altitude), send to UDP port 49003 on the PC running the bridge. Start a flight.
 - **MSFS 2020/2024:** the optional SimConnect Python package (`pip install SimConnect`) is needed for the MSFS connector. Start a flight. If it is unavailable, the app reports “not installed (optional)” and MSFS telemetry is not claimed.
-- The bridge HTTP server now binds to **127.0.0.1** by default. To use the legacy direct-on-LAN phone page, explicitly set `STRATOS_HOST=0.0.0.0`; the access token is then required on every remote request. The relay is the recommended phone path and never needs an inbound port.
+- The bridge HTTP server binds to **0.0.0.0** by default so the QR code can be opened by a phone on the same trusted network. Every non-loopback request needs the bridge token or a phone pairing cookie; the PC is trusted by loopback. Set `STRATOS_HOST=127.0.0.1` to disable LAN access entirely (and use the relay for phones). Never forward port 8765 from a router.
+- On Windows the bridge binds the HTTP port exclusively, so a second copy exits with `Could not start the bridge on port 8765` instead of competing with the first. The desktop app also probes `/health` before spawning.
 - UDP telemetry listens on `0.0.0.0:49003` so a simulator on another machine can send data. Set `STRATOS_UDP_HOST` to restrict it.
 
 Useful variables:
@@ -131,7 +178,7 @@ Useful variables:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `STRATOS_HTTP_PORT` | `8765` | Bridge HTTP port |
-| `STRATOS_HOST` | `127.0.0.1` | HTTP bind address |
+| `STRATOS_HOST` | `0.0.0.0` | HTTP bind address; set `127.0.0.1` to disable LAN/QR pairing |
 | `STRATOS_UDP_PORT` | `49003` | X-Plane data output port |
 | `STRATOS_UDP_HOST` | `0.0.0.0` | UDP bind address |
 | `STRATOS_DATA_DIR` | script folder | Logbook, token, replay data, caches |
@@ -175,21 +222,28 @@ All of them reject invalid input with 400 and never echo secrets.
 
 ### Premium entitlement (charts)
 
-The chart viewer is Premium-only. There is **no payment implementation** in this repository, and the app does not treat a browser flag as a purchase. The Electron main process decides; two environment variables control it:
+ILS and LOC approach charts — including ILS OR LOC, LOC/DME and localizer-only procedures — are free for everyone. Every other category needs a verified Premium entitlement. The same rule is applied by `accessLevel()` / `canOpenChart()` in `app/js/lib/charts.js`, so the catalogue label and the viewer gate cannot drift apart. There is **no payment implementation** in this repository, and the app does not treat a browser flag as a purchase. The Electron main process decides:
+
+- Running from source (`npm start`, or `electron .`) reports a labelled development entitlement automatically, so a developer can test the gated surfaces without configuring anything.
+- A packaged build needs one of the variables below.
 
 | Variable | Purpose |
 | --- | --- |
 | `STRATOS_ENTITLEMENT_URL` | HTTPS endpoint that receives `{ token, product }` and answers `{ active, plan, expiresAt }`. Without it, no purchase can be verified. |
-| `STRATOS_DEV_PREMIUM=1` | Development override. The UI labels it “Development entitlement — this build has no payment step”, so it can never be mistaken for a purchase. |
+| `STRATOS_DEV_PREMIUM=1` | Development override for a packaged build. The UI labels it “Development entitlement — this build has no payment step”, so it can never be mistaken for a purchase. |
 
-The token is read from `entitlement.json` in the app's user-data folder (beside `stratos.log`), so it never enters the page, the DOM or browser storage. Hosted pages have no trusted channel and are therefore free until a licence service exists for them.
+The token is read from `entitlement.json` in the app's user-data folder (beside `stratos.log`), so it never enters the page, the DOM or browser storage. Hosted pages have no trusted channel: they can open the free ILS/LOC approaches and nothing else until a licence service exists for them.
+
+Chart providers are declared in `app/js/lib/chartproviders.js`: regions, categories, format, update method, attribution and licence position. `faa-dtpp` is the only `integrated` provider; Canada, Europe and Australia are `link-only` until a redistribution licence exists. Add a licensed provider by adding its descriptor and fetch adapter, then flipping its status — the catalogue and viewer do not need to change.
+
+The bundled pdf.js 6 build calls JavaScript helpers newer than Chromium 138 (Electron 37): typed-array `toHex`/`fromHex`/`toBase64`/`fromBase64` and the Map upsert helpers. `app/vendor/pdfjs/compat.mjs` installs them on the page, and `worker-compat.mjs` is the worker entry that does the same in pdf.js's module worker. Keep both imports when upgrading pdf.js; without them every document fails with “toHex is not a function”.
 
 ## 6. Tests and checks
 
 ```bash
 npm ci
-npm test                     # data, chart, module, DOM/UI, Discovery and relay suites (83 tests)
-npm run test:py              # 10 bridge lifecycle/landing tests
+npm test                     # data, chart, module, DOM/UI, Discovery, relay and route-weather suites
+npm run test:py              # 31 bridge lifecycle, landing, checklist and pairing tests
 npm run test:integration     # real bridge + relay + SSE + pairing (about 10 s)
 node scripts/benchmark.mjs   # data-path benchmark
 ```
@@ -208,6 +262,7 @@ Browser automation was available for the charts check on Windows (Playwright + C
 - Bridge logbook: `stratos_logbook.json`, written atomically through a temp file. In-progress flights are snapshotted to `stratos_inprogress.json` and recovered after a crash; recovered flights are marked incomplete and excluded from career totals, not deleted.
 - Flight IDs are deduplicated on both sides. `mergeFlights` keeps a richer copy and never removes local records.
 - Settings, routes, dashboard layout and backups live in the same database. “Export backup” produces JSON containing flights and settings.
+- Phone pairings are stored in `phone_pairs.json` in the bridge data directory as SHA-256 hashes with a label and timestamp; the secrets exist only in each phone's HttpOnly cookie. Deleting that file un-pairs every phone. The bridge token is `bridge_token.txt` in the same folder.
 - Uninstalling the Windows app does not delete the bridge's data directory (`deleteAppDataOnUninstall: false`).
 - That directory lives at `%APPDATA%\stratos-desktop\bridge-data` on Windows: Electron derives the per-user folder from the package `name` field (`stratos-desktop`), not from electron-builder's `productName: 'Stratos'`, which only names the installer, Start Menu entry and shortcuts. So the folder is `stratos-desktop` even though the app is called Stratos. The bridge's pairing token is `bridge_token.txt` inside it.
 
@@ -216,7 +271,8 @@ Browser automation was available for the charts check on Windows (Playwright + C
 - No real simulator, iPhone, or Windows machine was available here. Simulator compatibility is implemented from the documented UDP/SimConnect interfaces but is **not** verified against a live sim in this environment.
 - Landing runway matching depends on the bridge's airport/runway data. It is labelled an estimate when the runway is inferred from position.
 - NOTAMs are not implemented. No legitimate free NOTAM API is wired in, so the briefing says so instead of inventing them.
-- Push notifications and QR pairing are not implemented. Pairing uses a short code.
+- Automatic local-network discovery (mDNS/DNS-SD) is not used: browsers do not expose it to a web page, and iOS restricts local-network probing. Pairing therefore stores the reachable bridge origin on the phone and reconnects to it; if the PC's DHCP address changes, scan a new QR code. A small-screen phone cannot be paired through an HTTPS page to an HTTP LAN bridge (mixed content), so open the QR's HTTP address directly.
+- Push notifications are not implemented. Pairing uses a QR code or a short code.
 - Replay is available only for flights recorded after track logging was enabled. Older flights without a track show an explicit explanation.
 - The relay keeps sessions in memory by default; a restart invalidates pairings unless `RELAY_PERSIST` and a persistent disk are used.
 - The public ADS-B providers and NOAA can rate-limit or block a network. The UI reports the failure; it does not substitute demo aircraft.

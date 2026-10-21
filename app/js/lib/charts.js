@@ -129,12 +129,49 @@ export function categoryRank(key) {
 export function approachType(title) {
   const name = String(title || '').toUpperCase();
   if (!name) return null;
-  if (/\bILS\b|\bLOC\b/.test(name)) return /LOC ONLY|LOC\b/.test(name) && !/ILS/.test(name) ? 'LOC' : 'ILS/LOC';
-  if (/\bRNAV\b|\bGPS\b|\bRNP\b/.test(name)) return 'RNAV';
+  const ils = /\bILS\b/.test(name);
+  const loc = /\bLOC\b|\bLOCALIZER\b/.test(name);
+  if (ils && loc) return 'ILS/LOC';
+  if (ils) return 'ILS';
+  if (loc) return 'LOC';
+  // "VOR OR GPS" and "NDB OR GPS" are ground-based approaches that also use
+  // GPS, so the ground aid is checked before the satellite one.
   if (/\bVOR\b/.test(name)) return 'VOR';
   if (/\bNDB\b/.test(name)) return 'NDB';
+  if (/\bRNAV\b|\bGPS\b|\bRNP\b/.test(name)) return 'RNAV';
   if (/\bVISUAL\b|\bVIS\b/.test(name)) return 'Visual';
   return null;
+}
+
+/**
+ * Charts that need no licence: ILS and localiser approaches.
+ *
+ * The FAA titles them "ILS RWY 28L", "ILS OR LOC RWY 04R", "LOC/DME RWY 22L"
+ * or "ILS PRM ...". A localiser-only procedure is free for the same reason an
+ * ILS is: the app's product rule is that lateral-guidance approaches stay open
+ * to every pilot. Diagrams, SIDs, STARs and every other approach stay Premium.
+ *
+ * The FAA documents are public-domain government data either way — the gate is
+ * a product decision, not a licence restriction.
+ */
+export function isFreeChart(chart) {
+  if (!chart || chart.category !== 'approach') return false;
+  if (chart.approach === 'ILS' || chart.approach === 'LOC' || chart.approach === 'ILS/LOC') return true;
+  // A source may omit the family; the published title is then the authority.
+  return /\bILS\b|\bLOC\b|\bLOCALIZER\b/.test(String(chart.title || '').toUpperCase());
+}
+
+/** 'free' | 'premium' — the single classification every surface should show. */
+export function accessLevel(chart) {
+  return isFreeChart(chart) ? 'free' : 'premium';
+}
+
+/**
+ * Whether this entitlement may open the chart. A verified Premium licence
+ * opens everything; otherwise only ILS/LOC procedures are available.
+ */
+export function canOpenChart(chart, premium = false) {
+  return Boolean(premium) || isFreeChart(chart);
 }
 
 /** Runway identifiers mentioned by a procedure title ("ILS RWY 28L"). */
@@ -247,6 +284,9 @@ export function toChart(record, context = {}) {
     pdf: String(record.pdf || '').trim().toUpperCase(),
     source: context.source || FAA_SOURCE.id,
     sourceName: context.sourceName || FAA_SOURCE.name,
+    provider: context.provider || context.source || FAA_SOURCE.id,
+    format: 'PDF',
+    retrieval: context.retrieval || 'faa-cycle',
     cycle: cycle || null,
     effective: Number.isFinite(context.effective) ? context.effective : null,
     expires: Number.isFinite(context.expires) ? context.expires : null,
@@ -275,6 +315,8 @@ export function normaliseCatalogue(payload, icao) {
     checkedAt: data.checkedAt,
     sourceName: data.sourceName,
     source: data.source,
+    provider: data.provider,
+    retrieval: data.retrieval,
   };
   return charts
     .map(record => toChart(record, context))
@@ -314,9 +356,16 @@ export function validityState(chart, now = Date.now()) {
 /** Plain-language validity line for the viewer. */
 export function validityText(chart, now = Date.now()) {
   const state = validityState(chart, now);
-  if (state === 'expired') return 'This cycle has expired — check the current FAA publication before use.';
+  if (state === 'expired') return 'This publication cycle has expired — check the current source before use.';
   if (state === 'unverified') return 'Validity could not be verified: the source did not supply an effective window.';
-  return 'Current FAA publication cycle.';
+  return 'Current publication cycle.';
+}
+
+/** True when the bytes carry a PDF header. A local file is never trusted blindly. */
+export function isPdfBytes(buffer) {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer || []);
+  if (bytes.length < 5) return false;
+  return bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46 && bytes[4] === 0x2d;
 }
 
 /** Cache key for a downloaded chart document. */

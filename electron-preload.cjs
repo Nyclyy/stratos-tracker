@@ -13,6 +13,14 @@ contextBridge.exposeInMainWorld('stratosDesktop', {
   getUpdateStatus: () => ipcRenderer.invoke('updater:status'),
   checkForUpdates: () => ipcRenderer.invoke('updater:check'),
   installUpdate: () => ipcRenderer.invoke('updater:install'),
+  // Download progress and verification results, pushed from the main process.
+  // The payload is the same status object as getUpdateStatus().
+  onUpdateProgress: callback => {
+    if (typeof callback !== 'function') return () => {};
+    const listener = (event, status) => callback(status);
+    ipcRenderer.on('updater:event', listener);
+    return () => ipcRenderer.removeListener('updater:event', listener);
+  },
   onStatus: callback => {
     if (typeof callback !== 'function') return () => {};
     const listener = (event, status) => callback(status);

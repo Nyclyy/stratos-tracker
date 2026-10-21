@@ -2,6 +2,16 @@ name: Build Windows installer
 
 on:
   workflow_dispatch:
+    inputs:
+      severity:
+        description: 'Update severity published in the manifest'
+        type: choice
+        options: [normal, important, critical]
+        default: normal
+      reason:
+        description: 'Why a critical update is required (required for critical)'
+        type: string
+        required: false
   push:
     tags:
       - 'v*'
@@ -19,6 +29,10 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          # The changelog is built from the commits between the previous tag and
+          # this one, so the runner needs the tags and their history.
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -46,6 +60,25 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           npm version --no-git-tag-version --allow-same-version "$VERSION" --silent
           python scripts/stamp-version.py "$VERSION"
+
+      # The build's own tests assert that the published manifest names the
+      # version the app reports, so the notes are created before they run. The
+      # installer URL, size and checksum are attached later, once they exist.
+      - name: Generate release notes and update manifest
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          SEVERITY: ${{ github.event.inputs.severity || 'normal' }}
+          CRITICAL_REASON: ${{ github.event.inputs.reason }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          PREVIOUS=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+          ARGS=(--version "$VERSION" --severity "$SEVERITY" --markdown dist/release-notes.md)
+          if [ -n "$PREVIOUS" ]; then ARGS+=(--from "$PREVIOUS"); fi
+          if [ "$SEVERITY" = "critical" ]; then ARGS+=(--reason "$CRITICAL_REASON"); fi
+          node scripts/release-notes.mjs "${ARGS[@]}"
+          node scripts/release-notes.mjs --check
 
       - name: Run JavaScript and relay tests
         run: npm test
@@ -79,6 +112,32 @@ jobs:
           Write-Host "Installer size: $size bytes"
           Write-Host "SHA256: $hash"
 
+      # Now that the installer and its checksum exist, the manifest can name the
+      # exact download. Re-running the generator updates the same release entry
+      # instead of adding a second one; the notes stay the same because they come
+      # from the same commit range.
+      - name: Attach the installer to the manifest
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          SEVERITY: ${{ github.event.inputs.severity || 'normal' }}
+          CRITICAL_REASON: ${{ github.event.inputs.reason }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          PREVIOUS=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+          HASH=$(cut -d' ' -f1 dist/Stratos-Setup.exe.sha256)
+          SIZE=$(wc -c < dist/Stratos-Setup.exe)
+          ARGS=(--version "$VERSION" --severity "$SEVERITY" --markdown dist/release-notes.md \
+            --windows "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/Stratos-Setup.exe" \
+            --sha256 "$HASH" --size "$SIZE")
+          if [ -n "$PREVIOUS" ]; then ARGS+=(--from "$PREVIOUS"); fi
+          if [ "$SEVERITY" = "critical" ]; then ARGS+=(--reason "$CRITICAL_REASON"); fi
+          node scripts/release-notes.mjs "${ARGS[@]}"
+          cp app/releases.json dist/releases.json
+          node scripts/release-notes.mjs --check
+          cat dist/release-notes.md
+
       - name: Upload installer as workflow artifact
         uses: actions/upload-artifact@v4
         with:
@@ -87,6 +146,8 @@ jobs:
             dist/Stratos-Setup.exe
             dist/Stratos-Setup.exe.sha256
             dist/latest.yml
+            dist/releases.json
+            dist/release-notes.md
             dist/*.blockmap
           retention-days: 30
 
@@ -98,6 +159,29 @@ jobs:
             dist/Stratos-Setup.exe
             dist/Stratos-Setup.exe.sha256
             dist/latest.yml
+            dist/releases.json
+            dist/release-notes.md
             dist/*.blockmap
-          generate_release_notes: true
+          body_path: dist/release-notes.md
           fail_on_unmatched_files: true
+
+  # The release page existing is not proof that it is installable. This job reads
+  # the published assets back and checks the manifest, checksum and installer
+  # against each other, so a broken release cannot pass as the newest version.
+  verify-release:
+    needs: build-windows
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify the published release and manifest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/check-release.mjs "${GITHUB_REF_NAME#v}"

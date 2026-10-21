@@ -9,6 +9,9 @@ These are measurements from the development container, not simulator FPS claims.
 - **Trails:** per-aircraft cap of 900 normal / 350 low / 0 minimal. Minimal stops allocating trail arrays entirely.
 - **Map:** minimal profile uses the vector base map instead of raster tiles, so no tile decode/upload. Tile cache is bounded at 500 entries.
 - **DOM:** the map is a single canvas; telemetry updates update text nodes, not full-page HTML. The floating flight card rebuilds only when one of its rendered values changes, which is at most once a minute (the UTC arrival time) plus the traffic refresh. Pilot sections are dynamically imported only when opened.
+- **Route planner:** selecting a leg or waypoint is a local class change plus one canvas redraw; it does not re-render the page or rebuild the waypoint list. Telemetry repaints are capped at 2 Hz and only refresh the four summary chips and the aircraft position. The route canvas keeps one tile cache and one `MiniMap` instance; the plan sidebar is a CSS width toggle. The vertical profile uses the same route estimate, so opening it adds no second calculation path.
+- **Checklists:** checking an item updates that row and the progress bar, not the whole checklist. A sync is debounced by 2.5 s and sends one small JSON body; there is no polling loop. The phone performs one `/checklist` read at mount and otherwise adopts state from the existing SSE frames. The bridge re-checks a stream's credential every 5 s, which is one hash comparison for a paired phone.
+- **Pairing:** a paired phone keeps one HttpOnly cookie; the bridge stores only its SHA-256 hash. No repeated IP entry, no discovery broadcast, and no extra polling. Revocation is an in-memory dictionary removal plus one small atomic file write.
 - **Replay:** recorded tracks are Douglas–Peucker simplified in a local nautical-mile projection and capped for rendering; the full track is kept for statistics. A 12,000-point track renders as ~566 points (95% reduction) in the benchmark.
 - **Service worker:** shell-only cache. Live/private endpoints are bypassed, so the browser does not repeatedly store and evict JSON.
 - **Bridge:** no busy loop on telemetry; `relay_loop` sends snapshots only when paired and scales its sleep to 2 s while telemetry is fresh, 5 s otherwise. Telemetry is processed once per UDP position sample. Logbook writes are atomic but not per-packet.
@@ -77,7 +80,7 @@ Measured on Windows 11 x64, Node v26, Chromium (Playwright headless) at 1440x900
 
 Why this does not compete with the simulator:
 
-- pdf.js (1.9 MB with standard fonts) is dynamically imported the first time a Premium pilot opens a chart. Browsing the catalogue downloads no renderer at all.
+- pdf.js (1.9 MB with standard fonts) is dynamically imported the first time a pilot opens a chart, free or Premium. Browsing the catalogue downloads no renderer at all, and an airport whose provider is not integrated is answered from the local registry without a network request.
 - The viewer owns exactly one canvas and one pdf.js document. Switching charts destroys the previous document; zooming cancels the in-flight render task before starting the next one.
 - The backing store is capped at device pixel ratio 2, and at 1.25 above 200% zoom, so a deep zoom costs a bounded amount of canvas memory instead of growing with zoom².
 - Documents are cached in their own IndexedDB database, keyed by cycle and filename, capped at 40 entries / 30 days. A repeated open does no network request.

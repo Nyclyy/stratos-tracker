@@ -330,30 +330,163 @@ function stopBridge() {
 //
 // Settings can ask for a check on demand (no six-hour wait) and, once a build
 // is downloaded, restart straight into it instead of waiting for a manual quit.
-const updateState = { downloadedVersion: '' };
+const updateState = {
+  downloadedVersion: '',
+  availableVersion: '',
+  lastCheckedAt: '',
+  // electron-updater verifies the downloaded package against the sha512 in the
+  // release's latest.yml before it emits 'update-downloaded'. This flag records
+  // that verification happened; it is never set optimistically.
+  verified: false,
+  progress: null,
+  error: '',
+};
+
+// ── Update smoke test ────────────────────────────────────────────────
+// The release workflow can install the previous build and launch it with
+// `--update-smoke`. This path writes one JSON receipt and exits; a normal launch
+// never sees it. Keeping it here means the test exercises the real updater, the
+// real app-update.yml and the real published `latest.yml`, not a stand-in.
+const smokeMode = app.isPackaged && process.argv.some(arg => arg === '--update-smoke' || arg.startsWith('--update-smoke='));
+let smokeFile = '';
+let smokeFinished = false;
+
+function writeSmokeReceipt(payload, exitCode) {
+  if (smokeFinished) return;
+  smokeFinished = true;
+  try { smokeFile = smokeFile || process.env.STRATOS_SMOKE_FILE || path.join(app.getPath('temp'), 'stratos-update-smoke.json'); }
+  catch (_) { smokeFile = process.env.STRATOS_SMOKE_FILE || 'stratos-update-smoke.json'; }
+  const receipt = {
+    at: new Date().toISOString(),
+    currentVersion: app.getVersion(),
+    platform: process.platform,
+    packaged: app.isPackaged,
+    ...payload,
+  };
+  try {
+    fs.mkdirSync(path.dirname(smokeFile), { recursive: true });
+    fs.writeFileSync(smokeFile, JSON.stringify(receipt, null, 2));
+    note(`Update smoke receipt: ${smokeFile}`);
+    console.log(`[update-smoke] ${JSON.stringify(receipt)}`);
+  } catch (error) {
+    note(`Could not write the update smoke receipt: ${error && error.message ? error.message : error}`);
+  }
+  // The success path is shut down by quitAndInstall; only a failure exits here.
+  if (exitCode != null) setTimeout(() => app.exit(exitCode), 1500);
+}
 
 function updateStatus() {
   return {
     supported: Boolean(app.isPackaged && autoUpdater),
     currentVersion: app.getVersion(),
     downloaded: Boolean(updateState.downloadedVersion),
-    version: updateState.downloadedVersion || app.getVersion(),
+    version: updateState.downloadedVersion || updateState.availableVersion || app.getVersion(),
+    availableVersion: updateState.availableVersion,
+    verified: updateState.verified,
+    lastCheckedAt: updateState.lastCheckedAt,
+    progress: updateState.progress,
+    error: updateState.error,
+    source: 'github',
   };
+}
+
+/** Send one update event to every open window; the renderer may have none. */
+function broadcastUpdate(payload) {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('updater:event', { ...updateStatus(), ...payload });
+  }
 }
 
 function startAutoUpdate() {
   if (!app.isPackaged || !autoUpdater) return;
+  if (smokeMode) {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = false;
+    autoUpdater.allowPrerelease = false;
+    autoUpdater.logger = console;
+    autoUpdater.on('update-not-available', info => writeSmokeReceipt({
+      error: 'The installed build is already the latest published version.',
+      latestVersion: info && info.version ? info.version : app.getVersion(),
+    }, 1));
+    autoUpdater.on('update-downloaded', info => {
+      const downloadedVersion = info && info.version ? info.version : 'unknown';
+      updateState.downloadedVersion = downloadedVersion;
+      updateState.verified = true;
+      // `update-downloaded` only fires after electron-updater has checked the
+      // package against latest.yml, so this receipt records a verified download.
+      writeSmokeReceipt({ downloadedVersion, verified: true }, null);
+      // Silent installer, no relaunch: CI checks the installed version itself.
+      setTimeout(() => {
+        try { autoUpdater.quitAndInstall(true, false); } catch (_) { app.exit(0); }
+      }, 700);
+      setTimeout(() => app.exit(0), 15000).unref?.();
+    });
+    autoUpdater.on('error', error => writeSmokeReceipt({
+      error: error && error.message ? error.message : String(error),
+    }, 1));
+    setTimeout(() => writeSmokeReceipt({ error: 'Timed out waiting for the update download.' }, 1), 6 * 60 * 1000).unref?.();
+    autoUpdater.checkForUpdates().catch(error => writeSmokeReceipt({
+      error: error && error.message ? error.message : String(error),
+    }, 1));
+    return;
+  }
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.allowPrerelease = false;
-  autoUpdater.on('error', error => note(`Update check failed: ${error && error.message ? error.message : error}`));
-  autoUpdater.on('update-available', info => note(`Update ${info.version} is available; downloading in the background.`));
+  autoUpdater.on('checking-for-update', () => {
+    // A new check clears the previous download error, so a transient failure is
+    // not shown forever.
+    updateState.error = '';
+    updateState.progress = null;
+    broadcastUpdate({ state: 'checking' });
+  });
+  autoUpdater.on('error', error => {
+    const message = error && error.message ? error.message : String(error);
+    updateState.error = message;
+    updateState.progress = { state: 'error', message };
+    note(`Update check failed: ${message}`);
+    broadcastUpdate({ state: 'error', message });
+  });
+  autoUpdater.on('update-available', info => {
+    updateState.availableVersion = info && info.version ? info.version : '';
+    updateState.error = '';
+    updateState.progress = { state: 'available', version: updateState.availableVersion, percent: null };
+    note(`Update ${updateState.availableVersion} is available; downloading in the background.`);
+    broadcastUpdate({ state: 'available', version: updateState.availableVersion });
+  });
+  autoUpdater.on('update-not-available', () => {
+    updateState.lastCheckedAt = new Date().toISOString();
+    updateState.availableVersion = '';
+    updateState.progress = null;
+    note(`Stratos ${app.getVersion()} is the latest version.`);
+    broadcastUpdate({ state: 'current' });
+  });
+  autoUpdater.on('download-progress', progress => {
+    const percent = Number(progress && progress.percent);
+    updateState.progress = {
+      state: 'downloading',
+      percent: Number.isFinite(percent) ? percent : null,
+      transferred: Number(progress?.transferred) || 0,
+      total: Number(progress?.total) || 0,
+      bytesPerSecond: Number(progress?.bytesPerSecond) || 0,
+    };
+    // Coalesced by the renderer; this fires a handful of times a second while
+    // the installer downloads and never touches the simulator.
+    broadcastUpdate({ state: 'downloading' });
+  });
   autoUpdater.on('update-downloaded', info => {
     updateState.downloadedVersion = info && info.version ? info.version : 'next';
-    note(`Update ${updateState.downloadedVersion} downloaded; it installs when Stratos quits or you press Restart to update.`);
+    updateState.availableVersion = updateState.downloadedVersion;
+    updateState.verified = true;
+    updateState.lastCheckedAt = new Date().toISOString();
+    updateState.progress = { state: 'downloaded', percent: 100, version: updateState.downloadedVersion };
+    note(`Update ${updateState.downloadedVersion} downloaded and verified; it installs when Stratos quits or you press Restart to update.`);
+    broadcastUpdate({ state: 'downloaded', version: updateState.downloadedVersion });
   });
   const check = () => {
-    autoUpdater.checkForUpdates().catch(error => note(`Update check failed: ${error && error.message ? error.message : error}`));
+    autoUpdater.checkForUpdates()
+      .then(() => { updateState.lastCheckedAt = new Date().toISOString(); })
+      .catch(error => note(`Update check failed: ${error && error.message ? error.message : error}`));
   };
   // Let the map and the bridge settle first; start-up never waits on GitHub.
   setTimeout(check, 8000).unref?.();
@@ -488,6 +621,17 @@ async function premiumStatus() {
       expiresAt: null, reason: 'This build has no payment step; the entitlement is a development override.',
     };
   }
+  // Running from source (`npm start`) is the developer's own checkout: report a
+  // labelled development entitlement instead of asking for an environment
+  // variable to test a feature being built. A packaged build never takes this
+  // path, so a shipped installer still needs a licence or the explicit flag.
+  if (!app.isPackaged) {
+    return {
+      premium: true, verified: true, mode: 'development', plan: 'Development build',
+      expiresAt: null,
+      reason: 'Running from source (npm start): development entitlement, not a purchase.',
+    };
+  }
   const endpoint = String(process.env.STRATOS_ENTITLEMENT_URL || '').trim();
   let record = null;
   try {
@@ -536,14 +680,23 @@ ipcMain.handle('updater:status', () => updateStatus());
 ipcMain.handle('updater:check', async () => {
   if (!app.isPackaged || !autoUpdater) return { ...updateStatus(), available: false, supported: false };
   if (updateState.downloadedVersion) return { ...updateStatus(), available: true };
+  updateState.error = '';
   try {
     const result = await autoUpdater.checkForUpdates();
     const version = result && result.updateInfo ? result.updateInfo.version : '';
+    // electron-updater resolves with the running version when nothing is
+    // published; comparing semantically keeps a stale manifest from looking new.
     const available = Boolean(version) && version !== app.getVersion();
-    if (!available) note(`Stratos ${app.getVersion()} is the latest version.`);
+    updateState.availableVersion = available ? version : '';
+    updateState.lastCheckedAt = new Date().toISOString();
+    if (!available) {
+      note(`Stratos ${app.getVersion()} is the latest version.`);
+      broadcastUpdate({ state: 'current' });
+    }
     return { ...updateStatus(), available, version: version || app.getVersion() };
   } catch (error) {
     const message = error && error.message ? error.message : String(error);
+    updateState.error = message;
     note(`Update check failed: ${message}`);
     return { ...updateStatus(), available: false, error: message };
   }
@@ -571,6 +724,17 @@ if (!gotLock) {
   });
 
   app.whenReady().then(() => {
+    // A smoke run is headless: no bridge, no window, just the updater and its
+    // receipt. It must never start a second bridge on a developer machine.
+    if (smokeMode) {
+      if (!autoUpdater) {
+        writeSmokeReceipt({ error: 'electron-updater is not available in this build.' }, 1);
+        return;
+      }
+      startAutoUpdate();
+      return;
+    }
+
     // The renderer is a local file (origin "null"). Only the known public data
     // providers need CORS; charts arrive through the loopback bridge.
     const corsHosts = new Set([

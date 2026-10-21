@@ -212,7 +212,7 @@ function updateMapMeta() {
   meta.innerHTML = `
     <b>${esc(reco.name)}</b>
     <span>${esc(routeLabel(reco))} · ${esc(nmText(reco.nm))} · ${esc(hoursText(reco.hours))} · ${esc(stopsText(reco.stops))}</span>
-    <span>Estimated values; tiles © OpenStreetMap contributors, CARTO.</span>
+    <span>Estimated values; tiles © Esri, HERE, Garmin · © OpenStreetMap contributors.</span>
     <span class="legend"><span><i></i>Route line</span><span><i style="background:#f6c453"></i>Airports</span></span>`;
 }
 

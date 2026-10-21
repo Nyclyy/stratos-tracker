@@ -106,6 +106,16 @@ test('landing: reported VS fallback is labelled', () => {
   assert.equal(severe.classification.key, 'severe');
 });
 
+test('landing: representative touchdown rates at 100, 200 and 500 fpm', () => {
+  // Same thresholds as bridge_logbook_addon.py (LANDING_THRESHOLDS), in fpm.
+  assert.equal(classifyLanding(-100, 'B738').key, 'smooth');
+  assert.equal(classifyLanding(-200, 'B738').key, 'firm');
+  assert.equal(classifyLanding(-500, 'B738').key, 'hard');
+  assert.equal(classifyLanding(-100, 'C172').key, 'good');
+  assert.equal(classifyLanding(-200, 'C172').key, 'firm');
+  assert.equal(classifyLanding(-500, 'C172').key, 'severe');
+});
+
 test('landing: runway matching uses real runway ends', () => {
   const airports = [{
     id: 'KAAA', name: 'Test Field', lat: 37.0, lon: -122.0,

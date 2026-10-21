@@ -1,0 +1,179 @@
+name: Windows update smoke test
+
+# Proves the real update path with two published releases, on a real Windows
+# installation: install `from_version`, let the installed app find and verify
+# `to_version` through electron-updater, then confirm the installed version
+# actually changed. It runs only on demand because it publishes nothing itself
+# and consumes a Windows runner for several minutes.
+on:
+  workflow_dispatch:
+    inputs:
+      from_version:
+        description: 'Release to install first. Leave empty for the release before the latest.'
+        required: false
+        type: string
+      to_version:
+        description: 'Newer release to update to. Leave empty for the latest stable release.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-update-smoke
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      # Inputs keep their own names here: the resolve step writes the resolved
+      # FROM_VERSION/TO_VERSION through GITHUB_ENV, and a job-level variable of
+      # the same name would override that for every later step.
+      INPUT_FROM: ${{ inputs.from_version }}
+      INPUT_TO: ${{ inputs.to_version }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # With no inputs, test the newest published release against the one before
+      # it: that is the update a normal user is offered today.
+      - name: Resolve which two releases to test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = 'application/vnd.github+json' }
+          $releases = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases?per_page=30"
+          $stable = @($releases | Where-Object {
+            -not $_.draft -and -not $_.prerelease -and $_.tag_name -match '^v\d+\.\d+\.\d+$'
+          } | Sort-Object { [datetime]$_.published_at } -Descending)
+          if ($stable.Count -lt 2) { throw 'At least two published stable releases are needed for an update test.' }
+          $to = if ($env:INPUT_TO) { $env:INPUT_TO.Trim().TrimStart('v') } else { $stable[0].tag_name.Substring(1) }
+          if ($env:INPUT_FROM) {
+            $from = $env:INPUT_FROM.Trim().TrimStart('v')
+          } else {
+            $index = -1
+            for ($i = 0; $i -lt $stable.Count; $i++) { if ($stable[$i].tag_name -eq "v$to") { $index = $i; break } }
+            if ($index -lt 0) { throw "v$to is not a published stable release; pass from_version explicitly." }
+            if ($index + 1 -ge $stable.Count) { throw "There is no published release older than v$to; pass from_version explicitly." }
+            $from = $stable[$index + 1].tag_name.Substring(1)
+          }
+          if ($from -eq $to) { throw 'from_version and to_version must differ.' }
+          # The installed build has to understand --update-smoke. It first ships
+          # in 2.1.14, so the first usable pair is 2.1.14 -> 2.1.15. Older builds
+          # would ignore the flag and open their window, hanging the runner.
+          if ([version]$from -lt [version]'2.1.14') {
+            throw "from_version $from predates the --update-smoke flag; use 2.1.14 or newer."
+          }
+          "FROM_VERSION=$from" >> $env:GITHUB_ENV
+          "TO_VERSION=$to" >> $env:GITHUB_ENV
+          Write-Host "Testing $from -> $to"
+
+      - name: Download both installers from the published releases
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = 'application/vnd.github+json' }
+          foreach ($version in @($env:FROM_VERSION, $env:TO_VERSION)) {
+            $tag = "v$version"
+            $uri = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$tag"
+            try {
+              $release = Invoke-RestMethod -Headers $headers -Uri $uri
+            } catch {
+              throw "No published release for $tag. Publish it before running this test."
+            }
+            $asset = $release.assets | Where-Object { $_.name -eq 'Stratos-Setup.exe' }
+            if (-not $asset) { throw "Release $tag has no Stratos-Setup.exe asset." }
+            if ($asset.state -ne 'uploaded') { throw "Release $tag's installer is still $($asset.state)." }
+            Invoke-WebRequest -Headers $headers -Uri $asset.browser_download_url -OutFile "Stratos-$version.exe"
+            Write-Host "Downloaded $tag ($([math]::Round($asset.size / 1MB, 1)) MB)"
+          }
+
+      - name: Install the older release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Join-Path $PWD "Stratos-$env:FROM_VERSION.exe"
+          $process = Start-Process -FilePath $installer -ArgumentList '/S' -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw "The installer exited with $($process.ExitCode)." }
+          Write-Host "Installed $env:FROM_VERSION silently."
+
+      - name: Confirm the installed version is the older release
+        id: installed
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . ./.github/scripts/stratos-install.ps1
+          $app = Get-StratosInstall
+          if (-not $app) { throw 'Stratos is not listed in the uninstall registry after installation.' }
+          $exe = Get-StratosExe $app
+          $fileVersion = (Get-Item $exe).VersionInfo.ProductVersion
+          Write-Host "Registry version: $($app.DisplayVersion); exe product version: $fileVersion; exe: $exe"
+          if ($app.DisplayVersion -ne $env:FROM_VERSION) {
+            throw "Stratos installed as $($app.DisplayVersion), expected $env:FROM_VERSION."
+          }
+          if (-not $fileVersion.StartsWith($env:FROM_VERSION)) {
+            throw "The installed exe reports $fileVersion, expected $env:FROM_VERSION."
+          }
+          "exe=$exe" >> $env:GITHUB_OUTPUT
+          "version=$($app.DisplayVersion)" >> $env:GITHUB_OUTPUT
+
+      - name: Let the installed app find, verify and download the update
+        shell: pwsh
+        env:
+          EXE: ${{ steps.installed.outputs.exe }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $receipt = Join-Path $env:RUNNER_TEMP 'update-smoke.json'
+          if (Test-Path $receipt) { Remove-Item $receipt }
+          $env:STRATOS_SMOKE_FILE = $receipt
+          # The smoke run is headless: it starts no bridge and no window.
+          $process = Start-Process -FilePath $env:EXE -ArgumentList '--update-smoke', '--disable-gpu' -PassThru
+          if (-not $process.WaitForExit(600000)) {
+            try { $process.Kill() } catch { }
+            throw 'The update smoke run did not finish within ten minutes.'
+          }
+          Write-Host "Smoke process exited with $($process.ExitCode)."
+          if (-not (Test-Path $receipt)) { throw 'The app wrote no update receipt.' }
+          Get-Content $receipt
+          node scripts/check-update-smoke.mjs $receipt --from $env:FROM_VERSION --to $env:TO_VERSION
+
+      - name: Confirm the silent installer changed the installed version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . ./.github/scripts/stratos-install.ps1
+          $deadline = (Get-Date).AddMinutes(4)
+          $app = $null
+          do {
+            Start-Sleep -Seconds 5
+            $app = Get-StratosInstall
+            if ($app -and $app.DisplayVersion -eq $env:TO_VERSION) { break }
+          } while ((Get-Date) -lt $deadline)
+          if (-not $app) { throw 'Stratos disappeared from the uninstall registry during the update.' }
+          if ($app.DisplayVersion -ne $env:TO_VERSION) {
+            throw "Stratos reports $($app.DisplayVersion) after the update, expected $env:TO_VERSION."
+          }
+          $exe = Get-StratosExe $app
+          $fileVersion = (Get-Item $exe).VersionInfo.ProductVersion
+          if (-not $fileVersion.StartsWith($env:TO_VERSION)) {
+            throw "The updated exe reports $fileVersion, expected $env:TO_VERSION."
+          }
+          Write-Host "Update confirmed: registry $($app.DisplayVersion), exe $fileVersion."
+
+      - name: Upload the update receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: update-smoke-receipt
+          path: ${{ runner.temp }}/update-smoke.json
+          if-no-files-found: warn
+          retention-days: 14

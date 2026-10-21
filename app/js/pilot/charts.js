@@ -5,30 +5,41 @@
  * days). The document is a PDF rendered by a locally bundled pdf.js build, so
  * the chart stays inside Stratos: no redirect and no third-party frame.
  *
- * Opening a document needs a verified Premium entitlement. The catalogue
- * itself is visible to everyone, which is the "preview" a free pilot gets.
+ * ILS approaches are free for everyone. Every other document needs a verified
+ * Premium entitlement; the catalogue itself is visible either way.
  */
 
 import { esc, fmtDateTime, num, tag, toast } from '../ui.js';
 import { airportResultHtml, searchDirectory, wireSearch } from './common.js';
 import {
-  describeEntitlement, getEntitlement, isPremium, premiumFeatures, premiumSetupNotes,
+  describeEntitlement, getEntitlement, isPremium, premiumSetupNotes,
 } from '../lib/entitlement.js';
 import {
-  FAA_SOURCE, chartCacheKey, groupCharts, normaliseCatalogue, readChartCache,
-  searchCharts, validityState, validityText, writeChartCache,
+  FAA_SOURCE, accessLevel, canOpenChart, chartCacheKey, groupCharts, isPdfBytes,
+  normaliseCatalogue, readChartCache, searchCharts, validityState, validityText, writeChartCache,
 } from '../lib/charts.js';
+import { coverageText, officialSourcesFor } from '../lib/chartdir.js';
+import { chartCoverage, coverageSummary, providerCategories } from '../lib/chartproviders.js';
 
 const FETCH_TIMEOUT = 12000;
+const SELECTION_KEY = 'stratos.charts.selection';
 
 let pdfjsPromise = null;
 
-/** Lazy: pdf.js is only fetched when a Premium pilot actually opens a chart. */
+/**
+ * Lazy: pdf.js is only fetched when a pilot actually opens a chart.
+ *
+ * The compat module runs first: the Chromium inside Electron 37 lacks the
+ * typed-array hex/base64 helpers pdf.js 6 calls, and without them every
+ * document fails with "a.toHex is not a function". The worker loads the same
+ * polyfills through worker-compat.mjs, which is the worker entry below.
+ */
 function loadPdfjs() {
   if (!pdfjsPromise) {
-    pdfjsPromise = import('../../vendor/pdfjs/pdf.min.mjs')
+    pdfjsPromise = import('../../vendor/pdfjs/compat.mjs')
+      .then(() => import('../../vendor/pdfjs/pdf.min.mjs'))
       .then(library => {
-        library.GlobalWorkerOptions.workerSrc = new URL('../../vendor/pdfjs/pdf.worker.min.mjs', import.meta.url).href;
+        library.GlobalWorkerOptions.workerSrc = new URL('../../vendor/pdfjs/worker-compat.mjs', import.meta.url).href;
         return library;
       })
       .catch(error => { pdfjsPromise = null; throw error; });
@@ -292,6 +303,8 @@ class ChartViewer {
 
 export async function mount(root, ctx) {
   let icao = String(ctx.params.get('icao') || '').trim().toUpperCase();
+  const saved = icao ? null : readSelection();
+  if (saved && saved.icao) icao = String(saved.icao).trim().toUpperCase();
   let catalogue = null;
   let source = null;
   let phase = 'idle';            // idle | loading | ready | missing | unsupported | error
@@ -302,6 +315,35 @@ export async function mount(root, ctx) {
   let documentState = { status: 'idle' };  // idle | loading | ready | error
   let viewer = null;
   let cleanups = [];
+  let coverage = chartCoverage(icao);
+  let collapsedGroups = new Set();
+  let pendingChartId = saved && saved.chartId ? String(saved.chartId) : null;
+
+  // Only the airport and the chart id are kept, and only for this session. No
+  // licence state is ever written here: entitlement comes from the main process.
+  function readSelection() {
+    try {
+      const value = globalThis.sessionStorage && globalThis.sessionStorage.getItem(SELECTION_KEY);
+      return value ? JSON.parse(value) : null;
+    } catch (_) { return null; }
+  }
+
+  function saveSelection(chart) {
+    try {
+      if (!globalThis.sessionStorage) return;
+      globalThis.sessionStorage.setItem(SELECTION_KEY, JSON.stringify({ icao, chartId: chart ? chart.id : null }));
+    } catch (_) { /* private mode or a full quota: the page still works */ }
+  }
+
+  function airportName(code) {
+    const found = (Array.isArray(ctx.directory) ? ctx.directory : []).find(airport => airport.id === code);
+    return found && found.name ? found.name : '';
+  }
+
+  /** Documents in the same order as the visible list, for previous/next. */
+  function visibleCharts() {
+    return catalogue ? searchCharts(catalogue.charts, filter) : [];
+  }
 
   const sources = () => {
     const list = [];
@@ -335,14 +377,27 @@ export async function mount(root, ctx) {
 
   async function loadCatalogue(code) {
     if (!code) { phase = 'idle'; renderList(); return; }
+    coverage = chartCoverage(code);
     phase = 'loading';
     message = '';
     catalogue = null;
     selected = null;
     documentState = { status: 'idle' };
+    saveSelection(null);
     destroyViewer();
     renderList();
     renderViewer();
+
+    // Never fetch a publisher that has not licensed its documents to Stratos.
+    // The publisher links are the honest result, not a failed request.
+    if (!coverage.integrated) {
+      phase = 'unsupported';
+      message = coverage.message;
+      renderList();
+      renderViewer();
+      return;
+    }
+
     let lastError = '';
     for (const candidate of sources()) {
       const timeout = withTimeout(FETCH_TIMEOUT);
@@ -372,9 +427,19 @@ export async function mount(root, ctx) {
           charts: normaliseCatalogue(payload, code),
         };
         phase = catalogue.charts.length ? 'ready' : 'missing';
-        if (!catalogue.charts.length) message = 'This airport has no published terminal procedures in the current cycle.';
+        if (!catalogue.charts.length) {
+          message = 'This airport has no published terminal procedures in the current cycle.';
+          pendingChartId = null;
+        }
         renderList();
         renderViewer();
+        // Returning to Charts after visiting another page reopens the chart the
+        // pilot last had open, but only when it is still in this cycle.
+        if (pendingChartId) {
+          const restore = catalogue.charts.find(chart => chart.id === pendingChartId);
+          pendingChartId = null;
+          if (restore) openChart(restore);
+        }
         return;
       } catch (error) {
         timeout.done();
@@ -389,11 +454,13 @@ export async function mount(root, ctx) {
 
   function renderHeader() {
     const count = document.getElementById('chart-count');
-    if (count) count.textContent = catalogue ? `${catalogue.charts.length} documents` : '';
+    const freeCount = catalogue ? catalogue.charts.filter(chart => accessLevel(chart) === 'free').length : 0;
+    if (count) count.textContent = catalogue ? `${catalogue.charts.length} documents · ${freeCount} free` : '';
     const el = document.getElementById('charts-head');
     if (!el) return;
     const cycle = catalogue && catalogue.cycle;
     const window = catalogue ? formatWindow(catalogue.effective, catalogue.expires) : '';
+    const premium = isPremium(entitlement);
     el.innerHTML = `
       <div class="page-head">
         <div>
@@ -401,18 +468,53 @@ export async function mount(root, ctx) {
           <p>Official terminal procedures inside Stratos. The catalogue is fetched from the publishing authority; documents are downloaded only when you open one.</p>
         </div>
         <span class="spacer"></span>
-        ${catalogue && cycle ? `<span class="tag" title="FAA publication cycle">Cycle ${esc(String(cycle))}</span>` : ''}
-        ${isPremium(entitlement) ? tag('Premium', 'good', describeEntitlement(entitlement)) : tag('Premium only', 'warn', 'Opening a chart needs a verified Premium licence')}
+        ${catalogue && cycle ? `<span class="tag" title="${esc(catalogue.sourceName)} publication cycle">Cycle ${esc(String(cycle))}</span>` : ''}
+        ${premium
+          ? tag('Premium', 'good', describeEntitlement(entitlement))
+          : tag('ILS/LOC free', 'accent', 'ILS and LOC approach charts open without a licence. Every other category needs a verified Premium licence.')}
       </div>
       ${catalogue ? `<div class="chart-meta">
         <span><b>${esc(catalogue.sourceName)}</b></span>
         <span>${esc(catalogue.licence)}</span>
         ${window ? `<span>${esc(window)}</span>` : ''}
+        ${premium ? '' : `<span>${freeCount} ILS/LOC charts open free</span>`}
         ${catalogue.checkedAt ? `<span>Checked ${esc(fmtDateTime(catalogue.checkedAt))}</span>` : ''}
         <span class="spacer"></span>
-        <a href="${FAA_SOURCE.terms}" target="_blank" rel="noopener">Source ↗</a>
-      </div>` : ''}
+        <a href="${esc((coverage.provider && coverage.provider.terms) || FAA_SOURCE.terms)}" target="_blank" rel="noopener">Source ↗</a>
+      </div>` : `<div class="chart-meta"><span>${esc(coverageSummary())}</span></div>`}
     `;
+  }
+
+  /** Links to the publisher instead of copying charts Stratos may not mirror. */
+  function officialSourcesHtml(code) {
+    const sources = officialSourcesFor(code);
+    if (!sources.length) return '';
+    return `<span>${esc(coverageText(code))}</span>
+      <div class="chart-sources">${sources.map(source => `
+        <a href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">
+          <b>${esc(source.name)}</b>
+          <span>${esc(source.note)}</span>
+        </a>`).join('')}</div>`;
+  }
+
+  function airportCard() {
+    if (!catalogue) return '';
+    const name = airportName(icao);
+    const groups = groupCharts(catalogue.charts);
+    const free = catalogue.charts.filter(chart => accessLevel(chart) === 'free').length;
+    const premium = catalogue.charts.length - free;
+    return `<div class="chart-airport">
+      <div class="chart-airport-id">
+        <span class="route-id">${esc(icao)}</span>
+        <div><b title="${esc(name || icao)}">${esc(name || icao)}</b><span>${esc(coverage.country || 'Country not listed')}</span></div>
+      </div>
+      <div class="chart-airport-stats">
+        <span><b>${catalogue.charts.length}</b> documents</span>
+        <span class="is-free"><b>${free}</b> free</span>
+        <span><b>${premium}</b> Premium</span>
+      </div>
+      <div class="chart-airport-cats">${groups.map(group => `<span class="chart-cat">${esc(group.label)} <b>${group.charts.length}</b></span>`).join('')}</div>
+    </div>`;
   }
 
   function renderList() {
@@ -422,7 +524,8 @@ export async function mount(root, ctx) {
     if (phase === 'idle') {
       host.innerHTML = `<div class="chart-empty">
         <strong>Search an airport to see its published charts</strong>
-        <span>Try KJFK, KDEN or PAJN. Charts are catalogued by ICAO code and procedure type.</span>
+        <span>Type an ICAO code or an airport name — KJFK, Kennedy, CYYZ, EGLL. ILS and LOC approaches are free; every other category is Premium.</span>
+        <span>${esc(coverageSummary())}</span>
       </div>`;
       return;
     }
@@ -431,10 +534,13 @@ export async function mount(root, ctx) {
       return;
     }
     if (phase === 'unsupported') {
+      const provider = coverage.provider;
       host.innerHTML = `<div class="chart-empty">
-        <strong>${esc(icao)} is outside the current chart coverage</strong>
-        <span>${esc(message)}</span>
-        <span>Coverage today is the FAA d-TPP publication: airports in the United States and its territories. Other authorities publish their own products and are not mirrored by Stratos.</span>
+        <strong>${esc(icao)}${coverage.country ? ` · ${esc(coverage.country)}` : ''} — no integrated charts</strong>
+        <span>${esc(message || coverage.message)}</span>
+        ${provider ? `<span>${esc(provider.name)} publishes: ${esc(providerCategories(provider).join(', ') || 'terminal procedures')}.</span>` : ''}
+        <span>Stratos will not copy or scrape a publisher that has not licensed its charts. You can still open a PDF you downloaded from the publisher with <b>Open PDF…</b>; it stays on this device.</span>
+        ${officialSourcesHtml(icao)}
       </div>`;
       return;
     }
@@ -442,6 +548,7 @@ export async function mount(root, ctx) {
       host.innerHTML = `<div class="chart-empty">
         <strong>No published charts for ${esc(icao)}</strong>
         <span>${esc(message || 'The source has no terminal procedures for this airport in the current cycle.')}</span>
+        ${officialSourcesHtml(icao)}
       </div>`;
       return;
     }
@@ -456,14 +563,20 @@ export async function mount(root, ctx) {
     }
     const charts = searchCharts(catalogue.charts, filter);
     if (!charts.length) {
-      host.innerHTML = `<div class="chart-empty"><strong>No chart matches “${esc(filter)}”</strong><span>Clear the filter to see all ${num(catalogue.charts.length)} documents.</span></div>`;
+      host.innerHTML = `${airportCard()}<div class="chart-empty"><strong>No chart matches “${esc(filter)}”</strong><span>Clear the filter to see all ${num(catalogue.charts.length)} documents.</span></div>`;
       return;
     }
     const premium = isPremium(entitlement);
-    host.innerHTML = groupCharts(charts).map(group => `
-      <div class="chart-group">
-        <div class="chart-group-head"><h3>${esc(group.label)}</h3><span class="hint">${group.charts.length}</span></div>
-        ${group.charts.map(chart => `
+    host.innerHTML = `${airportCard()}${groupCharts(charts).map(group => `
+      <details class="chart-group" data-group="${esc(group.key)}" ${collapsedGroups.has(group.key) ? '' : 'open'}>
+        <summary class="chart-group-head">
+          <h3>${esc(group.label)}</h3>
+          <span class="hint">${group.charts.length} · ${group.charts.filter(chart => accessLevel(chart) === 'free').length} free</span>
+        </summary>
+        ${group.charts.map(chart => {
+          const level = accessLevel(chart);
+          const open = canOpenChart(chart, premium);
+          return `
           <button class="chart-row${selected && selected.id === chart.id ? ' is-active' : ''}" data-chart="${esc(chart.id)}" type="button">
             <span class="chart-row-main">
               <b>${esc(chart.title || chart.pdf)}</b>
@@ -475,9 +588,13 @@ export async function mount(root, ctx) {
               </span>
             </span>
             ${validityState(chart) === 'expired' ? tag('expired', 'bad', validityText(chart)) : ''}
-            ${premium ? '<span class="chart-row-go">Open</span>' : '<span class="chart-row-lock" aria-hidden="true">Premium</span>'}
-          </button>`).join('')}
-      </div>`).join('');
+            ${level === 'free'
+              ? '<span class="chart-access is-free" title="Open to every pilot">Free</span>'
+              : `<span class="chart-access is-premium${open ? '' : ' chart-row-lock'}" title="${open ? 'Included in your licence' : 'Requires a verified Premium licence'}">Premium</span>`}
+            ${open ? '<span class="chart-row-go">Open</span>' : ''}
+          </button>`;
+        }).join('')}
+      </details>`).join('')}`;
 
     host.querySelectorAll('[data-chart]').forEach(button => {
       button.addEventListener('click', () => {
@@ -485,25 +602,34 @@ export async function mount(root, ctx) {
         if (chart) openChart(chart);
       });
     });
+    host.querySelectorAll('details.chart-group').forEach(details => {
+      details.addEventListener('toggle', () => {
+        if (details.open) collapsedGroups.delete(details.dataset.group);
+        else collapsedGroups.add(details.dataset.group);
+      });
+    });
   }
 
   function renderViewer() {
     const host = document.getElementById('chart-viewer');
     if (!host) return;
-    const premium = isPremium(entitlement);
+    // An ILS or LOC approach is free, and a PDF the pilot opened from their own
+    // disk is theirs; the Premium dialog covers neither.
+    const unlocked = canOpenChart(selected, isPremium(entitlement)) || Boolean(selected && selected.local);
 
-    if (!premium) {
-      destroyViewer();
-      host.innerHTML = premiumPanel();
-      wirePremiumPanel(host);
-      return;
-    }
     if (!selected) {
       destroyViewer();
       host.innerHTML = `<div class="chart-empty tall">
         <strong>Select a chart</strong>
-        <span>Zoom with the wheel, drag to pan, double-click to toggle fit, and use the toolbar for pages and full screen.</span>
+        <span>ILS and LOC approaches open for every pilot. Zoom with the wheel, drag to pan, double-click to toggle fit, and use the toolbar for pages, reset and full screen.</span>
+        <span class="chart-empty-hint">${esc(coverageSummary())}</span>
       </div>`;
+      return;
+    }
+    if (!unlocked) {
+      destroyViewer();
+      host.innerHTML = premiumPanel();
+      wirePremiumPanel(host);
       return;
     }
     if (documentState.status === 'error') {
@@ -526,6 +652,10 @@ export async function mount(root, ctx) {
       return;
     }
 
+    const list = visibleCharts();
+    const index = list.findIndex(chart => chart.id === selected.id);
+    const previous = index > 0 ? list[index - 1] : null;
+    const next = index >= 0 && index < list.length - 1 ? list[index + 1] : null;
     host.innerHTML = `
       <div class="chart-toolbar">
         <button class="btn small" data-zoom="out" aria-label="Zoom out" title="Zoom out">−</button>
@@ -534,22 +664,34 @@ export async function mount(root, ctx) {
         <span class="chart-tool-sep"></span>
         <button class="btn small" data-fit="width">Fit width</button>
         <button class="btn small" data-fit="page">Fit page</button>
+        <button class="btn small" data-reset title="Reset zoom and pan">Reset view</button>
+        <span class="chart-pager" id="chart-pager" hidden>
+          <span class="chart-tool-sep"></span>
+          <button class="btn small icon" data-page="-1" aria-label="Previous page" title="Previous page">‹</button>
+          <span class="chart-pages" id="chart-pages">1 / 1</span>
+          <button class="btn small icon" data-page="1" aria-label="Next page" title="Next page">›</button>
+        </span>
         <span class="chart-tool-sep"></span>
-        <button class="btn small icon" data-page="-1" aria-label="Previous page" title="Previous page">‹</button>
-        <span class="chart-pages" id="chart-pages">1 / 1</span>
-        <button class="btn small icon" data-page="1" aria-label="Next page" title="Next page">›</button>
+        <button class="btn small icon" data-doc="-1" ${previous ? '' : 'disabled'} aria-label="Previous chart" title="Previous chart">‹</button>
+        <span class="chart-doc-index" title="Chart ${index >= 0 ? index + 1 : '—'} of ${list.length}">${index >= 0 ? `${index + 1} / ${list.length}` : '—'}</span>
+        <button class="btn small icon" data-doc="1" ${next ? '' : 'disabled'} aria-label="Next chart" title="Next chart">›</button>
         <span class="spacer"></span>
         <button class="btn small" data-full>Full screen</button>
-        <a class="btn small ghost" href="${esc(selected.url || '#')}" target="_blank" rel="noopener" title="Open the official document in your browser">Official PDF ↗</a>
       </div>
       <div class="chart-canvas" id="chart-canvas"></div>
       <div class="chart-footer">
         <div class="chart-footer-main">
           <b>${esc(selected.title || selected.pdf)}</b>
-          <span>${esc(selected.sourceName)} · cycle ${esc(selected.cycle || '—')}${selected.effective ? ` · effective ${esc(new Date(selected.effective).toISOString().slice(0, 10))}` : ''}</span>
+          <span>${selected.local
+            ? 'Local file · opened from this device · not cached or uploaded'
+            : `${esc(selected.sourceName)} · ${esc(selected.format || 'PDF')} · cycle ${esc(selected.cycle || '—')}${selected.effective ? ` · effective ${esc(new Date(selected.effective).toISOString().slice(0, 10))}` : ''}${selected.expires ? ` · expires ${esc(new Date(selected.expires).toISOString().slice(0, 10))}` : ''}`}</span>
+          ${selected.local ? '' : '<span class="chart-footer-licence">Source attribution: publishing authority · not for navigation</span>'}
+          ${selected.url ? `<a class="chart-footer-link" href="${esc(selected.url)}" target="_blank" rel="noopener" title="Open the official document in your browser">Official PDF ↗</a>` : ''}
         </div>
-        <div class="chart-validity${validityState(selected) === 'expired' ? ' bad' : ''}">
-          <span id="chart-viewer-status">${esc(validityText(selected))}</span>
+        <div class="chart-validity${selected.local || validityState(selected) === 'expired' ? ' bad' : ''}">
+          <span id="chart-viewer-status">${selected.local
+            ? 'Local file — not from a verified source. Check the chart cycle and applicability yourself.'
+            : esc(validityText(selected))}</span>
         </div>
       </div>`;
 
@@ -561,14 +703,35 @@ export async function mount(root, ctx) {
         if (zoom) zoom.textContent = `${Math.round(state.scale * 100)}%`;
         const pages = document.getElementById('chart-pages');
         if (pages) pages.textContent = `${state.page} / ${state.pages}`;
+        const pager = document.getElementById('chart-pager');
+        if (pager) pager.hidden = !(state.pages > 1);
       },
     });
     document.querySelectorAll('[data-zoom]').forEach(button => button.addEventListener('click', () => {
       viewer.zoomBy(button.dataset.zoom === 'in' ? 1.25 : 0.8);
     }));
     document.querySelectorAll('[data-fit]').forEach(button => button.addEventListener('click', () => viewer.fit(button.dataset.fit === 'page' ? 'fit-page' : 'fit-width')));
+    document.querySelector('[data-reset]')?.addEventListener('click', () => {
+      viewer.mode = 'fit-width';
+      viewer.offset = { x: 0, y: 0 };
+      viewer.scheduleRender();
+    });
     document.querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => viewer.setPage(viewer.pageNumber + Number(button.dataset.page))));
+    document.querySelectorAll('[data-doc]').forEach(button => button.addEventListener('click', () => {
+      const current = visibleCharts();
+      const at = current.findIndex(chart => chart.id === selected.id);
+      const target = current[at + Number(button.dataset.doc)];
+      if (target) openChart(target);
+    }));
     document.querySelector('[data-full]')?.addEventListener('click', () => toggleFullscreen(host, viewer));
+  }
+
+  /** On a phone the viewer sits below the catalogue, so bring it into view. */
+  function revealViewer() {
+    try {
+      if (typeof window.matchMedia !== 'function' || !window.matchMedia('(max-width: 960px)').matches) return;
+      document.querySelector('.chart-viewer-card')?.scrollIntoView?.({ block: 'start' });
+    } catch (_) { /* scrolling is an enhancement */ }
   }
 
   function toggleFullscreen(host, instance) {
@@ -582,12 +745,53 @@ export async function mount(root, ctx) {
     }
   }
 
+  /** Open a PDF the pilot downloaded from a publisher that licenses its own charts. */
+  async function openLocalFile(file) {
+    const name = String(file && file.name ? file.name : 'chart.pdf');
+    if (!/\.pdf$/i.test(name) && file.type !== 'application/pdf') {
+      toast('Choose a PDF file.', 'bad');
+      return;
+    }
+    if (Number(file.size) > 25 * 1024 * 1024) {
+      toast('That PDF is larger than 25 MB.', 'bad');
+      return;
+    }
+    selected = {
+      id: `local:${name}:${file.size}`, icao, code: 'LOCAL', category: 'local',
+      categoryLabel: 'Local file', title: name.replace(/\.pdf$/i, ''), procedure: null,
+      approach: null, runways: [], pdf: name, source: 'local', sourceName: 'Local file',
+      cycle: null, effective: null, expires: null, amended: null, checkedAt: null,
+      url: null, local: true,
+    };
+    documentState = { status: 'loading' };
+    renderList();
+    renderViewer();
+    revealViewer();
+    try {
+      const bytes = await file.arrayBuffer();
+      if (!isPdfBytes(bytes)) throw new Error('That file does not start with a PDF header.');
+      documentState = { status: 'ready' };
+      renderViewer();
+      await viewer.load(bytes);
+    } catch (error) {
+      documentState = { status: 'error', error: error && error.message ? error.message : String(error) };
+      renderViewer();
+    }
+  }
+
   async function openChart(chart, force = false) {
     selected = chart;
     documentState = { status: 'loading' };
     renderList();
     renderViewer();
-    if (!isPremium(entitlement)) return;
+    if (!canOpenChart(chart, isPremium(entitlement))) {
+      // Nothing was requested: leave no "opening" state behind for a licence
+      // check that succeeds later. The dialog is what the pilot sees.
+      documentState = { status: 'idle' };
+      return;
+    }
+    saveSelection(chart);
+    revealViewer();
     try {
       const key = chartCacheKey(chart);
       let bytes = force ? null : (await readChartCache(key))?.bytes || null;
@@ -613,14 +817,23 @@ export async function mount(root, ctx) {
   }
 
   function premiumPanel() {
-    const list = premiumFeatures().map(feature => `<li><b>${esc(feature.label)}</b><span>${esc(feature.description)}</span></li>`).join('');
     const notes = premiumSetupNotes().map(note => `<li>${esc(note)}</li>`).join('');
-    return `<div class="premium-panel">
-      <span class="premium-kicker">Stratos Premium</span>
-      <h2>Integrated charts</h2>
-      <p class="premium-lede">Every procedure in the catalogue opens inside Stratos: zoom, pan, fit, pages and full screen. No redirect, no embedded third-party site.</p>
-      <ul class="premium-list">${list}</ul>
-      ${selected ? `<div class="premium-target">Selected: <b>${esc(selected.icao)} · ${esc(selected.title || selected.pdf)}</b></div>` : ''}
+    const title = selected && (selected.title || selected.pdf);
+    return `<div class="chart-lock-panel premium-panel" role="dialog" aria-modal="true" aria-labelledby="chart-lock-title">
+      <div class="chart-lock-top">
+        <span class="premium-kicker">Stratos Premium</span>
+        <button class="chart-lock-close" data-premium-close aria-label="Close" title="Back to the catalogue">×</button>
+      </div>
+      <h2 id="chart-lock-title">This chart needs Premium</h2>
+      <p class="premium-lede"><b>ILS and LOC approach charts are free.</b> Diagrams, SIDs, STARs, RNAV/VOR/NDB approaches and the other supported categories open inside Stratos with a verified Premium licence — zoom, pan, fit, pages and full screen, with no redirect and no embedded third-party site.</p>
+      ${title ? `<div class="premium-target">Selected: <b>${esc(selected.icao)} · ${esc(title)}</b></div>` : ''}
+      <ul class="premium-list">
+        <li><b>Airport diagrams</b><span>Aerodrome and parking charts.</span></li>
+        <li><b>Departures and arrivals</b><span>SIDs, STARs and obstacle departures.</span></li>
+        <li><b>Other approaches</b><span>RNAV/RNP, VOR, NDB and additional supported procedures.</span></li>
+        <li><b>Supplements</b><span>Minimums, hot spots and supplementary documents.</span></li>
+      </ul>
+      <p class="premium-setup">Only categories the selected source actually publishes appear in the catalogue. Canada, Europe and Australia currently offer official publisher links, because Stratos has no licence to embed those charts.</p>
       <div class="premium-status">
         <b>${isPremium(entitlement) ? 'Premium active' : entitlement && entitlement.mode === 'unavailable' ? 'Premium unavailable here' : 'No active licence'}</b>
         <span>${esc(describeEntitlement(entitlement))}</span>
@@ -632,16 +845,27 @@ export async function mount(root, ctx) {
         <p>For testing, start the desktop app with <code>STRATOS_DEV_PREMIUM=1</code>; it reports a clearly labelled development entitlement.</p>
       </details>
       <div class="btn-row">
-        <button class="btn" id="premium-retry">Re-check licence</button>
-        <a class="btn ghost" href="#settings">Settings</a>
+        <a class="btn" id="premium-upgrade" href="#settings" title="Open Settings to connect or refresh a licence">Upgrade</a>
+        <button class="btn ghost" data-premium-close>Back to charts</button>
+        <button class="btn ghost" id="premium-retry">Re-check licence</button>
       </div>
     </div>`;
   }
 
   function wirePremiumPanel(host) {
+    const close = () => {
+      selected = null;
+      documentState = { status: 'idle' };
+      saveSelection(null);
+      renderList();
+      renderViewer();
+    };
+    host.querySelectorAll('[data-premium-close]').forEach(button => button.addEventListener('click', close));
     document.getElementById('premium-retry')?.addEventListener('click', async () => {
       entitlement = await getEntitlement({ force: true });
       renderList();
+      // If the pilot had already picked a locked chart, honour that pick now.
+      if (isPremium(entitlement) && selected) { await openChart(selected); return; }
       renderViewer();
       toast(isPremium(entitlement) ? 'Premium licence verified.' : 'No verified Premium licence on this device.', isPremium(entitlement) ? 'good' : '');
     });
@@ -652,7 +876,10 @@ export async function mount(root, ctx) {
     <div class="charts-layout">
       <div class="stack charts-viewer-col">
         <div class="card chart-viewer-card">
-          <div class="card-head"><h2>Viewer</h2><span class="spacer"></span><span class="hint">Official documents only</span></div>
+          <div class="card-head"><h2>Viewer</h2><span class="spacer"></span>
+            <button class="btn small" id="chart-open-file" title="Open a PDF you downloaded from an official publisher">Open PDF…</button>
+            <span class="hint">Official sources or your own file</span></div>
+          <input type="file" id="chart-file" accept="application/pdf,.pdf" hidden>
           <div id="chart-viewer"></div>
         </div>
         <div class="notice"><div><strong>Not for navigation.</strong><br>The documents are reproduced from the publishing authority. Stratos does not verify that the installed cycle matches your simulator's AIRAC, and a chart is flagged when its published cycle has expired.</div></div>
@@ -661,7 +888,7 @@ export async function mount(root, ctx) {
         <div class="card">
           <div class="card-head"><h2>Chart catalogue</h2><span class="spacer"></span><span class="hint" id="chart-count"></span></div>
           <div class="chart-search">
-            <input class="input" id="chart-airport" placeholder="Airport ICAO — KJFK, KDEN, PAJN" autocomplete="off" spellcheck="false" value="${esc(icao)}">
+            <input class="input" id="chart-airport" placeholder="Airport ICAO or name — KJFK, Kennedy, CYYZ, EGLL" autocomplete="off" spellcheck="false" value="${esc(icao)}">
             <div class="chart-filter-wrap">
               <input class="input" id="chart-filter" placeholder="Filter — ILS 04R, SID, RNAV" autocomplete="off" spellcheck="false">
             </div>
@@ -672,6 +899,17 @@ export async function mount(root, ctx) {
     </div>
   `;
 
+  // A pilot may download a chart from NAV CANADA or a national AIS portal and
+  // open it here. The bytes never leave the device and are not cached as an
+  // official document.
+  const fileInput = document.getElementById('chart-file');
+  document.getElementById('chart-open-file')?.addEventListener('click', () => fileInput?.click());
+  fileInput?.addEventListener('change', () => {
+    const file = fileInput.files && fileInput.files[0];
+    try { fileInput.value = ''; } catch (_) { /* file inputs always allow a reset */ }
+    if (file) openLocalFile(file);
+  });
+
   const airportInput = document.getElementById('chart-airport');
   cleanups.push(wireSearch(airportInput, {
     getItems: query => searchDirectory(ctx.directory, query, 8),
@@ -680,6 +918,8 @@ export async function mount(root, ctx) {
       icao = item.id;
       airportInput.value = item.id;
       airportInput.blur();
+      pendingChartId = null;
+      collapsedGroups.clear();
       loadCatalogue(icao);
       if (history.replaceState) history.replaceState(null, '', `#charts?icao=${encodeURIComponent(icao)}`);
     },
@@ -688,7 +928,10 @@ export async function mount(root, ctx) {
     const code = airportInput.value.trim().toUpperCase();
     if (!code) return;
     icao = code;
+    pendingChartId = null;
+    collapsedGroups.clear();
     loadCatalogue(icao);
+    if (history.replaceState) history.replaceState(null, '', `#charts?icao=${encodeURIComponent(icao)}`);
   });
 
   const filterInput = document.getElementById('chart-filter');

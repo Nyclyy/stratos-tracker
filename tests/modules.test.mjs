@@ -81,13 +81,13 @@ test('the shipped version is stamped the same in the app, the bridge and the pac
   const read = file => fs.readFileSync(path.join(root, file), 'utf8');
   const pkg = JSON.parse(read('package.json')).version;
   const bridge = read('bridge_logbook_addon.py').match(/^VERSION = "([^"]+)"/m)?.[1];
-  const settings = read('app/js/pilot/settings.js')
-    .match(/<strong>Stratos<\/strong><span class="tag">v([\d.]+)<\/span>/)?.[1];
+  const appVersion = read('app/js/lib/version.js').match(/APP_VERSION = '([^']+)'/)?.[1];
   assert.match(pkg, /^\d+\.\d+\.\d+$/, 'package.json carries a release version');
   assert.equal(bridge, pkg, 'the bridge reports the release version');
-  assert.equal(settings, pkg, 'the Settings page shows the release version');
+  assert.equal(appVersion, pkg, 'the web app has one version constant and it matches the build');
+  assert.match(read('app/js/pilot/settings.js'), /APP_VERSION/, 'Settings reads the shared version instead of a second literal');
   const stamp = read('scripts/stamp-version.py');
-  for (const file of ['bridge_logbook_addon.py', 'app/js/pilot/settings.js']) {
+  for (const file of ['bridge_logbook_addon.py', 'app/js/lib/version.js', 'app/sw.js']) {
     assert.ok(stamp.includes(file), `the release stamp updates ${file}`);
   }
   // The tag now matches the committed version, so the build's stamp must accept
@@ -115,19 +115,30 @@ test('a packaged build can update itself from the GitHub releases', () => {
   }
   assert.match(main, /ipcMain\.handle\('updater:status'/, 'the cached update state is readable without a network call');
 
-  // The Settings button must not claim a browser-only update path inside the app.
+  // The Settings card mounts the shared update centre, which drives the desktop
+  // updater when it exists and the service worker otherwise.
   const settings = read('app/js/pilot/settings.js');
-  assert.match(settings, /desktop\?\.checkForUpdates/, 'the Check for updates button drives the desktop updater');
-  assert.match(settings, /desktop\.installUpdate\(\)/, 'a ready update can be installed from Settings');
+  assert.match(settings, /mountUpdateCenter/, 'Settings mounts the shared update centre');
+  const centre = read('app/js/update-ui.js');
+  assert.match(centre, /desktop\?\.checkForUpdates/, 'the update centre drives the desktop updater');
+  assert.match(centre, /desktop\.installUpdate/, 'a ready update can be installed from the centre');
+  assert.match(centre, /A new Stratos update is available\./, 'the announcement is the polished dialog');
+  const lib = read('app/js/lib/updates.js');
+  assert.match(lib, /releases\.json/, 'the app reads the published release manifest');
+  assert.match(lib, /compareVersions/, 'versions are compared semantically');
 
   const config = read('electron-builder.config.cjs');
   assert.match(config, /provider: 'github'/, 'the packaged app-update.yml points at GitHub');
   assert.match(config, /repo: 'stratos-tracker'/, 'the update provider names this repository');
 
   const workflow = read('.github/workflows/release-windows.yml');
-  assert.match(workflow, /dist\/latest\.yml/, 'the release ships the update manifest');
+  assert.match(workflow, /dist\/latest\.yml/, 'the release ships the updater manifest');
   assert.match(workflow, /blockmap/, 'differential update blocks are published too');
   assert.match(workflow, /did not produce latest\.yml/, 'a release without the manifest fails instead of shipping');
+  assert.match(workflow, /release-notes\.mjs --version|release-notes\.mjs \"\$\{ARGS/, 'the release generates its own notes and manifest');
+  assert.match(workflow, /dist\/releases\.json/, 'the release manifest is attached to the release');
+  assert.match(workflow, /verify-release/, 'a published release is verified after upload');
+  assert.match(workflow, /body_path: dist\/release-notes\.md/, 'the release page uses the categorised changelog');
 });
 
 test('bridge runtime state cannot be committed again', () => {

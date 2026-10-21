@@ -60,6 +60,7 @@ if (installer) {
   installer.digest ? pass(`installer digest ${installer.digest}`) : fail('GitHub reported no digest for the installer');
 }
 
+let publishedSha = '';
 if (installer && checksum) {
   const text = await (await fetch(checksum.browser_download_url, { headers })).text();
   const match = text.trim().match(/^([a-f0-9]{64})\s+\*?Stratos-Setup\.exe$/i);
@@ -68,7 +69,46 @@ if (installer && checksum) {
   } else if (installer.digest && installer.digest.toLowerCase() !== `sha256:${match[1].toLowerCase()}`) {
     fail(`published checksum does not match the installer (${match[1]} vs ${installer.digest})`);
   } else {
-    pass(`published checksum describes the installer (${match[1].slice(0, 12)}…)`);
+    publishedSha = match[1].toLowerCase();
+    pass(`published checksum describes the installer (${publishedSha.slice(0, 12)}…)`);
+  }
+}
+
+// The release manifest is what the app reads for version, notes and severity. A
+// manifest that points anywhere but this tag's installer would advertise an
+// update the user cannot actually install.
+const manifestAsset = byName.get('releases.json');
+manifestAsset ? pass('release manifest attached') : fail('releases.json is not attached; update checks have no notes');
+if (manifestAsset) {
+  const { validateManifest } = await import('../app/js/lib/updates.js');
+  let manifest = null;
+  try {
+    manifest = await (await fetch(manifestAsset.browser_download_url, { headers })).json();
+  } catch (error) {
+    fail(`release manifest could not be read: ${error.message}`);
+  }
+  if (manifest) {
+    const checked = validateManifest(manifest);
+    checked.ok ? pass('release manifest is valid') : fail(`release manifest is invalid: ${checked.problems.join('; ')}`);
+    const latest = checked.manifest?.latest;
+    if (!latest) {
+      fail('release manifest has no latest release');
+    } else {
+      latest.version === version ? pass(`manifest latest is ${latest.version}`) : fail(`manifest latest is ${latest.version}, expected ${version}`);
+      const windows = latest.downloads?.windows;
+      if (!windows) {
+        fail('manifest has no Windows download');
+      } else {
+        windows.url.includes(`/releases/download/${tag}/`) && windows.url.endsWith('/Stratos-Setup.exe')
+          ? pass('manifest download points at this tag\'s installer')
+          : fail(`manifest download points at ${windows.url}`);
+        if (publishedSha && windows.sha256 !== publishedSha) {
+          fail(`manifest checksum ${windows.sha256 || '(none)'} does not match the published ${publishedSha}`);
+        } else if (publishedSha) {
+          pass('manifest checksum matches the published installer');
+        }
+      }
+    }
   }
 }
 

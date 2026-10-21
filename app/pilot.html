@@ -28,6 +28,7 @@
       <button data-section="replay" type="button">Replay</button>
       <button data-section="briefing" type="button">Briefing</button>
       <button data-section="routes" type="button">Routes</button>
+      <button data-section="checklists" type="button">Checklists</button>
       <button data-section="airports" type="button">Airports</button>
       <button data-section="charts" type="button">Charts</button>
       <button data-section="settings" type="button">Settings</button>
@@ -39,6 +40,7 @@
 </div>
 
 <noscript><p style="padding:24px">Stratos Pilot needs JavaScript. The map and logbook also require JavaScript.</p></noscript>
+<script src="vendor/qrcode.js"></script>
 <script type="module" src="js/pilot.js"></script>
 <script type="module">
   import { mountShell } from './js/shell.js';

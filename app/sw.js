@@ -2,7 +2,7 @@
    The shell is available offline after the first visit. Live data, telemetry,
    logbook JSON, weather and map tiles are NEVER cached, so stale data can never
    be presented as live. A new build replaces the old cache on activation. */
-const CACHE = 'stratos-shell-v3';
+const CACHE = 'stratos-shell-v5';
 const SHELL = [
   './',
   'index.html',
@@ -13,12 +13,23 @@ const SHELL = [
   'icon-192.png',
   'icon-512.png',
   'icon-maskable-512.png',
+  'vendor/qrcode.js',
 ];
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then(cache => cache.addAll(SHELL))
+      // A first install takes over at once. An update waits: swapping the shell
+      // under a live map would discard the panel the pilot is reading, so the
+      // page asks for STRATOS_SKIP_WAITING when the user accepts the update.
+      .then(() => caches.keys())
+      .then(keys => { if (keys.length <= 1) return self.skipWaiting(); return undefined; })
   );
+});
+
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'STRATOS_SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
@@ -33,6 +44,9 @@ function isLiveRequest(url) {
   return (
     url.pathname.includes('/api/') ||
     url.pathname.endsWith('/logbook.json') ||
+    // The release manifest is checked fresh; a cached copy would keep offering
+    // an old "latest" version after a new release is published.
+    url.pathname.endsWith('/releases.json') ||
     url.pathname.endsWith('/health') ||
     url.pathname.endsWith('/stream') ||
     url.pathname.endsWith('/metar') ||

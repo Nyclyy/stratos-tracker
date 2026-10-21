@@ -12,6 +12,7 @@ const SECTIONS = {
   replay: { label: 'Replay', module: './pilot/replay.js' },
   briefing: { label: 'Briefing', module: './pilot/briefing.js' },
   routes: { label: 'Routes', module: './pilot/routes.js' },
+  checklists: { label: 'Checklists', module: './pilot/checklists.js' },
   airports: { label: 'Airports', module: './pilot/airports.js' },
   charts: { label: 'Charts', module: './pilot/charts.js' },
   settings: { label: 'Settings', module: './pilot/settings.js' },

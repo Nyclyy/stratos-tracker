@@ -2,7 +2,7 @@
    PLN/FMS/GPX import-export. Estimates are clearly labelled as estimates; this
    is not an operational flight plan and contains no winds, fuel or ATC data. */
 
-import { bearingDeg, distanceNm, isFiniteNumber, validLatLon } from './geo.js';
+import { bearingDeg, crossTrackNm, distanceNm, isFiniteNumber, validLatLon } from './geo.js';
 
 export const MAX_WAYPOINTS = 200;
 export const IDENT_RE = /^[A-Z0-9]{2,8}$/;
@@ -36,7 +36,18 @@ export function normalizeWaypoint(input) {
     // Only a value that came from an imported flight plan; never guessed.
     constraintAlt: isFiniteNumber(Number(input.constraintAlt)) && Number(input.constraintAlt) > 0
       ? Math.round(Number(input.constraintAlt)) : null,
+    // Magnetic variation (degrees east positive) is kept only when the source
+    // supplied it. Nothing fabricates variation for a waypoint that has none.
+    magVar: normalizeVariation(input.magVar),
   };
+}
+
+/** Variation in (-180, 180] or null. A value of exactly ±360 is not accepted. */
+export function normalizeVariation(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || Math.abs(n) > 180) return null;
+  return n;
 }
 
 export function validateRoute(route) {
@@ -76,6 +87,95 @@ export function routeLegs(route) {
     });
   }
   return legs;
+}
+
+/** Magnetic course from a true course. Variation is degrees east positive. */
+export function magneticCourse(trueCourse, variationDeg) {
+  const variation = normalizeVariation(variationDeg);
+  if (variation == null || !Number.isFinite(Number(trueCourse))) return null;
+  return (((Number(trueCourse) - variation) % 360) + 360) % 360;
+}
+
+/**
+ * Per-leg detail for the route inspector. True course, magnetic course and
+ * track over ground are separate fields: magnetic is null unless a source
+ * supplied variation, and nothing here is an observed ground track.
+ */
+export function legDetails(route, options = {}) {
+  const legs = routeLegs(route);
+  const cruise = Number(options.cruiseKts) > 0 ? Number(options.cruiseKts) : 450;
+  const groundSpeed = Number(options.groundSpeedKts) > 0 ? Number(options.groundSpeedKts) : null;
+  return legs.map((leg, i) => {
+    const fromVar = leg.from.magVar;
+    const toVar = leg.to.magVar;
+    let variation = null;
+    let variationSource = null;
+    if (fromVar != null && toVar != null) { variation = (fromVar + toVar) / 2; variationSource = 'mean of both waypoints'; }
+    else if (fromVar != null) { variation = fromVar; variationSource = 'departure waypoint'; }
+    else if (toVar != null) { variation = toVar; variationSource = 'arrival waypoint'; }
+    const gs = groundSpeed || cruise;
+    return {
+      index: i + 1,
+      fromIndex: i,
+      toIndex: i + 1,
+      from: leg.from,
+      to: leg.to,
+      distanceNm: leg.distanceNm,
+      trueCourse: leg.initialBearing,
+      magneticCourse: magneticCourse(leg.initialBearing, variation),
+      variationDeg: variation,
+      variationSource,
+      groundspeedKts: Math.round(gs),
+      groundspeedSource: groundSpeed ? 'current ground speed' : 'planned cruise speed',
+      eteMinutes: leg.distanceNm > 0 ? Math.round((leg.distanceNm / gs) * 60) : 0,
+      estimated: true,
+    };
+  });
+}
+
+/**
+ * Progress along a route from a live position. The closest leg by cross-track
+ * distance is used, then distance flown and remaining are measured along the
+ * plan. A position far from every leg is reported with onRoute: false rather
+ * than pretending to be on the route.
+ */
+export function routeProgress(route, position) {
+  const points = (route || []).map(normalizeWaypoint).filter(Boolean);
+  if (points.length < 2 || !position || !validLatLon(Number(position.lat), Number(position.lon))) return null;
+  const legs = routeLegs(points);
+  let best = null;
+  for (const leg of legs) {
+    const projection = crossTrackNm({ lat: Number(position.lat), lon: Number(position.lon) }, leg.from, leg.to);
+    if (!best || projection.distance < best.offTrackNm) {
+      best = { leg, fraction: projection.fraction, offTrackNm: projection.distance };
+    }
+  }
+  if (!best) return null;
+  const totalNm = legs.reduce((sum, leg) => sum + leg.distanceNm, 0);
+  let before = 0;
+  for (let i = 0; i < best.leg.index - 1; i++) before += legs[i].distanceNm;
+  const flownNm = Math.min(totalNm, before + best.fraction * best.leg.distanceNm);
+  return {
+    legIndex: best.leg.index,
+    fraction: best.fraction,
+    flownNm,
+    remainingNm: Math.max(0, totalNm - flownNm),
+    totalNm,
+    offTrackNm: best.offTrackNm,
+    onRoute: best.offTrackNm <= Math.max(8, best.leg.distanceNm * 0.3),
+  };
+}
+
+/** Move one waypoint without touching the rest of the route. */
+export function setWaypointPosition(route, index, position) {
+  const list = (route || []).slice();
+  if (index < 0 || index >= list.length) return list;
+  if (!position || typeof position !== 'object') return list;
+  const lat = Number(position.lat);
+  const lon = Number(position.lon);
+  if (!validLatLon(lat, lon)) return list;
+  list[index] = { ...list[index], lat, lon };
+  return list;
 }
 
 /**

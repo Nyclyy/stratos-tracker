@@ -37,6 +37,8 @@ const ICON = {
   airports: SVG('<path d="M4 20h16"/><path d="M12 20V9"/><path d="M12 13l5-2.5v-2L12 10 7 8.5v2z"/><path d="M10 20V6a2 2 0 0 1 4 0v14"/>'),
   stats: SVG('<path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="5" rx="1"/><rect x="12.5" y="7" width="3" height="9" rx="1"/><rect x="18" y="13" width="0" height="0"/><path d="M18 16v-3"/>'),
   progress: SVG('<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3"/>'),
+  checklist: SVG('<path d="M6 3h10a2 2 0 0 1 2 2v16H6a2 2 0 0 1-2-2z"/><path d="M8 8l1.6 1.6L12 7M8 13l1.6 1.6L12 12M14 9h2M14 14h2"/>'),
+  phone: SVG('<rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 5.5h2M10.5 18.5h3"/>'),
 };
 
 /** Sidebar icon for a destination, keyed by its id or its link. */
@@ -320,6 +322,7 @@ function buildBar(bar, { theme = false, rail = false, search = null, status = nu
       <a href="logbook.html" data-page="logbook">Logbook</a>
       <a href="weather.html" data-page="weather">Weather</a>
       <a href="live.html" data-page="live">Live</a>
+      <a href="pilot.html#checklists" data-page="checklists">Checklists</a>
     </nav>`}
     <span class="tb-gap"></span>
     ${status ? '' : `<div class="tb-status" data-status-host>
@@ -339,6 +342,7 @@ function buildBar(bar, { theme = false, rail = false, search = null, status = nu
           ${Object.values(RESOURCE_MODES).map(profile => `<option value="${esc(profile.key)}"${profile.key === mode ? ' selected' : ''}>${esc(profile.name)}</option>`).join('')}
         </select>
       </label>
+      <a class="tb-btn" href="pilot.html#settings?panel=phone" title="Connect a phone" aria-label="Connect a phone">${ICON.phone}</a>
       <a class="tb-btn" href="pilot.html#settings" title="Settings" aria-label="Settings">${ICON.settings}</a>
       <a class="tb-btn" href="logbook.html#profile" title="Pilot profile" aria-label="Pilot profile"><span class="tb-avatar">PF</span></a>
     </div>`;
@@ -488,6 +492,13 @@ export function mountShell({ page = 'home', theme = false } = {}) {
   if (S.clock) clearInterval(S.clock);
   S.clock = setInterval(paintClock, 1000);
   paintClock();
+
+  // Check the published release manifest and watch for a waiting service
+  // worker once per page. Both are background work: neither delays the first
+  // frame, and the prompt only appears for a release that was not dismissed.
+  import('./update-ui.js')
+    .then(({ initAppUpdates }) => initAppUpdates({ desktop: window.stratosDesktop || null }))
+    .catch(() => { /* the Settings update centre still works on demand */ });
 
   window.StratosShell = {
     refresh: () => pollHealth(),

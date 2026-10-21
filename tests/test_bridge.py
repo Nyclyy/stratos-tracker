@@ -97,6 +97,19 @@ class LandingAnalysisTests(unittest.TestCase):
         self.assertEqual(addon.classify_landing(None, "C172")["key"], "unclassified")
         self.assertEqual(addon.classify_landing(-150, "")["classKey"], "unknown")
 
+    def test_representative_touchdown_rates_use_fpm(self):
+        # 100, 200 and 500 fpm, against the published per-class thresholds.
+        # jet: smooth <=100, good <=180, firm <=300, hard <=600
+        self.assertEqual(addon.classify_landing(-100, "B738")["key"], "smooth")
+        self.assertEqual(addon.classify_landing(-200, "B738")["key"], "firm")
+        self.assertEqual(addon.classify_landing(-500, "B738")["key"], "hard")
+        # piston: smooth <=80, good <=140, firm <=220, hard <=400
+        self.assertEqual(addon.classify_landing(-100, "C172")["key"], "good")
+        self.assertEqual(addon.classify_landing(-200, "C172")["key"], "firm")
+        self.assertEqual(addon.classify_landing(-500, "C172")["key"], "severe")
+        # The rating reads the magnitude, so a positive sample is not a smooth landing.
+        self.assertEqual(addon.classify_landing(500, "B738")["key"], "hard")
+
 
 class FlightLifecycleTests(unittest.TestCase):
     def setUp(self):
@@ -253,6 +266,149 @@ class FlightLifecycleTests(unittest.TestCase):
 
 
 import unittest.mock  # noqa: E402  (imported after env setup for clarity)
+import stratos_bridge as bridge  # noqa: E402
+
+
+class PairingTests(unittest.TestCase):
+    def setUp(self):
+        bridge.revoke_pairs()
+        with bridge.PAIR_LOCK:
+            bridge.PAIR_ATTEMPTS.clear()
+            bridge.PAIR_CLIENTS.clear()
+        try:
+            os.unlink(bridge.PHONE_PAIRS_FILE)
+        except OSError:
+            pass
+
+    def test_a_new_pairing_is_short_lived_and_single_use(self):
+        session = bridge.create_pair_session()
+        self.assertIn("/pair?t=", session["url"])
+        self.assertRegex(session["code"], r"^\d{6}$")
+        self.assertEqual(session["ttlSeconds"], 120)
+        self.assertGreater(session["expiresAt"], time.time() * 1000)
+        self.assertTrue(bridge.claim_pair(session["token"]))
+        self.assertFalse(bridge.claim_pair(session["token"]), "a pairing token must work once")
+
+    def test_the_six_digit_code_pairs_once(self):
+        session = bridge.create_pair_session()
+        self.assertTrue(bridge.claim_pair(session["code"]))
+        self.assertFalse(bridge.claim_pair(session["code"]))
+
+    def test_unknown_or_empty_values_never_pair(self):
+        bridge.create_pair_session()
+        self.assertFalse(bridge.claim_pair(""))
+        self.assertFalse(bridge.claim_pair("000000-not-a-code"))
+        self.assertFalse(bridge.claim_pair(None))
+
+    def test_an_expired_pairing_is_rejected_and_cleaned_up(self):
+        session = bridge.create_pair_session()
+        with bridge.PAIR_LOCK:
+            for entry in bridge.PAIR_SESSIONS.values():
+                entry["expires"] = time.time() - 1
+        self.assertFalse(bridge.claim_pair(session["token"]))
+        bridge.pair_clean()
+        with bridge.PAIR_LOCK:
+            self.assertEqual(bridge.PAIR_SESSIONS, {})
+
+    def test_status_never_exposes_the_token(self):
+        bridge.create_pair_session()
+        status = bridge.pair_status()
+        self.assertEqual(status["activeCodes"], 1)
+        self.assertNotIn("token", json.dumps(status).lower())
+
+    def test_a_paired_phone_gets_its_own_secret_and_only_a_hash_is_stored(self):
+        secret, record = bridge.pair_client("10.0.0.9")
+        self.assertTrue(bridge.verify_phone_secret(secret))
+        self.assertFalse(bridge.verify_phone_secret("not-the-secret"))
+        self.assertFalse(bridge.verify_phone_secret(""))
+        self.assertTrue(record["id"])
+        status = bridge.pair_status()
+        self.assertEqual(status["clients"], 1)
+        self.assertEqual(status["devices"][0]["label"], "10.0.0.9")
+        serialized = json.dumps(status)
+        self.assertNotIn(secret, serialized)
+        with open(bridge.PHONE_PAIRS_FILE, "r", encoding="utf-8") as handle:
+            stored = handle.read()
+        self.assertNotIn(secret, stored)
+        self.assertIn(bridge.phone_digest(secret), stored)
+
+    def test_phone_pairing_survives_a_bridge_restart(self):
+        secret, record = bridge.pair_client("10.0.0.10")
+        with bridge.PAIR_LOCK:
+            bridge.PAIR_CLIENTS.clear()
+        self.assertFalse(bridge.verify_phone_secret(secret))
+        bridge.load_phone_clients()
+        self.assertTrue(bridge.verify_phone_secret(secret))
+        self.assertEqual(bridge.pair_status()["devices"][0]["id"], record["id"])
+
+    def test_forgetting_one_phone_keeps_the_other_paired(self):
+        first, first_record = bridge.pair_client("10.0.0.11")
+        second, _ = bridge.pair_client("10.0.0.12")
+        self.assertTrue(bridge.revoke_phone_client(first_record["id"]))
+        self.assertFalse(bridge.verify_phone_secret(first))
+        self.assertTrue(bridge.verify_phone_secret(second))
+        self.assertEqual(bridge.pair_status()["clients"], 1)
+        self.assertFalse(bridge.revoke_phone_client(first_record["id"]), "revoking twice is harmless")
+
+    def test_a_phone_can_forget_itself(self):
+        secret, _ = bridge.pair_client("10.0.0.13")
+        self.assertTrue(bridge.revoke_phone_client_for_secret(secret))
+        self.assertFalse(bridge.verify_phone_secret(secret))
+        self.assertFalse(bridge.revoke_phone_client_for_secret(secret))
+
+    def test_forgetting_every_phone_invalidates_old_secrets_and_rotates_the_shared_token(self):
+        secret, _ = bridge.pair_client("10.0.0.14")
+        before = bridge.TOKEN
+        bridge.revoke_pairs()
+        self.assertFalse(bridge.verify_phone_secret(secret))
+        self.assertEqual(bridge.pair_status()["clients"], 0)
+        self.assertNotEqual(bridge.TOKEN, before)
+        with open(bridge.TOKEN_FILE, "r", encoding="utf-8") as handle:
+            self.assertEqual(handle.read().strip(), bridge.TOKEN)
+
+
+class ChecklistSyncTests(unittest.TestCase):
+    def setUp(self):
+        with bridge.CHECKLIST_LOCK:
+            bridge.CHECKLIST_STATE.clear()
+
+    def test_state_is_sanitised_before_it_is_shared(self):
+        saved = bridge.save_checklist({
+            "profileKey": "a346-toliss",
+            "flightKey": "flight:1",
+            "activeSection": "beforeStart",
+            "revision": 4,
+            "checks": {"beforeStart.0": True, "beforeStart.1": False, "beforeStart.2": "yes",
+                       "x" * 200: True},
+        })
+        self.assertEqual(saved["checks"], {"beforeStart.0": True})
+        self.assertEqual(saved["flightKey"], "flight:1")
+        self.assertEqual(saved["revision"], 4)
+
+    def test_an_older_revision_cannot_overwrite_a_newer_one(self):
+        bridge.save_checklist({"flightKey": "flight:1", "revision": 5, "checks": {"a.0": True}})
+        result = bridge.save_checklist({"flightKey": "flight:1", "revision": 3, "checks": {"b.0": True}})
+        self.assertEqual(result["revision"], 5)
+        self.assertIn("a.0", result["checks"])
+        self.assertNotIn("b.0", result["checks"])
+
+    def test_a_new_flight_replaces_the_previous_state(self):
+        bridge.save_checklist({"flightKey": "flight:1", "revision": 9, "checks": {"a.0": True}})
+        bridge.save_checklist({"flightKey": "flight:2", "revision": 0, "checks": {}})
+        snapshot = bridge.checklist_snapshot()
+        self.assertEqual(snapshot["flightKey"], "flight:2")
+        self.assertEqual(snapshot["checks"], {})
+
+    def test_snapshots_are_copies(self):
+        bridge.save_checklist({"flightKey": "flight:1", "revision": 1, "checks": {"a.0": True}})
+        snapshot = bridge.checklist_snapshot()
+        snapshot["checks"]["b.0"] = True
+        self.assertEqual(bridge.checklist_snapshot()["checks"], {"a.0": True})
+
+    def test_empty_or_malformed_payloads_are_ignored(self):
+        self.assertIsNone(bridge.save_checklist("nope"))
+        self.assertIsNone(bridge.save_checklist([1, 2, 3]))
+        self.assertIsNone(bridge.checklist_snapshot())
 
 
 if __name__ == "__main__":

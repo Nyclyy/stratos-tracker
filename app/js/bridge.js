@@ -76,6 +76,35 @@ export async function pairRelay(url, name, base = defaultBridgeBase()) {
   return request(base, '/relay/pair', { method: 'POST', body: { url, name }, timeout: 20000 });
 }
 
+/* ── Local phone pairing ──────────────────────────────────────────
+   /pair/new is loopback-only: the QR code is created on the PC and the phone
+   exchanges its short-lived token for the bridge cookie. */
+
+export async function newPairing(base = defaultBridgeBase()) {
+  return request(base, '/pair/new', { timeout: 8000 });
+}
+
+export async function pairingStatus(base = defaultBridgeBase()) {
+  return request(base, '/pair/status', { timeout: 5000 });
+}
+
+export async function revokePairing(base = defaultBridgeBase()) {
+  return request(base, '/pair/revoke', { method: 'POST', body: {}, timeout: 8000 });
+}
+
+export async function forgetPairedPhone(id, base = defaultBridgeBase()) {
+  return request(base, '/pair/forget-client', { method: 'POST', body: { id }, timeout: 8000 });
+}
+
+/** Used by the phone: removes this phone's pairing and clears its cookie. */
+export async function forgetThisPhone(base = defaultBridgeBase()) {
+  return request(base, '/pair/self-revoke', { method: 'POST', body: {}, timeout: 8000 });
+}
+
+export async function pushChecklist(state, base = defaultBridgeBase()) {
+  return request(base, '/checklist', { method: 'POST', body: state, timeout: 5000 });
+}
+
 export async function unpairRelay(base = defaultBridgeBase()) {
   return request(base, '/relay/revoke', { method: 'POST', body: {}, timeout: 10000 });
 }
