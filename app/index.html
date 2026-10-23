@@ -96,6 +96,31 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 .mg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.mg>div{background:var(--ui2);border-radius:14px;padding:10px 12px}.mg b{display:block;font-size:24px;font-variant-numeric:tabular-nums;line-height:1.15}.mg span{font-size:11px;color:var(--mut);letter-spacing:.05em}.mg .big{grid-column:1/-1}.mg .big b{font-size:34px}
 .pill{border-radius:999px;padding:5px 11px;font-size:11px;font-weight:800;letter-spacing:.06em;background:var(--ui2);color:var(--mut);white-space:nowrap}.pill.on{background:rgba(52,211,153,.16);color:#34d399}
 .spark{width:100%;height:56px;display:block;margin-top:2px}.dot.lost{background:#fbbf24;box-shadow:0 0 8px #fbbf24}
+/* Aircraft card: spotter photo, draggable header, expanded detail. */
+#fc{padding:14px 16px}
+#fc.dragging{cursor:grabbing;box-shadow:0 18px 48px rgba(0,0,0,.45)}
+#fc .fh{cursor:grab;touch-action:none;user-select:none}
+#fc .fh em{border-color:color-mix(in srgb,var(--acc) 45%,transparent);color:var(--txt)}
+#fc .fci{flex:0 0 auto;width:22px;height:22px;display:grid;place-items:center;padding:0;border-radius:6px;border:1px solid color-mix(in srgb,var(--coast) 40%,transparent);background:none;color:var(--mut);font-size:11px;line-height:1;cursor:pointer}
+#fc .fci:hover{color:var(--txt);border-color:var(--acc)}
+#fc .fcph{position:relative;margin:-14px -16px 12px;border-radius:16px 16px 0 0;overflow:hidden;background:linear-gradient(135deg,#1e293b,#0b1220);display:block}
+#fc .fcph img{display:block;width:100%;height:132px;object-fit:cover}
+#fc .fcph figcaption{position:absolute;left:0;right:0;bottom:0;padding:14px 12px 5px;font-size:10px;letter-spacing:.02em;color:#e2e8f0;text-align:right;background:linear-gradient(180deg,transparent,rgba(3,7,18,.82))}
+#fc .fcph figcaption a{color:#e2e8f0;text-decoration:none}
+#fc .fcph figcaption a:hover{text-decoration:underline}
+#fc .fcph.none,#fc .fcph.load{display:flex;flex-direction:column;justify-content:center;gap:3px;min-height:84px;padding:12px 16px}
+#fc .fcph.none .fcph-t{font-size:14px;font-weight:700;color:var(--txt)}
+#fc .fcph.load .fcph-t{font-size:12px;color:var(--txt)}
+#fc .fcph .fcph-c{font-size:10px;color:var(--mut)}
+#fc .fcph figcaption .fcph-c{color:inherit}
+#fc .fcm{display:grid;grid-template-columns:1fr 1fr;gap:7px 12px;margin-top:10px;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--coast) 30%,transparent)}
+#fc .fcm div{min-width:0}
+#fc .fcm span{display:block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+#fc .fcm b{display:block;font-size:11.5px;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#fc .fca{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+#fc .fca button{padding:5px 9px;border-radius:7px;font-size:11px;font-weight:600;border:1px solid color-mix(in srgb,var(--coast) 45%,transparent);background:var(--ui2);color:var(--txt);cursor:pointer}
+#fc .fca button:hover{border-color:var(--acc)}
+#fc .fca button.on{border-color:var(--acc);color:var(--acc)}
 #cv{display:none;position:absolute;top:0;left:0;right:0;z-index:6;padding:10px 12px 8px;background:var(--surface);border-bottom:1px solid var(--ui2)}
 .chartmode #cv{display:block}.cvh{display:flex;align-items:center;gap:10px}.cvt{flex:1;min-width:0;display:flex;flex-direction:column}.cvt b{font-size:22px}.cvt span{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #ci{display:none;position:absolute;left:0;right:0;bottom:0;top:124px;background:var(--bg);color:var(--txt);z-index:5;overflow:auto;padding:14px 16px 30px}.chartinfo #ci{display:block}
@@ -759,7 +784,7 @@ closeRouteCard();wpIdx=null;sel=null;
 x-=rect.left;y-=rect.top;let best=null,bestD=Infinity;
 const items=[...(L.trf?T.map(o=>[o,18]):[]),...(L.apt?A.filter(a=>!a.x||V.z>=6).map(o=>[o,14]):[]),...(L.nav&&V.z>=6?N.map(o=>[o,12]):[]),...(liveOk()?[[{k:'own',id:'Own-ship',...own},22]]:[])];
 items.forEach(([o,rad])=>{const[a,b]=sc(o.lon,o.lat);let d=Math.hypot(a-x,b-y);if(o.det&&o.rpx)d=Math.max(d-o.rpx,0);if(d<=rad&&d<bestD){bestD=d;best=o}});
-if(best){sel=best;if(best.k=='trf'){tk=true;setFol(false)}panel='sel';render()}
+if(best){sel=best;if(best.k=='trf'){tk=true;setFol(false)}panel=null;render();fCard()}
 else{panel=null;render()}}
 /* search */
 $('#q').oninput=e=>{const q=e.target.value.trim().toLowerCase(),r=$('#res');if(!q){r.style.display='none';return}
@@ -781,7 +806,7 @@ function wpSel(i){wpIdx=wpIdx===i?null:i;render()}
 function wpFocus(i){const p=route[i];if(!p)return;setFol(false);V.lon=p.lon;V.lat=p.lat;V.tz=null;render()}
 function wpDetail(i){const p=route[i];if(!p)return'';const prev=route[i-1],next=route[i+1];let cum=0;for(let j=1;j<=i;j++)cum+=dist(route[j-1],route[j]);const alt=Number(p.elev)||0,planAlt=window.FP&&p.k!='apt'?FP.plannedAltitudeFt((FP.loadOfp(localStorage)||{}).ofp,p.id):null,course=next?brg(p,next):prev?brg(prev,p):null;const rows=[['Altitude',alt>0?Math.round(alt).toLocaleString()+' ft'+(p.k=='apt'?' (field elevation)':' (planned)'):planAlt?Math.round(planAlt).toLocaleString()+' ft (planned, SimBrief)':'Not in the plan'],['From previous',prev?Math.round(dist(prev,p))+' nm':'Departure'],['To next',next?Math.round(dist(p,next))+' nm':'Destination'],['Course'+(next?' to next':''),course==null?'–':String(Math.round(course)).padStart(3,'0')+'°'],['From departure',Math.round(cum)+' nm'],['ETE from departure @ '+CRUISE+' kt',hm(cum/CRUISE)]];return'<div class="wpd"><h3>'+(i+1)+'. '+esc(p.id)+' · '+esc(p.name||p.id)+'</h3><table>'+rows.map(r=>'<tr><td class="m">'+r[0]+'</td><td>'+r[1]+'</td></tr>').join('')+'</table><div class="row"><button onclick="wpFocus('+i+')">Focus on map</button></div></div>'}
 function render(){const s=$('#sheet');tabHi();if(!panel){s.style.display='none';return}s.style.display='block';
-if(panel=='fsum'){s.innerHTML=fsumHtml();return}if(panel=='live'){s.innerHTML=liveHtml();return}if(panel=='data'){s.innerHTML=dataHtml();return}if(panel=='wx'){s.innerHTML=wxHtml();return}if(panel=='charts'){s.innerHTML=chHtml();return}if(panel=='sel'&&sel){const o=sel;if(o.k=='trf'||o.k=='own'){s.innerHTML=planeHtml(o);updPl();return}if(o.k=='apt'){getMetar(o);s.innerHTML=aptHtml(o);return}
+if(panel=='fsum'){s.innerHTML=fsumHtml();return}if(panel=='live'){s.innerHTML=liveHtml();return}if(panel=='data'){s.innerHTML=dataHtml();return}if(panel=='wx'){s.innerHTML=wxHtml();return}if(panel=='charts'){s.innerHTML=chHtml();return}if(panel=='sel'&&sel){const o=sel;if(o.k=='apt'){getMetar(o);s.innerHTML=aptHtml(o);return}
 if(o.k=='apt')getMetar(o);if(o.k=='apt')s.innerHTML=`<h3>${o.id} · ${o.name}</h3><div class="m">Elev ${o.elev} ft · TWR ${o.twr} · ATIS ${o.atis}</div><div class="m">Runways: ${pairs(o).map(p=>p.map(x=>String(x).padStart(2,'0')).join('/')).join(', ')}</div><code>${o.metar}</code><div class="m">${dec(o.metar)}</div><div class="m">${mAge(o)}</div><div class="m">Real-time reports from AviationWeather.gov via the bridge. Wind uses gusts.</div><div class="m">${o.rws?'':'Unverified placeholder data. Import the data pack (Data tab) for real runways, frequencies and layout.<br>'}${o.lat.toFixed(3)}, ${o.lon.toFixed(3)}${liveOk()?' - '+Math.round(dist(own,o))+' nm from you':''}</div>${rwTable(o)}<div class="row"><button onclick="openChart(sel)">Layout</button><button onclick="chSel=sel;panel='charts';render()">Charts</button><button onclick="addSel()">Add to route</button><button onclick="chartMap()">Zoom in</button></div>`;
 else if(o.k=='nav')s.innerHTML=`<h3>${o.id} · ${o.name}</h3><div class="m">${o.type} · ${o.freq} · ${o.lat.toFixed(3)}, ${o.lon.toFixed(3)}</div><div class="row"><button onclick="addSel()">Add to route</button></div>`;
 else s.innerHTML=`<h3>${o.id}</h3><div class="m">Alt ${Math.round(o.alt/10)*10} ft · ${o.gs?o.gs+' kt · ':''}HDG ${String(Math.round(o.hdg)).padStart(3,'0')}°</div>`;return}
@@ -1034,7 +1059,7 @@ return h+'<div class="row"><button onclick="addSel()">Add to route</button><butt
 function closeChart(){$('#chart').style.display='none'}
 function chartMap(){closeChart();setFol(false);V.lon=sel.lon;V.lat=sel.lat;V.tz=null;V.z=12.5;panel='sel';render()}
 /* X-Plane live link */
-function liveStep(dt){T.forEach(a=>{if(Date.now()-(a.seen||0)<45000){const p=fwd(a,a.hdg,a.gs/3600*dt);a.lat=p.lat;a.lon=p.lon}});if(tk&&sel&&sel.k=='trf'){V.lon=sel.lon;V.lat=sel.lat}if(panel=='sel'&&sel&&(sel.k=='trf'||sel.k=='own')&&(live.f=(live.f||0)+1)%10==0)updPl();const d=live.d;own.lat=d.lat;own.lon=d.lon;trlAdd('own',d.lat,d.lon,d.alt,8000);own.hdg=d.hdg||0;own.alt=d.alt;own.vs=d.vs||0;const gs=d.gs||0,el=route.length?dist(own,route.at(-1)):NaN;
+function liveStep(dt){T.forEach(a=>{if(Date.now()-(a.seen||0)<45000){const p=fwd(a,a.hdg,a.gs/3600*dt);a.lat=p.lat;a.lon=p.lon}});if(tk&&sel&&sel.k=='trf'){V.lon=sel.lon;V.lat=sel.lat}const d=live.d;own.lat=d.lat;own.lon=d.lon;trlAdd('own',d.lat,d.lon,d.alt,8000);own.hdg=d.hdg||0;own.alt=d.alt;own.vs=d.vs||0;const gs=d.gs||0,el=route.length?dist(own,route.at(-1)):NaN;
 $('#tGS').textContent=Math.round(gs);$('#tAL').textContent=Math.round(own.alt);$('#tHD').textContent=String(Math.round(own.hdg+360)%360).padStart(3,'0');$('#tVS').textContent=Math.round(own.vs/10)*10;$('#tDS').textContent=isFinite(el)?el.toFixed(1):'–';$('#tEt').textContent=isFinite(el)&&gs>30?hm(el/gs):'–';if(V.fol){V.lon=own.lon;V.lat=own.lat}}
 let wxList=[];try{wxList=JSON.parse(localStorage.getItem('dl.wx')||'[]')}catch(_){}
 function wxAdd(a){if(!wxList.includes(a.id)){wxList.unshift(a.id);wxList=wxList.slice(0,8);try{localStorage.setItem('dl.wx',JSON.stringify(wxList))}catch(_){}}}
@@ -1148,8 +1173,8 @@ const WSRC=[
 let wtProxy=null;
 function wtApi(u){return'/api/traffic?url='+encodeURIComponent(u)}
 async function wtUseProxy(){if(wtProxy!==null)return wtProxy;if(location.protocol=='https:'){wtProxy=true;return true}try{const r=await fetch('/api/traffic',{cache:'no-store'});wtProxy=r.status==400}catch(_){wtProxy=false}return wtProxy}
-function wtAdsb(j){const ac=j&&(j.ac||j.aircraft);return Array.isArray(ac)?ac.filter(a=>a.lat!=null&&a.lon!=null&&a.alt_baro!='ground').slice(0,400).map(a=>({hx:a.hex,id:((a.flight||'').trim()||a.r||a.hex||'?').toUpperCase(),lat:a.lat,lon:a.lon,hdg:a.track??a.true_heading??0,gs:a.gs||0,alt:typeof a.alt_baro=='number'?a.alt_baro:0,vs:a.baro_rate||0,cc:[a.t,a.r].filter(Boolean).join(' · ')})):null}
-function wtSky(j){return j&&Array.isArray(j.states)?j.states.filter(s=>s[5]!=null&&s[6]!=null&&!s[8]).slice(0,400).map(s=>({hx:s[0],id:((s[1]||'').trim()||s[0]).toUpperCase(),lon:s[5],lat:s[6],alt:Math.round((s[7]||0)*3.281),gs:Math.round((s[9]||0)*1.944),hdg:s[10]||0,vs:Math.round((s[11]||0)*196.85),cc:s[2]||''})):(j&&j.states===null?[]:null)}
+function wtAdsb(j){const ac=j&&(j.ac||j.aircraft);return Array.isArray(ac)?ac.filter(a=>a.lat!=null&&a.lon!=null&&a.alt_baro!='ground').slice(0,400).map(a=>({hx:a.hex,id:((a.flight||'').trim()||a.r||a.hex||'?').toUpperCase(),lat:a.lat,lon:a.lon,hdg:a.track??a.true_heading??0,gs:a.gs||0,alt:typeof a.alt_baro=='number'?a.alt_baro:0,vs:a.baro_rate||0,reg:a.r||'',type:a.t||'',source:'adsb',cc:[a.t,a.r].filter(Boolean).join(' · ')})):null}
+function wtSky(j){return j&&Array.isArray(j.states)?j.states.filter(s=>s[5]!=null&&s[6]!=null&&!s[8]).slice(0,400).map(s=>({hx:s[0],id:((s[1]||'').trim()||s[0]).toUpperCase(),lon:s[5],lat:s[6],alt:Math.round((s[7]||0)*3.281),gs:Math.round((s[9]||0)*1.944),hdg:s[10]||0,vs:Math.round((s[11]||0)*196.85),source:'adsb',cc:s[2]||''})):(j&&j.states===null?[]:null)}
 function wtTxt(){if(TRS=='vatsim'){if(WT.n)return'● VATSIM · '+WT.n+' pilot'+(WT.n==1?'':'s');if(vatsimFeed&&vatsimFeed.error)return'VATSIM unavailable ('+vatsimFeed.error+')';return vatsimFeed&&!vatsimFeed.error?'No VATSIM pilots in view':'Loading VATSIM…'}const hint=wtProxy===false&&location.protocol=='http:';
 return WT.n?'● Live ADS-B · '+WT.n+' aircraft':WT.busy?'Loading traffic…':WT.fail>=2?(hint?'Live ADS-B needs the dev server (npm run dev) or the desktop app':'Live ADS-B unavailable (check your connection)'):live.on?'Connecting…':'No traffic in view'}
 function wtMerge(l){const m=new Map(T.map(a=>[a.hx,a])),n=[];l.forEach(o=>{o.seen=Date.now();trlAdd(o.hx,o.lat,o.lon,o.alt,400);const a=m.get(o.hx);if(a){Object.assign(a,o);n.push(a)}else n.push({k:'trf',...o})});if(sel&&sel.k=='trf'&&!n.includes(sel))n.push(sel);T.length=0;n.forEach(a=>T.push(a));WT.n=T.length;trlGC()}
@@ -1157,7 +1182,7 @@ async function wtPoll(){if(TRS!='adsb'||WT.busy||document.hidden||liveOk())retur
 const via=await wtUseProxy();
 for(const sr of WSRC){try{const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),8000),u=sr.u(la,lo,r),x=await fetch(via?wtApi(u):u,{signal:ac.signal});clearTimeout(tm);if(!x.ok)continue;l=sr.p(await x.json());if(l){WT.src=sr.n;break}}catch(_){}}
 WT.busy=0;if(liveOk())return;if(l){WT.fail=0;WT.okAt=Date.now();wtMerge(l)}else{if(++WT.fail>=2&&Date.now()-(WT.okAt||0)>120000){T.length=0;WT.n=0}}const t=wtTxt();if(panel=='live'&&t!=WT.last)render();WT.last=t}
-function wtStep(dt){if(!T.length)return;T.forEach(a=>{if(a.gs>30&&Date.now()-(a.seen||0)<45000){const p=fwd(a,a.hdg,a.gs/3600*dt);a.lat=p.lat;a.lon=p.lon}});if(tk&&sel&&sel.k=='trf'){V.lon=sel.lon;V.lat=sel.lat}if(panel=='sel'&&sel&&sel.k=='trf'&&(WT.f=(WT.f||0)+1)%30==0)updPl()}
+function wtStep(dt){if(!T.length)return;T.forEach(a=>{if(a.gs>30&&Date.now()-(a.seen||0)<45000){const p=fwd(a,a.hdg,a.gs/3600*dt);a.lat=p.lat;a.lon=p.lon}});if(tk&&sel&&sel.k=='trf'){V.lon=sel.lon;V.lat=sel.lat}}
 Object.assign(RL,{RJTT:[8202,8202,11024],RJAA:[13123],RJBB:[13125],RJCC:[9843],RJFF:[9383],ROAH:[9843],RKSI:[12303,13123],RKSS:[10500],RCTP:[12467],ZBAA:[12467,12467],ZSPD:[11811,13123],ZGGG:[12467,12467],VHHH:[12467],WSSS:[13123],WMKK:[13123,13123],VTBS:[13123],VTBD:[12139],WIII:[9843,12008],WADD:[9843],RPLL:[11004,7200],VVTS:[10171],VVNB:[12467],VIDP:[9229,12500,14534],VABB:[11336,7454],VOBL:[13123],VOMM:[10000,7500],VECC:[11900],VCBI:[11001],VGHS:[10500],VNKT:[10007],OPKC:[10000],OPLA:[11500],OMDB:[14764],OMAA:[13123],OTHH:[16000],OERK:[13796],OEJN:[13123],LLBG:[9000,10800],SBGR:[12139],SBSP:[6365],SBKP:[10630],SBGL:[13123,10827],SBRJ:[4347],SBBR:[10827],SBCF:[9843],SBSV:[10827],SBRF:[10171],SBFZ:[8858],SBPA:[7546],SBCT:[7218],SAEZ:[10827,10187],SABE:[6847],SCEL:[12303],SUMU:[10499],SGAS:[10138],SLLP:[13123],SPJC:[11506],SPZO:[11155],SEQM:[13451],SKBO:[12467],SKRG:[11483],SVMI:[11319],YSSY:[8301,12999],YMML:[7500,11998],YBBN:[11483],YPPH:[11299,6893],YPAD:[10171,5420],YBCG:[7694],YSCB:[8800],YPDN:[10919],YBCS:[10499],NZAA:[11926],NZWN:[6351],NZCH:[10787],NZQN:[6204],NFFN:[10732],NTAA:[11204],NWWW:[10663],AYPY:[9022],AGGH:[7218]});
 EX.push([[26,40.8],[29,41],[36,41.5],[41,41],[41.5,43],[37.5,45],[39,47],[40,47.5],[40,60.5],[60,68],[70,73],[80,73.5],[100,77],[113,74],[130,71.5],[140,72.5],[160,70],[170,69.8],[180,68.5],[180,65],[170,60],[163,60],[160,54],[156,51],[155,57],[143,59],[137,54],[141,52],[140,48],[135,43],[131,43],[129,41],[127,39.5],[129,35.5],[126.5,34.5],[126.3,37],[125,39.5],[121.5,40.3],[121.5,38.9],[118,38.2],[119.2,37],[122.5,37.2],[120,35],[121.8,31.2],[122,29.5],[119.5,25.5],[116,22.8],[110.5,21],[108.5,21.7],[106.5,20],[105.8,19],[108.5,15.5],[109.3,12],[107,10.3],[105,8.6],[104.8,10.2],[103,11],[100.8,13.4],[99.5,10.5],[100.3,8],[102.2,6.2],[103.5,4.3],[103.5,1.4],[101.4,2.8],[100.4,5.3],[98.3,8.2],[98.5,10.5],[97.7,16.5],[94.3,16],[94.2,19.5],[92,22],[90.5,22],[88,21.6],[86.8,20],[84.5,18.5],[82,16.5],[80.2,15.2],[80.3,13],[79.8,10.3],[77.5,8.1],[76.2,9.9],[74.8,12.7],[73,17.5],[72.8,20.5],[72.5,21.8],[70,20.8],[69,22.3],[70.5,23],[67,24.8],[66.5,25.4],[61.5,25.2],[57.3,25.7],[56.5,27],[54,26.7],[51,27.8],[49.5,30],[48,29.8],[48.8,28],[49.5,27],[50.2,26.2],[51.6,24.4],[55,24.2],[56.4,26.3],[56.6,24.5],[58.8,23.5],[59.8,22.4],[57.7,19],[55,17],[52,16],[45,13],[43.2,12.7],[42.8,15],[41.2,19],[39.1,21.5],[37,25.5],[35,28],[34.9,29.5],[34.2,31.3],[35,33],[35.9,34.5],[36,36.5],[34,36.2],[30,36.3],[28,36.8],[26.5,38.5],[26,40.5]],
 [[130.9,34],[135,33.5],[136.9,34.6],[139.8,35],[140.9,35.7],[141.9,38.5],[141.5,41.4],[140,40.5],[139.9,38],[137,37],[136,36],[132,35.6],[131,34.3]],[[140,41.6],[141.5,42.5],[145.4,43.3],[143.5,44.5],[141.7,45.4],[141.5,43.5],[140.2,43]],[[130,31.3],[131.5,31.4],[131.9,33.3],[130.9,33.9],[129.7,33.2]],[[120.1,23],[121,25.2],[122,25],[121.5,22.5]],[[79.8,6.5],[80.2,9.7],[81.8,7.2],[80.6,6]],[[108.7,18.5],[110.5,20],[111,19.5],[109.5,18.2]],
@@ -1206,33 +1231,139 @@ if(L.trl){cx.strokeStyle=col;cx.lineWidth=1.2;cx.globalAlpha=.35;TRL.forEach((a,
 if(sel&&sel.k=='trf'){const a=TRL.get(sel.hx||sel.id);if(a)drawTrail(a,sel,col,5)}
 if(liveOk()){const a=TRL.get('own');if(a)drawTrail(a,own,C.own,5)}}
 function trCenter(){if(!sel)return;setFol(false);const q=sel.k=='own'?own:sel;V.lon=q.lon;V.lat=q.lat;V.in=null}
-function trClear(){if(!sel)return;TRL.delete(sel.k=='own'?'own':(sel.hx||sel.id));updPl()}
+function trClear(){if(!sel)return;TRL.delete(sel.k=='own'?'own':(sel.hx||sel.id));fCard()}
 function spark(tr){if(tr.length<3)return '<div class="m">The altitude profile appears as the trail builds.</div>';const W2=300,H2=56,al=tr.map(p=>p[2]||0),mn=Math.min(...al),mx=Math.max(...al),r=Math.max(mx-mn,500),pts=al.map((v,i)=>(i/(al.length-1)*W2).toFixed(1)+','+(H2-4-(v-mn)/r*(H2-8)).toFixed(1)).join(' ');
 return '<svg class="spark" viewBox="0 0 '+W2+' '+H2+'" preserveAspectRatio="none"><polyline points="'+pts+'" fill="none" stroke="var(--acc)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg><div class="m" style="display:flex;justify-content:space-between"><span>'+Math.round(mn).toLocaleString()+' ft</span><span>altitude profile</span><span>'+Math.round(mx).toLocaleString()+' ft</span></div>'}
-function planeHtml(o){const io=o.k=='own';const src=o.source=='vatsim'?'VATSIM pilot':o.source=='adsb'?'Live ADS-B traffic':(o.cc||'');return '<div class="ah"><div><b class="ic">'+(io?'Your aircraft':esc(o.id))+'</b><div class="m">'+(io?'Live from '+esc((live.d&&live.d.src)||'simulator'):esc(o.cc||src))+'</div></div><span class="pill'+((io||tk)?' on':'')+'">'+(io?'&#9679; LIVE':tk?'&#9679; TRACKING':'SELECTED')+'</span></div><div id="pv"></div><div class="row">'+(io?'':'<button class="'+(tk?'on':'')+'" onclick="tk=!tk;if(tk)setFol(false);render()">'+(tk?'Stop tracking':'Track')+'</button>')+'<button onclick="trCenter()">Center</button><button onclick="trClear()">Clear trail</button><button onclick="panel=null;sel=null;tk=false;render()">Close</button></div>'}
-function updPl(){const e=$('#pv');if(!e||!sel)return;const io=sel.k=='own',o=io?{...own,gs:live.d?live.d.gs:0}:sel,alt=Math.round((o.alt||0)/10)*10,fl=alt>=18000?'FL'+String(Math.round(alt/100)).padStart(3,'0'):alt.toLocaleString()+' ft',vs=Math.round((o.vs||0)/10)*10,ar=vs>200?'&#9650;':vs<-200?'&#9660;':'&#9644;',hd=String(Math.round((o.hdg+360)%360)%360).padStart(3,'0'),tr=TRL.get(io?'own':(sel.hx||sel.id))||[],lost=!io&&Date.now()-(sel.seen||0)>45000;
-let nm=0;for(let i=1;i<tr.length;i++)nm+=dist({lat:tr[i-1][0],lon:tr[i-1][1]},{lat:tr[i][0],lon:tr[i][1]});const mins=tr.length>1?Math.round((tr[tr.length-1][3]-tr[0][3])/60000):0;
-e.innerHTML=(lost?'<div class="m" style="color:#fbbf24">Signal lost '+Math.round((Date.now()-sel.seen)/1000)+'s ago. Showing the last known position.</div>':'')+'<div class="mg"><div class="big"><span>ALTITUDE</span><b>'+fl+' <small style="font-size:15px">'+ar+' '+Math.abs(vs)+' fpm</small></b></div><div><span>GROUND SPEED</span><b>'+Math.round(o.gs||0)+' kt</b></div><div><span>HEADING</span><b>'+hd+'&deg;</b></div>'+(!io&&liveOk()?'<div><span>FROM YOU</span><b>'+Math.round(dist(own,o))+' nm</b></div>':'')+'<div><span>TRAIL</span><b>'+nm.toFixed(0)+' nm</b><span>'+mins+' min recorded</span></div></div>'+spark(tr)}
-/* The flight card: who is flying, the route, the real times and the live
-   readouts. Every field comes from the simulator snapshot, the traffic feed or
-   the planned route, and a field the source does not provide says so rather
-   than showing a plausible number. */
+/* The one aircraft card, top-left over the map. Clicking a target fills it with
+   the callsign, the registration the feed reported, a spotter photo of that
+   registration when one is published, and the live readouts. It drags by its
+   header and expands for the rest. The same card is the flight card for your
+   own aircraft when nothing is selected. Every field comes from the simulator
+   snapshot, the traffic feed or the planned route; a field a source does not
+   provide says so rather than showing a plausible number. */
+const PHOTOS=new Map();
+let fExp=(()=>{try{return localStorage.getItem('stratos.cardExpanded')=='1'}catch(_){return false}})();
+function fCard(){fcS='';fcRender(liveOk())}
+function fcTog(){fExp=!fExp;try{localStorage.setItem('stratos.cardExpanded',fExp?'1':'0')}catch(_){}fCard()}
+function fcReg(o){const io=o.k=='own',raw=io?(live.d&&live.d.registration):o.reg;return window.PHOTO?window.PHOTO.normalizeRegistration(raw):''}
+function fcType(o){const io=o.k=='own',t=io?((live.d&&live.d.aircraft)||''):(o.type||'');return String(t).trim()}
+function fcSource(o){if(o.k=='own')return 'LIVE FROM '+String((live.d&&live.d.src)||'SIM').toUpperCase();if(o.source=='vatsim')return 'VATSIM';if(o.source=='adsb')return 'ADS-B'+(WT.src?' VIA '+String(WT.src).toUpperCase():'');return String(o.cc||'TRAFFIC').toUpperCase()}
+/* One lookup per registration per session. A failure is remembered as a
+   failure, so a missing photo is not retried on every frame. */
+async function fcPhoto(reg){
+  if(!reg||PHOTOS.has(reg))return;
+  PHOTOS.set(reg,{state:'loading'});
+  const direct='https://api.planespotters.net/pub/photos/reg/'+encodeURIComponent(reg);
+  const ask=async url=>{const r=await fetch(url,{cache:'force-cache'});if(!r.ok)throw new Error('HTTP '+r.status);return window.PHOTO.photoFromPayload(await r.json())};
+  let photo=null;
+  if(location.protocol!=='file:'){try{photo=await ask(window.PHOTO.photoRequest(reg))}catch(_){photo=null}}
+  // The desktop build has no same-origin API; its main process supplies the
+  // User-Agent the service requires, so the direct call is the working path there.
+  if(photo===null&&location.protocol=='file:'){try{photo=await ask(direct)}catch(_){photo=null}}
+  PHOTOS.set(reg,photo?{state:'ok',photo}:{state:'none'});
+  fCard();
+}
+function fcPhotoHtml(o){
+  const reg=fcReg(o),type=fcType(o),label=type||'Aircraft';
+  if(!reg)return '<div class="fcph none"><span class="fcph-t">'+esc(label)+'</span><span class="fcph-c">Registration not reported, so no photo can be matched</span></div>';
+  const p=PHOTOS.get(reg);
+  if(!p||p.state=='loading')return '<div class="fcph load"><span class="fcph-t">Looking up '+esc(reg)+'…</span><span class="fcph-c">Planespotters.net</span></div>';
+  if(p.state!='ok'||!p.photo)return '<div class="fcph none"><span class="fcph-t">'+esc(label)+'</span><span class="fcph-c">No spotter photo published for '+esc(reg)+'</span></div>';
+  const credit=esc(window.PHOTO.photoCredit(p.photo));
+  const cap=p.photo.link?'<a href="'+esc(p.photo.link)+'" target="_blank" rel="noopener">'+credit+'</a>':credit;
+  return '<figure class="fcph"><img src="'+esc(p.photo.src)+'" alt="'+esc(label)+' '+esc(reg)+'" loading="lazy" referrerpolicy="no-referrer"><figcaption class="fcph-c">'+cap+'</figcaption></figure>';
+}
+function fcAircraftHtml(o){
+  const io=o.k=='own',d=live.d||{};
+  const lat=io?own.lat:o.lat,lon=io?own.lon:o.lon;
+  const id=io?(d.callsign||d.registration||'Your aircraft'):(o.id||o.hx||'Unknown');
+  const reg=fcReg(o),type=fcType(o);
+  const alt=Math.round(((io?own.alt:o.alt)||0)/10)*10;
+  const gs=Math.round(io?(d.gs||0):(o.gs||0));
+  const hdg=String(Math.round(((io?own.hdg:o.hdg)||0)+360)%360%360).padStart(3,'0');
+  const vs=Math.round(((io?own.vs:o.vs)||0)/10)*10;
+  const lost=!io&&Date.now()-(o.seen||0)>45000;
+  const trail=TRL.get(io?'own':(o.hx||o.id))||[];
+  let nm=0;for(let i=1;i<trail.length;i++)nm+=dist({lat:trail[i-1][0],lon:trail[i-1][1]},{lat:trail[i][0],lon:trail[i][1]});
+  const mins=trail.length>1?Math.round((trail[trail.length-1][3]-trail[0][3])/60000):0;
+  const away=!io&&liveOk()?Math.round(dist(own,o)):null;
+  const level=alt>=18000?'FL'+String(Math.round(alt/100)).padStart(3,'0'):alt.toLocaleString();
+  const rows=[['Registration',reg?esc(reg):'Not reported'],['Type',type?esc(type):'Not reported'],['Source',esc(fcSource(o))],['Position',Number(lat).toFixed(3)+', '+Number(lon).toFixed(3)]];
+  if(away!=null)rows.push(['From you',away+' nm']);
+  rows.push(['Trail',trail.length>1?nm.toFixed(0)+' nm in '+mins+' min':'Not recorded yet']);
+  const more='<div class="fcm">'+rows.map(r=>'<div><span>'+r[0]+'</span><b>'+r[1]+'</b></div>').join('')+'</div>'
+    +(fExp&&trail.length>2?spark(trail):'')
+    +'<div class="fca">'
+    +(io?'':'<button type="button" class="'+(tk?'on':'')+'" data-fc-act="track">'+(tk?'Stop tracking':'Track')+'</button>')
+    +'<button type="button" data-fc-act="center">Center</button>'
+    +'<button type="button" data-fc-act="clear">Clear trail</button>'
+    +'</div>';
+  return '<div class="fh" data-fc-drag><span class="dot'+(lost?' lost':'')+'"></span><b>'+esc(id)+'</b><span class="sp"></span><i>'+esc(type||'AIRCRAFT')+'</i><em>'+(lost?'SIGNAL LOST':tk?'TRACKED':'SELECTED')+'</em>'
+    +'<button type="button" class="fci" data-fc-toggle aria-expanded="'+(fExp?'true':'false')+'" title="'+(fExp?'Less information':'More information')+'">'+(fExp?'&#9652;':'&#9662;')+'</button>'
+    +'<button type="button" class="fci" data-fc-act="close" title="Close">&#10005;</button></div>'
+    +'<div class="fcd">'+esc(reg||'registration not reported')+' · '+esc(fcSource(o))+'</div>'
+    +'<div class="fg">'+fcField(level,level.startsWith('FL')?'LEVEL':'ALT FT')
+    +fcField(gs,'GS KT')+fcField(hdg+'&deg;','HDG')
+    +fcField((vs>0?'+':'')+vs,'VS FPM')+fcField(away==null?'–':away,'FROM YOU')+'</div>'
+    +(fExp?more:'');
+}
+/* Keep the card on screen after a drag or a content change. */
+function clampCard(){
+  const e=document.getElementById('fc');if(!e||e.style.display=='none')return;
+  const r=e.getBoundingClientRect();
+  let x=parseFloat(e.style.left),y=parseFloat(e.style.top);
+  if(!Number.isFinite(x))x=12;if(!Number.isFinite(y))y=12;
+  x=Math.min(Math.max(0,x),Math.max(0,innerWidth-r.width-4));
+  y=Math.min(Math.max(0,y),Math.max(0,innerHeight-r.height-4));
+  e.style.left=x+'px';e.style.top=y+'px';
+}
+(function cardPointer(){
+  const e=document.getElementById('fc');if(!e)return;
+  try{const p=JSON.parse(localStorage.getItem('stratos.cardPos')||'null');if(p&&Number.isFinite(p.x)&&Number.isFinite(p.y)){e.style.left=p.x+'px';e.style.top=p.y+'px'}}catch(_){}
+  let drag=null;
+  e.addEventListener('pointerdown',ev=>{
+    if(ev.target.closest('button,a,input,select'))return;
+    if(!ev.target.closest('[data-fc-drag]'))return;
+    const r=e.getBoundingClientRect();
+    drag={x:ev.clientX-r.left,y:ev.clientY-r.top};
+    e.classList.add('dragging');
+    try{e.setPointerCapture(ev.pointerId)}catch(_){}
+    ev.preventDefault();
+  });
+  e.addEventListener('pointermove',ev=>{
+    if(!drag)return;
+    const x=Math.min(Math.max(0,ev.clientX-drag.x),Math.max(0,innerWidth-80));
+    const y=Math.min(Math.max(0,ev.clientY-drag.y),Math.max(0,innerHeight-60));
+    e.style.left=x+'px';e.style.top=y+'px';
+  });
+  const end=()=>{if(!drag)return;drag=null;e.classList.remove('dragging');clampCard();
+    try{localStorage.setItem('stratos.cardPos',JSON.stringify({x:parseFloat(e.style.left)||12,y:parseFloat(e.style.top)||12}))}catch(_){}};
+  e.addEventListener('pointerup',end);e.addEventListener('pointercancel',end);
+  window.addEventListener('resize',()=>clampCard());
+  e.addEventListener('click',ev=>{
+    const t=ev.target.closest('[data-fc-toggle],[data-fc-act]');if(!t)return;
+    if(t.hasAttribute('data-fc-toggle')){fcTog();return}
+    const act=t.dataset.fcAct;
+    if(act=='track'){tk=!tk;if(tk)setFol(false);fCard()}
+    else if(act=='center'){trCenter();fCard()}
+    else if(act=='clear'){trClear()}
+    else if(act=='close'){sel=null;tk=false;render();fCard()}
+  });
+})();
 function zTime(value){const n=Number(value);if(!Number.isFinite(n)||n<=0)return'–';const d=new Date(n<1e12?n*1000:n);return String(d.getUTCHours()).padStart(2,'0')+String(d.getUTCMinutes()).padStart(2,'0')+'Z'}
 function etaZ(duration){ // 'h:mm' remaining -> the clock time it lands, in UTC
   const m=/^(\d+):(\d{2})$/.exec(String(duration||'').trim());if(!m)return '–';
   return zTime(Date.now()/1000+(Number(m[1])*60+Number(m[2]))*60)}
 function fcField(value,label){return '<div><b>'+value+'</b><span>'+label+'</span></div>'}
 function fcRender(ok){
-  const e=$('#fc'),tr=tk&&sel&&sel.k=='trf';
-  if(!ok&&!tr){if(fcS){fcS='';e.style.display='none'}return}
+  const e=$('#fc'),pick=sel&&(sel.k=='trf'||sel.k=='own');
+  if(!pick&&!ok){if(fcS){fcS='';e.style.display='none'}return}
   const g=i=>$('#'+i).textContent;
   let s;
-  if(tr){
-    const o=sel,alt=Math.round((o.alt||0)/10)*10,vs=Math.round((o.vs||0)/10)*10,lost=Date.now()-(o.seen||0)>45000;
-    s='<div class="fh"><span class="dot'+(lost?' lost':'')+'"></span><b>'+esc(o.id||o.hx||'Unknown')+'</b><span class="sp"></span><i>'+esc((String(o.cc||'').split(' · ')[0])||'ADS-B')+'</i><em>'+(lost?'Signal lost':'Tracked')+'</em></div>'      +'<div class="fcd">'+esc(o.cc||(o.source=='vatsim'?'VATSIM pilot':'Live ADS-B traffic'))+'</div>'
-     +'<div class="fg">'+fcField(alt>=18000?'FL'+String(Math.round(alt/100)).padStart(3,'0'):alt.toLocaleString(),alt>=18000?'LEVEL':'ALT FT')
-     +fcField(Math.round(o.gs||0),'GS KT')+fcField(String(Math.round((o.hdg+360)%360)%360).padStart(3,'0'),'HDG°')
-     +fcField((vs>0?'+':'')+vs,'VS FPM')+fcField('–','DEST NM')+'</div>';
+  if(pick){
+    s=fcPhotoHtml(sel)+fcAircraftHtml(sel);
+    const reg=fcReg(sel);
+    if(reg)fcPhoto(reg);
   }else{
     const d=live.d||{},cf=d.currentFlight||{},rt=route.length>1,tot=rt?total():0,pr=rt?routeProg():0,pct=tot?Math.min(100,pr/tot*100):0;
     const org=cf.depAirport||(rt?route[0].id:''),dst=cf.arrAirport||(rt?route[route.length-1].id:'');
@@ -1245,7 +1376,7 @@ function fcRender(ok){
      +'<div class="fg">'+fcField(g('tAL'),'ALT FT')+fcField(g('tGS'),'GS KT')+fcField(g('tHD')+'°','HDG')+fcField(g('tVS'),'VS FPM')
      +fcField(isFinite(parseFloat(g('tDS')))?g('tDS'):'–','DEST NM')+'</div>';
   }
-  if(s!==fcS){fcS=s;e.innerHTML=s;e.style.display='block'}}
+  if(s!==fcS){fcS=s;e.innerHTML=s;e.style.display='block';clampCard()}}
 /* The native Charts workspace owns chart viewing now. */
 function chartLauncherHtml(a){const id=(a&&a.id)||'';const url='pilot.html#charts'+(id?'?icao='+encodeURIComponent(id):'');let h='<div style="margin-top:12px"><b>'+esc(id)+'</b> <span class="m">'+esc((a&&a.name)||'')+'</span></div>';h+='<div class="m" style="margin-top:8px">Official terminal procedures open in the integrated Charts workspace: zoom, pan, fit, pages and full screen, without leaving Stratos.</div><div class="row" style="margin-top:10px"><a href="'+url+'"><button class="on">Open Charts'+(id?' for '+esc(id):'')+'</button></a></div>';return h}
 function openChartsPage(icao){location.href='pilot.html#charts'+(icao?'?icao='+encodeURIComponent(icao):'')}
@@ -1285,8 +1416,10 @@ try{if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').t
   import * as FP from './js/flightpanel.js';
   import * as VATSIM from './js/lib/vatsim.js';
   import * as AC from './js/lib/aircraft.js';
+  import * as PHOTO from './js/lib/aircraftphoto.js';
   window.VATSIM = VATSIM;
   window.AC = AC;
   window.FP = FP;
+  window.PHOTO = PHOTO;
 </script>
 </body></html>

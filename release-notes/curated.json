@@ -1,4 +1,30 @@
 {
+  "2.1.18": {
+    "summary": "One aircraft card with a spotter photo of its registration, drag it where you want and expand it for the rest.",
+    "changelog": {
+      "features": [
+        "Selecting an aircraft opens one card on the left: a spotter photo of its registration, the callsign, type, altitude, speed, heading and vertical speed. The duplicate panel on the right is gone.",
+        "The card drags by its header, stays where you put it, and expands for registration, type, source, position, trail and the altitude profile.",
+        "The registration is read from the ADS-B feed, or from the simulator for your own aircraft, and matched to a published photo."
+      ],
+      "improvements": [
+        "A registration with no published photo says so, with the aircraft type, instead of showing an unrelated airframe.",
+        "Track, Center and Clear trail moved into the card, so following an aircraft no longer needs a second panel."
+      ],
+      "fixes": [
+        "The aircraft subtitle no longer repeats the type and registration, and names the live feed the position came from.",
+        "VATSIM pilots report no registration, and the card now says it was not reported rather than leaving a blank line."
+      ],
+      "performance": [],
+      "ui": [
+        "Every photo credits its photographer and links to the photo page on Planespotters, whose terms ask for both."
+      ],
+      "compatibility": [
+        "Photos load through the app's own /api/photo route, which the local dev server also serves; the desktop build supplies the header the photo service requires."
+      ],
+      "other": []
+    }
+  },
   "2.1.17": {
     "summary": "Live VATSIM traffic, a flight plan you can edit on its own map, and a flight overview split into tabs.",
     "changelog": {

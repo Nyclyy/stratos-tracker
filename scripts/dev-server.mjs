@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import traffic from '../api/traffic.js';
+import photo from '../api/photo.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..', 'app');
 const PORT = Number(process.env.PORT) || 8123;
@@ -65,7 +66,8 @@ function adapt(handler) {
   };
 }
 
-const api = adapt(traffic);
+const trafficApi = adapt(traffic);
+const photoApi = adapt(photo);
 
 /** A path inside app/, or null when it escapes the root. */
 function resolveFile(pathname) {
@@ -88,9 +90,10 @@ function resolveFile(pathname) {
 const server = http.createServer(async (req, res) => {
   const { pathname } = new URL(req.url, 'http://localhost');
 
-  if (pathname === '/api/traffic') {
+  const route = pathname === '/api/traffic' ? trafficApi : pathname === '/api/photo' ? photoApi : null;
+  if (route) {
     try {
-      await api(req, res);
+      await route(req, res);
     } catch (_) {
       if (!res.writableEnded) {
         res.statusCode = 500;
@@ -125,7 +128,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Stratos dev server: http://${HOST}:${PORT}/  (ADS-B proxied through /api/traffic)`);
+  console.log(`Stratos dev server: http://${HOST}:${PORT}/  (ADS-B via /api/traffic, photos via /api/photo)`);
 });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {

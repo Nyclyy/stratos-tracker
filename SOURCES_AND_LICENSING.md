@@ -17,6 +17,10 @@ Aircraft image sources and licenses:
 
 The separately bundled Commons images and adaptations remain under their respective CC BY-SA terms. Several other common types intentionally use a neutral fallback rather than a falsely labelled model drawing.
 
+## Aircraft photos
+
+- **Planespotters.net photo API** — `api.planespotters.net/pub/photos/reg/<registration>`. A photo is requested only when an aircraft is opened on the map, at most once per registration per session, through the app's own `/api/photo` route (or the local dev server), which also carries the application User-Agent the API requires. Only the first published photo is shown, with the photographer's name and a link to its Planespotters page, as their terms ask. Images are loaded from `t.plnspttrs.net` and are not copied into Stratos or redistributed with it. A registration with no published photo says so; no other aircraft's photo is substituted.
+
 ## Airport and navigation data
 
 - **OurAirports** — public domain (CC0). CSV data is downloaded at runtime from `ourairports.com` / the maintained GitHub mirror and cached. Attribution is included in the UI even though CC0 does not require it.

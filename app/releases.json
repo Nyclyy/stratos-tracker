@@ -3,60 +3,64 @@
   "product": "stratos",
   "source": "https://github.com/Nyclyy/stratos-tracker",
   "latest": {
-    "version": "2.1.17",
+    "version": "2.1.18",
     "releasedAt": "2026-10-23",
     "severity": "normal",
-    "summary": "Live VATSIM traffic, a flight plan you can edit on its own map, and a flight overview split into tabs.",
+    "summary": "One aircraft card with a spotter photo of its registration, drag it where you want and expand it for the rest.",
     "changelog": {
       "features": [
-        "Traffic source in Map layers: VATSIM shows pilots online now with callsign, type, altitude and speed, next to the existing live ADS-B feeds; an airport panel also names the controllers online for that airport.",
-        "The route planner's map now shows the plan: select a waypoint or the leg between two of them for its coordinates, altitude, distances and connected legs, then Move up, Move down, Direct or Delete it, or drag to move it.",
-        "Flight overview is split into Overview, Route, Flight data and Weather, with the aircraft identified by type and matched to a silhouette where artwork exists.",
-        "SimBrief is connected once: Settings saves the Pilot ID or username and every import reuses it."
+        "Selecting an aircraft opens one card on the left: a spotter photo of its registration, the callsign, type, altitude, speed, heading and vertical speed. The duplicate panel on the right is gone.",
+        "The card drags by its header, stays where you put it, and expands for registration, type, source, position, trail and the altitude profile.",
+        "The registration is read from the ADS-B feed, or from the simulator for your own aircraft, and matched to a published photo."
       ],
       "improvements": [
-        "Live ADS-B works from a local copy of the app: npm run dev serves it and fetches the feeds server-side, so the browser's cross-origin rules no longer block them.",
-        "Map layers offers only the traffic sources that answer. Volanta, ElevateX and Flightradar24 were removed instead of sitting there with no data."
+        "A registration with no published photo says so, with the aircraft type, instead of showing an unrelated airframe.",
+        "Track, Center and Clear trail moved into the card, so following an aircraft no longer needs a second panel."
       ],
       "fixes": [
-        "The first ADS-B mirror was read with the wrong key, so its aircraft were thrown away and every poll fell through to a slower fallback.",
-        "VATSIM pilots appeared only after a delayed retry because the first poll ran before the feed parser had loaded.",
-        "The corner traffic badge said 'aircrafts' for a count of aircraft.",
-        "The desktop build could not read VATSIM's live feed or one ADS-B mirror because those hosts were missing from its CORS allowlist."
+        "The aircraft subtitle no longer repeats the type and registration, and names the live feed the position came from.",
+        "VATSIM pilots report no registration, and the card now says it was not reported rather than leaving a blank line."
       ],
       "performance": [],
       "ui": [
-        "The corner badge counts aircraft or pilots according to the source in use, and names it in the tooltip."
+        "Every photo credits its photographer and links to the photo page on Planespotters, whose terms ask for both."
       ],
-      "compatibility": [],
-      "other": [
-        "npm run dev starts a local server with the same traffic proxy the hosted build uses; a plain static server still serves the files but cannot reach the ADS-B feeds."
-      ]
-    },
-    "downloads": {
-      "windows": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.17/Stratos-Setup.exe",
-        "sha256": "9e9ded5e4a1c7bce0ce8905df3584a35d123eaa08a075765f3a0519aa417f032",
-        "size": 103849832
-      },
-      "mac-arm64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.17/Stratos-2.1.17-mac-arm64.dmg",
-        "sha256": "b3c30e8a4e92a906a35c022a7fdbcdb6c8bada15123cf5dde750138e4e0d825f",
-        "size": 119604464
-      },
-      "mac-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.17/Stratos-2.1.17-mac-x64.dmg",
-        "sha256": "29118881ee16a52a412e98fec35bf22b93b709d3bec8a14fa9c3ddad4d5becf2",
-        "size": 124907396
-      },
-      "linux-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.17/Stratos-2.1.17-linux-x64.AppImage",
-        "sha256": "a5849aebfeeb75a49cb6a0665773e8cc0a86da70365be6bf9fe25190a957781a",
-        "size": 140333416
-      }
+      "compatibility": [
+        "Photos load through the app's own /api/photo route, which the local dev server also serves; the desktop build supplies the header the photo service requires."
+      ],
+      "other": []
     }
   },
   "releases": [
+    {
+      "version": "2.1.18",
+      "releasedAt": "2026-10-23",
+      "severity": "normal",
+      "summary": "One aircraft card with a spotter photo of its registration, drag it where you want and expand it for the rest.",
+      "changelog": {
+        "features": [
+          "Selecting an aircraft opens one card on the left: a spotter photo of its registration, the callsign, type, altitude, speed, heading and vertical speed. The duplicate panel on the right is gone.",
+          "The card drags by its header, stays where you put it, and expands for registration, type, source, position, trail and the altitude profile.",
+          "The registration is read from the ADS-B feed, or from the simulator for your own aircraft, and matched to a published photo."
+        ],
+        "improvements": [
+          "A registration with no published photo says so, with the aircraft type, instead of showing an unrelated airframe.",
+          "Track, Center and Clear trail moved into the card, so following an aircraft no longer needs a second panel."
+        ],
+        "fixes": [
+          "The aircraft subtitle no longer repeats the type and registration, and names the live feed the position came from.",
+          "VATSIM pilots report no registration, and the card now says it was not reported rather than leaving a blank line."
+        ],
+        "performance": [],
+        "ui": [
+          "Every photo credits its photographer and links to the photo page on Planespotters, whose terms ask for both."
+        ],
+        "compatibility": [
+          "Photos load through the app's own /api/photo route, which the local dev server also serves; the desktop build supplies the header the photo service requires."
+        ],
+        "other": []
+      }
+    },
     {
       "version": "2.1.17",
       "releasedAt": "2026-10-23",

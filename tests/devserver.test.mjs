@@ -65,6 +65,13 @@ test('dev server: the traffic proxy refuses non-https and credential-bearing tar
   }
 });
 
+test('dev server: the photo endpoint rejects a missing or implausible registration', async () => {
+  for (const url of ['/api/photo', '/api/photo?reg=', '/api/photo?reg=BAW2620', '/api/photo?reg=1234']) {
+    const response = await fetch(BASE + url);
+    assert.equal(response.status, 400, url);
+  }
+});
+
 test('dev server: encoded traversal cannot read files outside app', async () => {
   const response = await fetch(BASE + '/%2e%2e/package.json');
   assert.equal(response.status, 404);

@@ -766,6 +766,19 @@ if (!gotLock) {
     // Charts are rendered by the bundled pdf.js from bytes fetched through the
     // bridge, so no third-party site is framed any more.
 
+    // The photo API refuses a browser User-Agent and asks for an application
+    // name with a contact URL. A page cannot set that header, and the renderer
+    // is the browser here, so the main process supplies it for that host only.
+    session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+      let hostname = '';
+      try { hostname = new URL(details.url).hostname; } catch (_) {}
+      const requestHeaders = { ...(details.requestHeaders || {}) };
+      if (hostname === 'api.planespotters.net') {
+        requestHeaders['User-Agent'] = `Stratos/${app.getVersion()} (+https://github.com/Nyclyy/stratos-tracker)`;
+      }
+      callback({ requestHeaders });
+    });
+
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
       let hostname = '';
       try { hostname = new URL(details.url).hostname; } catch (_) {}
