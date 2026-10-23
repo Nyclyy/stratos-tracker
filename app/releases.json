@@ -4,7 +4,7 @@
   "source": "https://github.com/Nyclyy/stratos-tracker",
   "latest": {
     "version": "2.1.17",
-    "releasedAt": "2026-10-22",
+    "releasedAt": "2026-10-23",
     "severity": "normal",
     "summary": "Live VATSIM traffic, a flight plan you can edit on its own map, and a flight overview split into tabs.",
     "changelog": {
@@ -32,12 +32,34 @@
       "other": [
         "npm run dev starts a local server with the same traffic proxy the hosted build uses; a plain static server still serves the files but cannot reach the ADS-B feeds."
       ]
+    },
+    "downloads": {
+      "windows": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.17/Stratos-Setup.exe",
+        "sha256": "9e9ded5e4a1c7bce0ce8905df3584a35d123eaa08a075765f3a0519aa417f032",
+        "size": 103849832
+      },
+      "mac-arm64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.17/Stratos-2.1.17-mac-arm64.dmg",
+        "sha256": "b3c30e8a4e92a906a35c022a7fdbcdb6c8bada15123cf5dde750138e4e0d825f",
+        "size": 119604464
+      },
+      "mac-x64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.17/Stratos-2.1.17-mac-x64.dmg",
+        "sha256": "29118881ee16a52a412e98fec35bf22b93b709d3bec8a14fa9c3ddad4d5becf2",
+        "size": 124907396
+      },
+      "linux-x64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.17/Stratos-2.1.17-linux-x64.AppImage",
+        "sha256": "a5849aebfeeb75a49cb6a0665773e8cc0a86da70365be6bf9fe25190a957781a",
+        "size": 140333416
+      }
     }
   },
   "releases": [
     {
       "version": "2.1.17",
-      "releasedAt": "2026-10-22",
+      "releasedAt": "2026-10-23",
       "severity": "normal",
       "summary": "Live VATSIM traffic, a flight plan you can edit on its own map, and a flight overview split into tabs.",
       "changelog": {
@@ -65,6 +87,28 @@
         "other": [
           "npm run dev starts a local server with the same traffic proxy the hosted build uses; a plain static server still serves the files but cannot reach the ADS-B feeds."
         ]
+      },
+      "downloads": {
+        "windows": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.17/Stratos-Setup.exe",
+          "sha256": "9e9ded5e4a1c7bce0ce8905df3584a35d123eaa08a075765f3a0519aa417f032",
+          "size": 103849832
+        },
+        "mac-arm64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.17/Stratos-2.1.17-mac-arm64.dmg",
+          "sha256": "b3c30e8a4e92a906a35c022a7fdbcdb6c8bada15123cf5dde750138e4e0d825f",
+          "size": 119604464
+        },
+        "mac-x64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.17/Stratos-2.1.17-mac-x64.dmg",
+          "sha256": "29118881ee16a52a412e98fec35bf22b93b709d3bec8a14fa9c3ddad4d5becf2",
+          "size": 124907396
+        },
+        "linux-x64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.17/Stratos-2.1.17-linux-x64.AppImage",
+          "sha256": "a5849aebfeeb75a49cb6a0665773e8cc0a86da70365be6bf9fe25190a957781a",
+          "size": 140333416
+        }
       }
     },
     {
