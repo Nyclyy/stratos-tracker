@@ -19,6 +19,7 @@ The separately bundled Commons images and adaptations remain under their respect
 
 ## Aircraft photos
 
+- **Registration lookup** — a registration the feed did not carry is worked out when an aircraft is opened on the map: from the simulator's aircraft title or livery for your own airframe, from the Mode S address in [hexdb.io](https://hexdb.io) for live traffic, or, when VATSIM is the only source, from a live callsign search (`api.adsb.lol/v2/callsign/<callsign>`, through the app's `/api/traffic` route where the deployment has one). One lookup per aircraft per session. A registration found this way is shown as detected, never as feed data, so a photo of a different airframe is not presented as yours.
 - **Planespotters.net photo API** — `api.planespotters.net/pub/photos/reg/<registration>`. A photo is requested only when an aircraft is opened on the map, at most once per registration per session, through the app's own `/api/photo` route (or the local dev server), which also carries the application User-Agent the API requires. Only the first published photo is shown, with the photographer's name and a link to its Planespotters page, as their terms ask. Images are loaded from `t.plnspttrs.net` and are not copied into Stratos or redistributed with it. A registration with no published photo says so; no other aircraft's photo is substituted.
 
 ## Airport and navigation data

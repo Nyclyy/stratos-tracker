@@ -478,7 +478,7 @@ const cv=$('#map'),cx=cv.getContext('2d');let W,H,dpr,C={};
 const V={lon:-119.5,lat:38.8,z:6,fol:false},L={apt:1,nav:1,trf:1,grid:0,rte:1,style:(function(){try{return localStorage.getItem('dl.style')||'sat'}catch(e){return'sat'}})()};
 let plan=false,panel=null,sel=null,route=[],trav=0,own={lat:0,lon:0,hdg:0,alt:0,vs:0};
 const byId=id=>A.find(a=>a.id==id)||N.find(a=>a.id==id);
-const wp=o=>({id:o.id,name:o.name,lat:o.lat,lon:o.lon,k:o.k||'fix',elev:o.elev||0});
+const wp=o=>({id:o.id,name:o.name,lat:o.lat,lon:o.lon,k:o.k||'fix',elev:o.elev||0,ss:o.ss||'',aw:o.aw||''});
 const wpx=(lon,lat,z)=>{const zoom=z!==undefined?z:V.z,k=SZ*2**zoom,s=Math.sin(lat*R);return[(lon+180)/360*k,(.5-Math.log((1+s)/(1-s))/(4*Math.PI))*k]};
 const wun=(X,Y,z)=>{const zoom=z!==undefined?z:V.z,k=SZ*2**zoom;return[X/k*360-180,Math.atan(Math.sinh(Math.PI-2*Math.PI*Y/k))/R]};
 const sc=(lon,lat)=>{const c=wpx(V.lon,V.lat,V.z),p=wpx(lon,lat,V.z);return[p[0]-c[0]+W/2,p[1]-c[1]+H/2]};
@@ -501,12 +501,12 @@ const T=[],WT={n:0,src:'',busy:0,fail:0,last:'',okAt:0};
 function save(){try{localStorage.setItem('dl.route',JSON.stringify(route));mirrorRoute()}catch(e){}}
 function mirrorRoute(){try{
   const a=JSON.parse(localStorage.getItem('stratos.activeRoute')||'null')||{};
-  localStorage.setItem('stratos.activeRoute',JSON.stringify({...a,points:route.map(p=>({id:p.id,name:p.name||p.id,lat:p.lat,lon:p.lon,kind:p.k||'fix',elev:Number(p.elev)||0}))}));
+  localStorage.setItem('stratos.activeRoute',JSON.stringify({...a,points:route.map(p=>({id:p.id,name:p.name||p.id,lat:p.lat,lon:p.lon,kind:p.k||'fix',elev:Number(p.elev)||0,ss:p.ss||'',aw:p.aw||''}))}));
 }catch(e){}}
 function load(){
   try{const a=JSON.parse(localStorage.getItem('stratos.activeRoute')||'null');
     if(a&&Array.isArray(a.points)){
-      route=a.points.map(p=>({id:p.id,name:p.name||p.id,lat:+p.lat,lon:+p.lon,k:p.kind||p.k||'fix',elev:Number(p.elev)||0}));
+      route=a.points.map(p=>({id:p.id,name:p.name||p.id,lat:+p.lat,lon:+p.lon,k:p.kind||p.k||'fix',elev:Number(p.elev)||0,ss:p.ss||'',aw:p.aw||''}));
       return true;
     }
   }catch(e){}
@@ -564,17 +564,196 @@ const tl=wpx(V.lon,V.lat);
 if(L.grid&&V.z<12&&!CH.on){const s=V.z<4?10:V.z<5.5?5:V.z<7?2:V.z<8.5?1:V.z<10?.5:.1,a=wun(tl[0]-W/2,tl[1]-H/2),b=wun(tl[0]+W/2,tl[1]+H/2);cx.strokeStyle=C.grid;cx.lineWidth=1;cx.fillStyle=C.coast;cx.font='10px sans-serif';cx.beginPath();
 for(let o=Math.ceil(a[0]/s)*s;o<b[0];o+=s){const x=sc(o,0)[0];cx.moveTo(x,0);cx.lineTo(x,H);cx.fillText(o.toFixed(s<1?1:0)+'°',x+2,H-100)}
 for(let t=Math.ceil(b[1]/s)*s;t<a[1];t+=s){const y=sc(0,t)[1];cx.moveTo(0,y);cx.lineTo(W,y);cx.fillText(t.toFixed(s<1?1:0)+'°',4,y-2)}cx.stroke()}
-const ppn=lat=>SZ*2**V.z/360/(60*Math.cos(lat*R));
-if(L.nav&&!CH.on)N.forEach(n=>{const[x,y]=sc(n.lon,n.lat);if(V.z<6)return;if(x<-20||x>W+20||y<-20||y>H+20)return;cx.strokeStyle=C.nav;cx.lineWidth=1.6;cx.beginPath();cx.moveTo(x,y-6);cx.lineTo(x+5.5,y+4);cx.lineTo(x-5.5,y+4);cx.closePath();cx.stroke();if(V.z>5.5){cx.fillStyle=C.nav;cx.font='11px sans-serif';cx.fillText(n.id,x+8,y+4)}});
+const ppn=lat=>SZ*2**V.z/360/(60*Math.cos(lat*R));MKL.length=0;
+if(L.nav&&!CH.on)N.forEach(n=>{const[x,y]=sc(n.lon,n.lat);if(V.z<6)return;if(x<-20||x>W+20||y<-20||y>H+20)return;const t=String(n.type||'').toUpperCase(),kind=/NDB/.test(t)?'ndb':/VOR|TACAN|DME/.test(t)?'vor':'int';mkDraw(kind,x,y,mkR()*.8);if(V.z>5.5)mkText(n.id,x+Math.round(mkR()*.55)-4,y+4,mkColor(kind),11,false)});
 if(L.apt)A.forEach(a=>{if(CH.on&&a!==CH.a)return;const[x,y]=sc(a.lon,a.lat);if(a.x&&V.z<6)return;const mg=V.z>10?4000:60;if(x<-mg||x>W+mg||y<-mg||y>H+mg)return;
 if(V.z>8.5)drawReal(a,x,y);else a.det=false;if(0)pairs(a).forEach(pr=>{const n=pr[0],h=n*10,p=ppn(a.lat)*1.4,dx=Math.sin(h*R)*p,dy=-Math.cos(h*R)*p;cx.strokeStyle=C.ap;cx.lineWidth=Math.max(3,p/9);cx.lineCap='butt';cx.beginPath();cx.moveTo(x-dx,y-dy);cx.lineTo(x+dx,y+dy);cx.stroke()});
-cx.beginPath();cx.arc(x,y,a.det?0:V.z>8.5?3:5,0,7);cx.fillStyle=C.land;cx.fill();cx.strokeStyle=C.ap;cx.lineWidth=2.2;cx.stroke();
-if(V.z>(a.x?7:4.8)){cx.font='bold 12px sans-serif';if(SAT()){cx.lineWidth=3;cx.strokeStyle=DKM()?'rgba(0,0,0,.7)':'rgba(255,255,255,.85)';cx.strokeText(a.id,x+9,y-6)}cx.fillStyle=SAT()?(DKM()?'#fff':'#111'):C.txt;cx.fillText(a.id,x+9,y-6)}});
+if(a.det){}else if(V.z>8.5){cx.beginPath();cx.arc(x,y,3,0,7);cx.fillStyle=C.land;cx.fill();cx.strokeStyle=C.ap;cx.lineWidth=2.2;cx.stroke()}else mkRing(x,y,mkR()*.9,mkColor('apt'),1);
+if(V.z>(a.x?7:4.8)&&x>-40&&x<W+40&&y>-40&&y<H+40&&!(L.rte&&planTocTod().ids.has(String(a.id).toUpperCase())))mkText(a.id,x+Math.round(mkR()*.62)-3,y-6,SAT()?(DKM()?'#fff':'#111'):C.txt,12.5,true)});
 if(route.length&&!CH.on&&L.rte){cx.save();cx.globalAlpha=.35;cx.strokeStyle=C.route;cx.lineWidth=12;cx.lineCap='round';cx.lineJoin='round';cx.beginPath();route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke();if(liveOk()&&route.length>1){const pr=routeProg(),pts=[route[0]];let acc=0;for(let i=0;i<route.length-1;i++){acc+=dist(route[i],route[i+1]);if(acc<pr)pts.push(route[i+1])}pts.push(pos(pr));cx.globalAlpha=.6;cx.beginPath();pts.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke()}cx.restore()
-route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat),big=/^(TOC|TOD)$/.test(p.id),r=big?6:(i===0||i===route.length-1)?5:4;cx.save();cx.translate(x,y);cx.rotate(Math.PI/4);cx.fillStyle=DKM()?'#0b1118':'#ffffff';cx.fillRect(-r,-r,r*2,r*2);cx.lineWidth=1.8;cx.strokeStyle=C.route;cx.strokeRect(-r,-r,r*2,r*2);cx.fillStyle=C.route;cx.fillRect(-r+2,-r+2,r*2-4,r*2-4);cx.restore();if(big){cx.font='bold 14px sans-serif';cx.lineWidth=3;cx.strokeStyle='rgba(0,0,0,.75)';cx.strokeText(p.id,x+11,y+18);cx.fillStyle='#fff';cx.fillText(p.id,x+11,y+18)}else if(V.z>=4||i===0||i===route.length-1){cx.font='11px sans-serif';cx.lineWidth=3;cx.strokeStyle='rgba(0,0,0,.7)';cx.strokeText(p.id,x+7,y+14);cx.fillStyle=C.route;cx.fillText(p.id,x+7,y+14)}})}
-trails();if(L.trf&&!CH.on)T.forEach(a=>{const[x,y]=sc(a.lon,a.lat);drawAircraft(a.type,x,y,a.hdg,C.trf,32);if(V.z>6){cx.fillStyle=C.trf;cx.font='10px sans-serif';cx.fillText(a.id+' '+Math.round(a.alt/100),x+12,y+4)}});
+drawRouteMarkers();}
+trails();if(L.trf&&!CH.on)T.forEach(a=>{const[x,y]=sc(a.lon,a.lat);drawAircraft(a.type,x,y,a.hdg,C.trf,32);if(V.z>6&&x>-40&&x<W+40&&y>-20&&y<H+20)mkText(a.id+' '+Math.round(a.alt/100),x+4,y+4,C.trf,10,false)});
 if(liveOk()){const[x,y]=sc(own.lon,own.lat);cx.beginPath();cx.arc(x,y,19,0,7);cx.strokeStyle=C.own;cx.globalAlpha=.38;cx.lineWidth=1.5;cx.stroke();cx.globalAlpha=1;drawAircraft(live.d?.type||live.d?.aircraft||live.d?.aircraftType,x,y,own.hdg,C.own,40)}
 if(CH.on)chartFx();if(sel&&!CH.on){const q=sel.k=='own'?own:sel,[x,y]=sc(q.lon,q.lat);cx.strokeStyle=C.txt;cx.lineWidth=2;cx.beginPath();cx.arc(x,y,16+(tk?3*Math.sin(performance.now()/260):0),0,7);cx.stroke()}}
+
+/* ── Waypoint markers ─────────────────────────────────────────────────
+   One chart-style symbol per aeronautical meaning: a blue crosshair for an
+   ordinary en-route fix, a teal star for a fix on an airway, a magenta
+   triangle for a departure procedure, a violet diamond for an arrival, a
+   white ring for an airport, amber for a VOR, pink for an NDB, a grey
+   hexagon for a navaid the data cannot classify, and cyan/amber climb and
+   descent symbols for TOC and TOD.
+
+   This is a separate visual layer. The route line above keeps its own
+   colour, width, opacity, dash pattern and point order; nothing here adds,
+   moves or removes a waypoint, and nothing is written back to the route.
+   Sizes follow the zoom so a fix stays legible without covering the map,
+   and every label is checked against the labels already placed this frame,
+   so names give way instead of overprinting. Legs of 50 nm or more also
+   carry a heading-and-distance tag at their midpoint, and all of it is set
+   in the shell's condensed technical face rather than a default UI sans. */
+const MKN={wp:'#3b82f6',sid:'#d946ef',star:'#a855f7',air:'#2dd4bf',apt:'#eef4fa',vor:'#f5a524',ndb:'#fb7185',int:'#94a3b8',toc:'#22d3ee',tod:'#f59e0b'};
+/* The same meanings, darkened for a light base map: the night palette washes
+   out over beige land and pale satellite imagery. */
+const MKD={wp:'#2563eb',sid:'#c026d3',star:'#7e22ce',air:'#0f766e',apt:'#1f2937',vor:'#a16207',ndb:'#e11d48',int:'#64748b',toc:'#0e7490',tod:'#c2410c'};
+const MKL=[],MKW=new Map(),NTP=new Map();
+/* Symbols sit a clear step above the route line's 12 px band: the glyph is
+   roughly one and a half times that width at every zoom, so a fix reads as a
+   mark on the line rather than a thickening of it. */
+function mkR(){return V.z>=12?16:V.z>=9.5?15:V.z>=7.5?13.8:V.z>=5.5?12.4:11.2}
+function mkLightBg(){const t=document.documentElement.dataset.theme;return !DKM()&&t!='night'&&t!='contrast'}
+function mkColor(kind){const p=mkLightBg()?MKD:MKN;return p[kind]||p.wp}
+function mkPen(c,w){cx.strokeStyle=c;cx.lineWidth=w;cx.lineCap='round';cx.lineJoin='round';cx.beginPath()}
+function mkDot(x,y,c,r){cx.fillStyle=c;cx.beginPath();cx.arc(x,y,r,0,7);cx.fill()}
+function mkCross(x,y,r,c){mkPen(c,1.8);cx.arc(x,y,r*.6,0,7);cx.stroke();
+  mkPen(c,1.8);cx.moveTo(x-r,y);cx.lineTo(x-r*.6,y);cx.moveTo(x+r*.6,y);cx.lineTo(x+r,y);cx.moveTo(x,y-r);cx.lineTo(x,y-r*.6);cx.moveTo(x,y+r*.6);cx.lineTo(x,y+r);cx.stroke();mkDot(x,y,c,1.4)}
+function mkStar4(x,y,r,c){mkPen(c,1.8);
+  for(let k=0;k<8;k++){const a=k*Math.PI/4-Math.PI/2,rr=k%2?r*.4:r,px=x+Math.cos(a)*rr,py=y+Math.sin(a)*rr;k?cx.lineTo(px,py):cx.moveTo(px,py)}
+  cx.closePath();cx.stroke()}
+function mkDiamond(x,y,r,c){mkPen(c,1.9);cx.moveTo(x,y-r);cx.lineTo(x+r*.8,y);cx.lineTo(x,y+r);cx.lineTo(x-r*.8,y);cx.closePath();cx.stroke();mkDot(x,y,c,1.5)}
+function mkTri(x,y,r,c){mkPen(c,1.9);cx.moveTo(x,y-r);cx.lineTo(x+r*.88,y+r*.68);cx.lineTo(x-r*.88,y+r*.68);cx.closePath();cx.stroke();
+  mkPen(c,1.5);cx.moveTo(x,y-r*.44);cx.lineTo(x+r*.34,y+r*.27);cx.lineTo(x-r*.34,y+r*.27);cx.closePath();cx.stroke()}
+function mkRing(x,y,r,c,dot){mkPen(c,1.9);cx.arc(x,y,r*.68,0,7);cx.stroke();if(dot)mkDot(x,y,c,Math.max(1.6,r*.24))}
+function mkSquare(x,y,r,c){mkPen(c,1.9);cx.rect(x-r*.66,y-r*.66,r*1.32,r*1.32);cx.stroke()}
+function mkHex(x,y,r,c){mkPen(c,1.8);for(let k=0;k<6;k++){const a=k*Math.PI/3-Math.PI/2,px=x+Math.cos(a)*r*.78,py=y+Math.sin(a)*r*.78;k?cx.lineTo(px,py):cx.moveTo(px,py)}cx.closePath();cx.stroke()}
+function mkClimb(x,y,r,c,up){mkPen(c,2);cx.arc(x,y,r*.72,0,7);cx.stroke();
+  mkPen(c,2.1);cx.moveTo(x-r*.32,y+(up?r*.2:-r*.2));cx.lineTo(x,y+(up?-r*.22:r*.22));cx.lineTo(x+r*.32,y+(up?r*.2:-r*.2));cx.stroke()}
+function mkDraw(kind,x,y,r){
+  const c=mkColor(kind);
+  if(kind=='apt'||kind=='vor')mkRing(x,y,r,c,1);
+  else if(kind=='ndb')mkSquare(x,y,r,c);
+  else if(kind=='int')mkHex(x,y,r,c);
+  else if(kind=='sid')mkTri(x,y,r,c);
+  else if(kind=='star')mkDiamond(x,y,r,c);
+  else if(kind=='air')mkStar4(x,y,r,c);
+  else mkCross(x,y,r,c)}
+/* Map type is set in the shell's own technical face — a condensed DIN-style
+   stack — instead of the default UI sans. It is narrower per character, so a
+   name covers less of the chart, and the slight tracking keeps 4-letter
+   idents from smudging into one blob at 11 px. */
+const MKF='"Bahnschrift SemiCondensed","DIN Alternate","Avenir Next Condensed","Segoe UI Variable Text","Segoe UI",Roboto,system-ui,sans-serif';
+/* A label that keeps clear of the ones already placed this frame. */
+function mkText(text,x,y,color,size,weight,halo){
+  const t=String(text==null?'':text);if(!t)return null;
+  const font=(weight?'600 ':'500 ')+size+'px '+MKF,key=font+'|'+t;
+  cx.font=font;cx.letterSpacing='0.3px';
+  let w=MKW.get(key);
+  if(w==null){w=cx.measureText(t).width;MKW.set(key,w)}
+  const bw=w+5,bh=size+3;
+  let lx=x+8,top=y-size*.8;
+  if(lx+bw>W-4)lx=x-8-bw;
+  for(let pass=0;pass<3;pass++){
+    const hit=MKL.find(b=>lx<b.x+b.w&&lx+bw>b.x&&top<b.y+b.h&&top+bh>b.y);
+    if(!hit)break;
+    top=hit.y+bh+1;
+    if(top+bh>H-6){cx.letterSpacing='0px';return null}}
+  MKL.push({x:lx,y:top,w:bw,h:bh});
+  cx.font=font;cx.lineWidth=3;cx.strokeStyle=halo||(DKM()?'rgba(0,0,0,.72)':'rgba(255,255,255,.85)');
+  cx.strokeText(t,lx,top+size*.8);cx.fillStyle=color;cx.fillText(t,lx,top+size*.8);
+  cx.letterSpacing='0px';
+  return {x:lx,y:top,w:bw,h:bh}}
+/* A long leg carries its own distance and initial heading on a small tag at
+   the midpoint. Navigraph writes this rotated along the course; here it stays
+   horizontal and is held off the line, on whichever side is free, so nothing
+   has to be read at an angle and the course itself is never covered. */
+const LEG_MIN_NM=50,LEG_MIN_PX=92;
+function mkLegTag(ax,ay,bx,by,nm,hdg){
+  const len=Math.hypot(bx-ax,by-ay);if(len<LEG_MIN_PX)return;
+  const mx=(ax+bx)/2,my=(ay+by)/2;
+  let nx=-(by-ay)/len,ny=(bx-ax)/len;
+  if(ny<0){nx=-nx;ny=-ny}
+  const dm=Math.round(nm)+' NM',hd=String(((Math.round(hdg)%360)+360)%360).padStart(3,'0')+'°';
+  const size=10.5,font='600 '+size+'px '+MKF;
+  cx.font=font;cx.letterSpacing='0.3px';
+  const wd=cx.measureText(dm).width,wh=cx.measureText(hd).width;
+  cx.letterSpacing='0px';
+  const tw=Math.round(wd+5+wh+12),th=17,light=mkLightBg();
+  // How far the tag has to stand off the course so its own box clears the
+  // 12 px band: a horizontal leg needs only the tag's height, a vertical one
+  // the whole width, so the same tag never lands across the line.
+  const off=Math.max(18,(Math.abs(nx)*tw+Math.abs(ny)*th)/2+12);
+  for(const side of [1,-1]){
+    const x=Math.round(mx+nx*off*side-tw/2),y=Math.round(my+ny*off*side-th/2);
+    if(x<4||x+tw>W-4||y<4||y+th>H-4)continue;
+    if(MKL.some(b=>x<b.x+b.w+2&&x+tw>b.x-2&&y<b.y+b.h+2&&y+th>b.y-2))continue;
+    cx.beginPath();
+    if(cx.roundRect)cx.roundRect(x,y,tw,th,4);else cx.rect(x,y,tw,th);
+    cx.fillStyle=light?'rgba(255,255,255,.82)':'rgba(9,15,23,.68)';cx.fill();
+    cx.strokeStyle=light?'rgba(30,41,59,.22)':'rgba(148,163,184,.28)';cx.lineWidth=1;cx.stroke();
+    cx.font=font;cx.letterSpacing='0.3px';
+    cx.fillStyle=light?'#1f2937':'#e2e8f0';cx.fillText(dm,x+6,y+th/2+size*.36);
+    cx.fillStyle=light?'#5b6b7f':'#9fb0c4';cx.fillText(hd,x+6+wd+5,y+th/2+size*.36);
+    cx.letterSpacing='0px';
+    MKL.push({x,y,w:tw,h:th});
+    return}
+}
+/* The navaid type behind a route point, looked up once and remembered. */
+function navType(id){const key=String(id||'');if(!NTP.has(key)){const n=N.find(v=>v.id==key);NTP.set(key,n?String(n.type||'').toUpperCase():'')}return NTP.get(key)}
+/* Which symbol a route point earns. Only what the plan actually reports is
+   used: a procedure tag from the imported plan, an airway, or a navaid type.
+   An ordinary fix keeps the en-route crosshair rather than borrowing a shape. */
+function routeKind(p){
+  const id=String(p.id||'').toUpperCase();
+  if(id=='TOC')return 'toc';
+  if(id=='TOD')return 'tod';
+  if(p.ss=='sid')return 'sid';
+  if(p.ss=='star')return 'star';
+  if(p.k=='apt')return 'apt';
+  if(p.k=='nav'){const t=navType(p.id);return /NDB/.test(t)?'ndb':/VOR|TACAN|DME/.test(t)?'vor':'int'}
+  return p.aw?'air':'wp'}
+function altText(alt){const v=Math.round(Number(alt)||0);return v>=1000?'FL'+Math.round(v/100):v?v+' ft':''}
+/* TOC/TOD from the plan the route already carries: the cruise level is the
+   highest planned altitude, the climb point is where it is first reached and
+   the descent point where it is last left. Nothing is inserted into the
+   route, so the drawn line cannot move; a route whose plan carries no
+   altitudes gets no TOC/TOD at all rather than a guessed one. */
+let MTP={key:'',toc:null,tod:null,cruise:0,hasToc:false,hasTod:false,ids:new Set()};
+function planTocTod(){
+  let key='';
+  for(let i=0;i<route.length;i++){const p=route[i];key+=p.id+':'+Math.round(Number(p.elev)||0)+':'+p.lat.toFixed(3)+':'+p.lon.toFixed(3)+'|'}
+  if(MTP.key==key)return MTP;
+  const out={key,toc:null,tod:null,cruise:0,hasToc:false,hasTod:false,ids:new Set(route.map(p=>String(p.id||'').toUpperCase()))};
+  out.hasToc=route.some(p=>String(p.id||'').toUpperCase()=='TOC');
+  out.hasTod=route.some(p=>String(p.id||'').toUpperCase()=='TOD');
+  for(let i=0;i<route.length;i++){const e=Math.round(Number(route[i].elev)||0);if(e>out.cruise)out.cruise=e}
+  if(out.cruise>=10000&&route.length>3){
+    let toc=-1,tod=-1;
+    for(let i=1;i<route.length-1;i++){
+      if(Math.abs(Math.round(Number(route[i].elev)||0)-out.cruise)>100)continue;
+      if(toc<0)toc=i;
+      tod=i}
+    if(toc>0&&toc<route.length-1&&!out.hasToc)out.toc={lat:route[toc].lat,lon:route[toc].lon};
+    if(tod>toc&&!out.hasTod)out.tod={lat:route[tod].lat,lon:route[tod].lon}}
+  MTP=out;return out}
+function mkPlanLabel(kind,x,y,r,alt){
+  const c=mkColor(kind),mark=kind=='toc'?'TOC':'TOD';
+  mkClimb(x,y,r,c,kind=='toc');
+  const box=mkText(mark,x+Math.round(r*.72)-3,y+4,c,11.5,true);
+  const sub=altText(alt);
+  if(box&&sub)mkText(sub,box.x-8,box.y+box.h+8,mkColor('int'),9.5,false)}
+function drawRouteMarkers(){
+  if(!route.length||CH.on||!L.rte)return;
+  const plan=planTocTod(),n=route.length,r=mkR();
+  for(let i=0;i<n;i++){
+    const p=route[i],[x,y]=sc(p.lon,p.lat);
+    if(x<-30||x>W+30||y<-30||y>H+30)continue;
+    const kind=routeKind(p),end=i===0||i===n-1;
+    if(kind=='toc'||kind=='tod'){
+      mkPlanLabel(kind,x,y,r*1.05,kind=='toc'?(Number(p.elev)||plan.cruise):(Number(route[n-1].elev)||0));
+      continue}
+    mkDraw(kind,x,y,kind=='apt'?r*1.05:r);
+    if(V.z>=4||end)mkText(String(p.id||'').toUpperCase(),x+Math.round(r*.55)-4,y+14,mkColor(kind),12,end)}
+  const planPoint=(kind,m,alt)=>{const[x,y]=sc(m.lon,m.lat);if(x<-30||x>W+30||y<-30||y>H+30)return;mkPlanLabel(kind,x,y,r*1.05,alt)};
+  if(plan.toc&&!plan.hasToc)planPoint('toc',plan.toc,plan.cruise);
+  if(plan.tod&&!plan.hasTod)planPoint('tod',plan.tod,Number(route[n-1].elev)||0);
+  /* Every leg of LEG_MIN_NM or more carries its distance and initial heading.
+     Short legs are left bare: their tag would crowd the two idents it sits
+     between. */
+  for(let i=0;i<n-1;i++){
+    const a=route[i],b=route[i+1],nm=dist(a,b);
+    if(!(nm>=LEG_MIN_NM))continue;
+    const[ax,ay]=sc(a.lon,a.lat),[bx,by]=sc(b.lon,b.lat);
+    mkLegTag(ax,ay,bx,by,nm,brg(a,b))}}
 window.addEventListener('aircraft-atlas-ready', draw);
 let last=performance.now(),lastDraw=0;
 const frameMs=1000/RP.fps;
@@ -637,7 +816,11 @@ async function importSB(){
       lat:parseFloat(w.pos_lat),
       lon:parseFloat(w.pos_long),
       elev:parseFloat(w.altitude_feet||0),
-      k:w.type=='apt'?'apt':w.type=='vor'||w.type=='ndb'?'nav':'fix'
+      k:w.type=='apt'?'apt':w.type=='vor'||w.type=='ndb'?'nav':'fix',
+      // A procedure tag and an airway are kept only when the plan states them:
+      // they decide the SID/STAR and airway-fix symbols, never a guess.
+      ss:w.is_sid_star=='1'?(String(w.stage||'').toUpperCase()=='DES'?'star':'sid'):'',
+      aw:w.via_airway&&!/^DCT$/i.test(w.via_airway)?String(w.via_airway).toUpperCase():''
     })).filter(w=>!isNaN(w.lat)&&!isNaN(w.lon));
     placeTod();
     save();trav=0;panel='route';render();
@@ -670,7 +853,7 @@ function applyTrafficSource(next,save){
   const st=document.getElementById('st');if(st&&!liveOk()&&!deskStatus)st.textContent=t;
 }
 /* Index of the route waypoint under a screen point, or -1. */
-function wpAt(x,y){const r=cv.getBoundingClientRect();x-=r.left;y-=r.top;let best=-1,bd=16;route.forEach((p,i)=>{const[a,b]=sc(p.lon,p.lat),d=Math.hypot(a-x,b-y);if(d<bd){bd=d;best=i}});return best}
+function wpAt(x,y){const r=cv.getBoundingClientRect();x-=r.left;y-=r.top;let best=-1,bd=Math.max(18,mkR()+9);route.forEach((p,i)=>{const[a,b]=sc(p.lon,p.lat),d=Math.hypot(a-x,b-y);if(d<bd){bd=d;best=i}});return best}
 /* Move one waypoint to the point under the pointer (live, no undo stack here). */
 function moveWp(i,x,y){const r=cv.getBoundingClientRect();x-=r.left;y-=r.top;const c=wpx(V.lon,V.lat,V.z);const p=wun(c[0]+x-W/2,c[1]+y-H/2,V.z);route[i]={...route[i],lat:p[1],lon:p[0]};trav=Math.min(trav,total());if(panel=='route')render()}
 /* Index of the route leg under a screen point (its start waypoint), or -1. */
@@ -1245,7 +1428,67 @@ const PHOTOS=new Map();
 let fExp=(()=>{try{return localStorage.getItem('stratos.cardExpanded')=='1'}catch(_){return false}})();
 function fCard(){fcS='';fcRender(liveOk())}
 function fcTog(){fExp=!fExp;try{localStorage.setItem('stratos.cardExpanded',fExp?'1':'0')}catch(_){}fCard()}
-function fcReg(o){const io=o.k=='own',raw=io?(live.d&&live.d.registration):o.reg;return window.PHOTO?window.PHOTO.normalizeRegistration(raw):''}
+const IDENT=new Map();
+function fcKey(o){return o.k=='own'?'own:'+String((live.d&&live.d.aircraft)||'')+'|'+String((live.d&&live.d.registration)||''):String(o.hx||o.id||'')}
+function fcReported(o){const io=o.k=='own',raw=io?(live.d&&live.d.registration):o.reg;return window.PHOTO?window.PHOTO.normalizeRegistration(raw):''}
+function fcRegState(o){const reported=fcReported(o);return reported?{state:'ok',registration:reported,via:'reported'}:(IDENT.get(fcKey(o))||{state:'idle'})}
+function fcReg(o){const s=fcRegState(o);return s.state=='ok'?s.registration:''}
+/* The registration a feed did not carry. Your own airframe is named in the
+   aircraft title or its livery, which is how Volanta and similar apps identify
+   what you are flying; a live target is resolved from its Mode S address, or,
+   when VATSIM is the only source, from its callsign. One lookup per aircraft
+   per session, and a negative answer is kept as an answer.
+   Anything found this way is labelled as detected, never as feed data: the
+   airframe flying a callsign today need not be the one you are flying. */
+function fcDetect(o){
+  const key=fcKey(o);
+  if(!key||IDENT.has(key)||!window.REG)return;
+  if(o.k=='own'){
+    const found=window.REG.registrationFromTitle((live.d&&live.d.aircraft)||'');
+    IDENT.set(key,found?{state:'ok',registration:found,via:'title'}:{state:'none'});
+    return;
+  }
+  const plan=window.REG.lookupPlan({hex:o.hx,callsign:o.id});
+  if(!plan){IDENT.set(key,{state:'none'});return}
+  IDENT.set(key,{state:'loading'});
+  (async()=>{
+    /* missingRouteIs404 separates "this deployment has no lookup route" from
+       "the database does not know this aircraft", which are different answers. */
+    const ask=async(url,missingRouteIs404)=>{
+      let r;
+      try{r=await fetch(url,{cache:'force-cache'})}catch(_){return {state:'unavailable'}}
+      if(missingRouteIs404&&r.status===404)return {state:'unavailable'};
+      let payload=null;
+      try{payload=await r.json()}catch(_){payload=null}
+      return window.REG.registrationOutcome(plan,r.status,payload);
+    };
+    // hexdb.io answers with CORS for any origin; the live callsign search sends
+    // none, so it goes through the app's traffic route where there is one.
+    const proxied=plan.kind=='callsign'&&await wtUseProxy();
+    const outcome=await ask(proxied?wtApi(plan.url):plan.url,proxied);
+    IDENT.set(key,outcome&&outcome.state?outcome:{state:'unavailable'});
+    fCard();
+  })();
+}
+function fcDetectNote(o){
+  if(o.k=='own')return 'Reading the registration from the aircraft title';
+  const plan=window.REG?window.REG.lookupPlan({hex:o.hx,callsign:o.id}):null;
+  if(!plan)return '';
+  return plan.kind=='hex'?'Looking up Mode S '+plan.value+' · hexdb.io':'Searching live traffic for '+plan.value+' · adsb.lol';
+}
+function fcNoRegHtml(o){
+  const label=esc(fcType(o)||'Aircraft'),state=fcRegState(o).state;
+  if(state=='idle'||state=='loading')return '<div class="fcph load"><span class="fcph-t">Detecting the registration…</span><span class="fcph-c">'+esc(fcDetectNote(o))+'</span></div>';
+  const plan=o.k=='own'?null:(window.REG?window.REG.lookupPlan({hex:o.hx,callsign:o.id}):null);
+  let note;
+  if(state=='unavailable'&&plan)note='Registration lookup is unavailable here · '+(plan.kind=='hex'?'Mode S '+plan.value:'callsign '+plan.value);
+  else if(state=='unavailable')note='The simulator reports no registration';
+  else if(o.k=='own')note='The simulator reports no registration and the aircraft title names none';
+  else if(plan&&plan.kind=='callsign')note='VATSIM reports no registration and the callsign lookup found none';
+  else if(plan)note='The feed reports no registration and its Mode S address is not in the database';
+  else note='Registration not reported, so no photo can be matched';
+  return '<div class="fcph none"><span class="fcph-t">'+label+'</span><span class="fcph-c">'+esc(note)+'</span></div>';
+}
 function fcType(o){const io=o.k=='own',t=io?((live.d&&live.d.aircraft)||''):(o.type||'');return String(t).trim()}
 function fcSource(o){if(o.k=='own')return 'LIVE FROM '+String((live.d&&live.d.src)||'SIM').toUpperCase();if(o.source=='vatsim')return 'VATSIM';if(o.source=='adsb')return 'ADS-B'+(WT.src?' VIA '+String(WT.src).toUpperCase():'');return String(o.cc||'TRAFFIC').toUpperCase()}
 /* One lookup per registration per session. A failure is remembered as a
@@ -1274,7 +1517,7 @@ async function fcPhoto(reg){
 }
 function fcPhotoHtml(o){
   const reg=fcReg(o),type=fcType(o),label=type||'Aircraft';
-  if(!reg)return '<div class="fcph none"><span class="fcph-t">'+esc(label)+'</span><span class="fcph-c">Registration not reported, so no photo can be matched</span></div>';
+  if(!reg)return fcNoRegHtml(o);
   const p=PHOTOS.get(reg);
   if(!p||p.state=='loading')return '<div class="fcph load"><span class="fcph-t">Looking up '+esc(reg)+'…</span><span class="fcph-c">Planespotters.net</span></div>';
   if(p.state=='unavailable')return '<div class="fcph none"><span class="fcph-t">'+esc(label)+'</span><span class="fcph-c">Photo lookup is unavailable here · registration '+esc(reg)+'</span></div>';
@@ -1287,7 +1530,7 @@ function fcAircraftHtml(o){
   const io=o.k=='own',d=live.d||{};
   const lat=io?own.lat:o.lat,lon=io?own.lon:o.lon;
   const id=io?(d.callsign||d.registration||'Your aircraft'):(o.id||o.hx||'Unknown');
-  const reg=fcReg(o),type=fcType(o);
+  const reg=fcReg(o),type=fcType(o),detected=Boolean(reg)&&fcRegState(o).via!=='reported';
   const alt=Math.round(((io?own.alt:o.alt)||0)/10)*10;
   const gs=Math.round(io?(d.gs||0):(o.gs||0));
   const hdg=String(Math.round(((io?own.hdg:o.hdg)||0)+360)%360%360).padStart(3,'0');
@@ -1298,7 +1541,7 @@ function fcAircraftHtml(o){
   const mins=trail.length>1?Math.round((trail[trail.length-1][3]-trail[0][3])/60000):0;
   const away=!io&&liveOk()?Math.round(dist(own,o)):null;
   const level=alt>=18000?'FL'+String(Math.round(alt/100)).padStart(3,'0'):alt.toLocaleString();
-  const rows=[['Registration',reg?esc(reg):'Not reported'],['Type',type?esc(type):'Not reported'],['Source',esc(fcSource(o))],['Position',Number(lat).toFixed(3)+', '+Number(lon).toFixed(3)]];
+  const rows=[['Registration',reg?esc(reg)+(detected?' · detected':''):'Not reported'],['Type',type?esc(type):'Not reported'],['Source',esc(fcSource(o))],['Position',Number(lat).toFixed(3)+', '+Number(lon).toFixed(3)]];
   if(away!=null)rows.push(['From you',away+' nm']);
   rows.push(['Trail',trail.length>1?nm.toFixed(0)+' nm in '+mins+' min':'Not recorded yet']);
   const more='<div class="fcm">'+rows.map(r=>'<div><span>'+r[0]+'</span><b>'+r[1]+'</b></div>').join('')+'</div>'
@@ -1311,7 +1554,7 @@ function fcAircraftHtml(o){
   return '<div class="fh" data-fc-drag><span class="dot'+(lost?' lost':'')+'"></span><b>'+esc(id)+'</b><span class="sp"></span><i>'+esc(type||'AIRCRAFT')+'</i><em>'+(lost?'SIGNAL LOST':tk?'TRACKED':'SELECTED')+'</em>'
     +'<button type="button" class="fci" data-fc-toggle aria-expanded="'+(fExp?'true':'false')+'" title="'+(fExp?'Less information':'More information')+'">'+(fExp?'&#9652;':'&#9662;')+'</button>'
     +'<button type="button" class="fci" data-fc-act="close" title="Close">&#10005;</button></div>'
-    +'<div class="fcd">'+esc(reg||'registration not reported')+' · '+esc(fcSource(o))+'</div>'
+    +'<div class="fcd">'+esc(reg||'registration not reported')+(detected?' (detected)':'')+' · '+esc(fcSource(o))+'</div>'
     +'<div class="fg">'+fcField(level,level.startsWith('FL')?'LEVEL':'ALT FT')
     +fcField(gs,'GS KT')+fcField(hdg+'&deg;','HDG')
     +fcField((vs>0?'+':'')+vs,'VS FPM')+fcField(away==null?'–':away,'FROM YOU')+'</div>'
@@ -1371,9 +1614,10 @@ function fcRender(ok){
   const g=i=>$('#'+i).textContent;
   let s;
   if(pick){
-    s=fcPhotoHtml(sel)+fcAircraftHtml(sel);
+    fcDetect(sel);
     const reg=fcReg(sel);
     if(reg)fcPhoto(reg);
+    s=fcPhotoHtml(sel)+fcAircraftHtml(sel);
   }else{
     const d=live.d||{},cf=d.currentFlight||{},rt=route.length>1,tot=rt?total():0,pr=rt?routeProg():0,pct=tot?Math.min(100,pr/tot*100):0;
     const org=cf.depAirport||(rt?route[0].id:''),dst=cf.arrAirport||(rt?route[route.length-1].id:'');
@@ -1427,9 +1671,11 @@ try{if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').t
   import * as VATSIM from './js/lib/vatsim.js';
   import * as AC from './js/lib/aircraft.js';
   import * as PHOTO from './js/lib/aircraftphoto.js';
+  import * as REG from './js/lib/aircraftreg.js';
   window.VATSIM = VATSIM;
   window.AC = AC;
   window.FP = FP;
   window.PHOTO = PHOTO;
+  window.REG = REG;
 </script>
 </body></html>

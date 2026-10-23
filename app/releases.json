@@ -3,47 +3,64 @@
   "product": "stratos",
   "source": "https://github.com/Nyclyy/stratos-tracker",
   "latest": {
-    "version": "2.1.19",
+    "version": "2.1.20",
     "releasedAt": "2026-10-23",
     "severity": "normal",
-    "summary": "The aircraft card now tells a missing photo route apart from a registration that has no photo.",
+    "summary": "The route is drawn with chart symbols, long legs carry their heading and distance, and map labels are set in a chart typeface.",
     "changelog": {
-      "features": [],
+      "features": [
+        "Route points carry a symbol by meaning: a crosshair for an en-route fix, a star on an airway, a triangle for a SID, a diamond for a STAR, a ring for an airport, amber for a VOR, pink for an NDB, a hexagon otherwise.",
+        "TOC and TOD appear on the plan from the altitudes it already carries, with the cruise level beside them; nothing is added to the route.",
+        "Every leg of 50 nm or more shows its distance and initial heading on a small tag at the midpoint.",
+        "The aircraft card works out a registration the feed did not report, from the simulator's aircraft title, a Mode S address or a VATSIM callsign, and labels it as detected."
+      ],
       "improvements": [
-        "The card separates three answers: a photo, no published photo for that registration, and a deployment that cannot look photos up at all."
+        "Airport, waypoint, navaid and traffic labels are set in the shell's condensed technical face with slight tracking, so idents stay readable while covering less of the map.",
+        "Waypoint symbols sit a step above the route band, so a fix reads as a mark on the line rather than a thicker part of it.",
+        "Labels give way instead of overprinting: each is checked against the ones already placed this frame, and a leg tag is dropped rather than laid over a name."
       ],
       "fixes": [
-        "A build without the photo route said no photo was published for the registration; it now says the lookup is unavailable there instead of making a claim it cannot check."
+        "The desktop build could not reach the registration database because hexdb.io was missing from its CORS allowlist.",
+        "A build with no registration lookup route said the registration did not exist; it now says the lookup is unavailable there."
       ],
       "performance": [],
-      "ui": [],
+      "ui": [
+        "Distance and heading sit horizontally on a tag beside the leg, held clear of the course, instead of being rotated along it."
+      ],
       "compatibility": [],
       "other": []
-    },
-    "downloads": {
-      "windows": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.19/Stratos-Setup.exe",
-        "sha256": "94b26a82d45c2841c28eea3a3f4a51a9e7d5297cbedd9eb376e3787ef03bb5c1",
-        "size": 103857404
-      },
-      "mac-arm64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.19/Stratos-2.1.19-mac-arm64.dmg",
-        "sha256": "21576642dc41a8e4719af3df1aba0ebf4b35e9f9387eab8eec08ed4eb94c0fc6",
-        "size": 119585839
-      },
-      "mac-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.19/Stratos-2.1.19-mac-x64.dmg",
-        "sha256": "cecf383febab39ac31c39b99ce23f0e7facd08b9c1c58878ac0e2c84dfc4c4e5",
-        "size": 124912873
-      },
-      "linux-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.19/Stratos-2.1.19-linux-x64.AppImage",
-        "sha256": "a16851038bff640645761fed90198149e9230381a6909b8f7693abf08ae0f132",
-        "size": 140345714
-      }
     }
   },
   "releases": [
+    {
+      "version": "2.1.20",
+      "releasedAt": "2026-10-23",
+      "severity": "normal",
+      "summary": "The route is drawn with chart symbols, long legs carry their heading and distance, and map labels are set in a chart typeface.",
+      "changelog": {
+        "features": [
+          "Route points carry a symbol by meaning: a crosshair for an en-route fix, a star on an airway, a triangle for a SID, a diamond for a STAR, a ring for an airport, amber for a VOR, pink for an NDB, a hexagon otherwise.",
+          "TOC and TOD appear on the plan from the altitudes it already carries, with the cruise level beside them; nothing is added to the route.",
+          "Every leg of 50 nm or more shows its distance and initial heading on a small tag at the midpoint.",
+          "The aircraft card works out a registration the feed did not report, from the simulator's aircraft title, a Mode S address or a VATSIM callsign, and labels it as detected."
+        ],
+        "improvements": [
+          "Airport, waypoint, navaid and traffic labels are set in the shell's condensed technical face with slight tracking, so idents stay readable while covering less of the map.",
+          "Waypoint symbols sit a step above the route band, so a fix reads as a mark on the line rather than a thicker part of it.",
+          "Labels give way instead of overprinting: each is checked against the ones already placed this frame, and a leg tag is dropped rather than laid over a name."
+        ],
+        "fixes": [
+          "The desktop build could not reach the registration database because hexdb.io was missing from its CORS allowlist.",
+          "A build with no registration lookup route said the registration did not exist; it now says the lookup is unavailable there."
+        ],
+        "performance": [],
+        "ui": [
+          "Distance and heading sit horizontally on a tag beside the leg, held clear of the course, instead of being rotated along it."
+        ],
+        "compatibility": [],
+        "other": []
+      }
+    },
     {
       "version": "2.1.19",
       "releasedAt": "2026-10-23",

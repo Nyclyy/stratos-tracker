@@ -6,7 +6,7 @@
    scripts/stamp-version.py. Settings, the About card and the update checker all
    read it from here so no screen can claim a different build. */
 
-export const APP_VERSION = '2.1.19';
+export const APP_VERSION = '2.1.20';
 
 /** A version string with no build metadata, for display next to the wordmark. */
 export function displayVersion(version = APP_VERSION) {

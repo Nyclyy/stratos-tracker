@@ -1046,3 +1046,67 @@ test('map tiles need no API key and credit the provider that serves them', async
   assert.match(minimap, /Canvas\/\$\{service\}\/MapServer\/tile/, 'the replay and preview maps use the same key-free tiles');
   assert.match(minimap, /© Esri, HERE, Garmin · © OpenStreetMap contributors/, 'the minimap credits Esri');
 });
+
+test('the aircraft card works out a registration its feed did not report', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  assert.match(page, /import \* as REG from '\.\/js\/lib\/aircraftreg\.js';/, 'the card loads the registration module');
+  assert.match(page, /window\.REG = REG;/, 'and the page script can reach it');
+  // The simulator's own airframe carries no tail number in every livery; the
+  // title is what Volanta-style apps read instead.
+  assert.match(page, /registrationFromTitle\(\(live\.d&&live\.d\.aircraft\)\|\|''\)/, 'your aircraft is identified from its title');
+  assert.match(page, /lookupPlan\(\{hex:o\.hx,callsign:o\.id\}\)/, 'live traffic is resolved from its Mode S address or callsign');
+  assert.match(page, /fcDetect\(sel\);/, 'the card detects before it draws');
+  assert.match(page, /\(detected\?' \(detected\)':''\)/, 'a worked-out registration is labelled as detected, not as feed data');
+  assert.match(page, /if\(!reg\)return fcNoRegHtml\(o\);/, 'a missing registration has its own card states');
+  assert.match(page, /Detecting the registration…/, 'the card says it is detecting instead of claiming there is none');
+});
+
+test('the map draws waypoint symbols over a route line it never rewrites', async () => {
+  const fs = await import('node:fs');
+  const { execFileSync } = await import('node:child_process');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+
+  // The route line is locked: the statement that paints it is byte-identical to
+  // the one in the previous release, and it is painted before any marker.
+  const line = 'if(route.length&&!CH.on&&L.rte){cx.save();cx.globalAlpha=.35;cx.strokeStyle=C.route;cx.lineWidth=12;cx.lineCap=\'round\';cx.lineJoin=\'round\';cx.beginPath();route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke();if(liveOk()&&route.length>1){const pr=routeProg(),pts=[route[0]];let acc=0;for(let i=0;i<route.length-1;i++){acc+=dist(route[i],route[i+1]);if(acc<pr)pts.push(route[i+1])}pts.push(pos(pr));cx.globalAlpha=.6;cx.beginPath();pts.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke()}cx.restore()';
+  assert.ok(page.includes(line), 'the route line statement is unchanged');
+  assert.ok(page.indexOf(line) < page.indexOf('drawRouteMarkers();}'), 'markers are painted after the line');
+
+  // The marker layer is a separate visual pass: no symbol code may touch the
+  // route array, its order or its coordinates.
+  const start = page.indexOf('/* ── Waypoint markers');
+  const stop = page.indexOf("window.addEventListener('aircraft-atlas-ready'");
+  const markerLayer = page.slice(start, stop);
+  assert.ok(start > 0 && stop > start, 'the marker layer exists as its own pass');
+  assert.doesNotMatch(markerLayer, /route\s*=|route\.push|route\.splice|route\.sort|route\[[^\]]+\]\s*=/, 'marker code never edits the route');
+  assert.match(markerLayer, /function routeKind\(p\)/, 'symbols come from the point type, not from its position');
+
+  // One shape per aeronautical meaning, in the reference palette.
+  for (const [shape, colour] of [['mkCross', '#3b82f6'], ['mkTri', '#d946ef'], ['mkDiamond', '#a855f7'], ['mkStar4', '#2dd4bf'], ['mkRing', '#'], ['mkSquare', '#fb7185'], ['mkHex', '#94a3b8']]) {
+    assert.ok(page.includes(`function ${shape}(`), `${shape} exists`);
+    assert.ok(page.includes(colour), `${colour} is in the palette`);
+  }
+  assert.match(page, /function mkR\(\)\{return V\.z>=12\?16/, 'markers are larger than the old four-pixel squares and sit a step above the 12 px route band');
+  // Long legs carry their own heading and distance; short ones stay bare so
+  // the idents at each end are not crowded.
+  assert.match(markerLayer, /const LEG_MIN_NM=50,LEG_MIN_PX=92/, 'only legs of 50 nm or more get a tag, and only when they are long on screen');
+  assert.match(markerLayer, /function mkLegTag\(ax,ay,bx,by,nm,hdg\)/, 'the leg tag is drawn by its own helper');
+  assert.match(markerLayer, /Math\.round\(nm\)\+' NM'/, 'the tag carries the leg distance');
+  assert.match(markerLayer, /Math\.round\(hdg\)/, 'the tag carries the initial heading');
+  // Map labels use the shell's condensed technical face, not a default UI sans.
+  assert.match(markerLayer, /const MKF='"Bahnschrift SemiCondensed"/, 'labels are set in the condensed chart face');
+  assert.match(markerLayer, /\+'px '\+MKF/, 'every map label measures and draws in that face');
+  assert.match(page, /registrationFromTitle|mkPlanLabel/, 'the drawing layer is wired up');
+  // TOC/TOD are read from the plan: a procedure tag and an airway are only used
+  // when the imported plan states them, and TOC/TOD never become route points.
+  assert.match(page, /is_sid_star/, 'a SID/STAR tag is taken from the plan');
+  assert.match(page, /via_airway/, 'an airway fix is taken from the plan');
+  assert.match(page, /function planTocTod\(\)/, 'TOC/TOD are derived for drawing');
+  assert.doesNotMatch(markerLayer, /route\.(push|unshift)\(/, 'TOC/TOD are not inserted into the route');
+
+  // cross-check the locked line against the committed file, so an edit in the
+  // working tree cannot quietly disagree with what the test above compares to.
+  const head = execFileSync('git', ['show', 'HEAD:app/index.html'], { encoding: 'utf8' });
+  assert.ok(head.includes(line), 'the committed build paints the same line');
+});

@@ -757,7 +757,7 @@ if (!gotLock) {
     // providers need CORS; charts arrive through the loopback bridge.
     const corsHosts = new Set([
       'aviationweather.gov', 'adsb.fi', 'api.adsb.one', 'api.adsb.lol', 'airplanes.live',
-      'opensky-network.org', 'data.vatsim.net',
+      'opensky-network.org', 'data.vatsim.net', 'hexdb.io',
       'ourairports.com', 'davidmegginson.github.io', 'raw.githubusercontent.com',
       'tile.openstreetmap.org', 'server.arcgisonline.com', 'overpass-api.de',
       'overpass.kumi.systems', 'overpass.private.coffee', 'simbrief.com',

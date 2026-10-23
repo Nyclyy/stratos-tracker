@@ -801,6 +801,8 @@ export async function mount(root, ctx) {
     const mapRoute = points.map(p => ({
       id: p.id, name: p.name || p.id, lat: p.lat, lon: p.lon,
       elev: Number(p.elev) || 0, k: p.kind || p.k || 'fix',
+      // Kept so the map can draw a SID/STAR and an airway fix when the plan said so.
+      ss: p.ss || '', aw: p.aw || '',
     }));
     try {
       localStorage.setItem('dl.route', JSON.stringify(mapRoute));

@@ -1,4 +1,30 @@
 {
+  "2.1.20": {
+    "summary": "The route is drawn with chart symbols, long legs carry their heading and distance, and map labels are set in a chart typeface.",
+    "changelog": {
+      "features": [
+        "Route points carry a symbol by meaning: a crosshair for an en-route fix, a star on an airway, a triangle for a SID, a diamond for a STAR, a ring for an airport, amber for a VOR, pink for an NDB, a hexagon otherwise.",
+        "TOC and TOD appear on the plan from the altitudes it already carries, with the cruise level beside them; nothing is added to the route.",
+        "Every leg of 50 nm or more shows its distance and initial heading on a small tag at the midpoint.",
+        "The aircraft card works out a registration the feed did not report, from the simulator's aircraft title, a Mode S address or a VATSIM callsign, and labels it as detected."
+      ],
+      "improvements": [
+        "Airport, waypoint, navaid and traffic labels are set in the shell's condensed technical face with slight tracking, so idents stay readable while covering less of the map.",
+        "Waypoint symbols sit a step above the route band, so a fix reads as a mark on the line rather than a thicker part of it.",
+        "Labels give way instead of overprinting: each is checked against the ones already placed this frame, and a leg tag is dropped rather than laid over a name."
+      ],
+      "fixes": [
+        "The desktop build could not reach the registration database because hexdb.io was missing from its CORS allowlist.",
+        "A build with no registration lookup route said the registration did not exist; it now says the lookup is unavailable there."
+      ],
+      "performance": [],
+      "ui": [
+        "Distance and heading sit horizontally on a tag beside the leg, held clear of the course, instead of being rotated along it."
+      ],
+      "compatibility": [],
+      "other": []
+    }
+  },
   "2.1.19": {
     "summary": "The aircraft card now tells a missing photo route apart from a registration that has no photo.",
     "changelog": {
