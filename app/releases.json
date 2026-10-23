@@ -29,6 +29,28 @@
         "Photos load through the app's own /api/photo route, which the local dev server also serves; the desktop build supplies the header the photo service requires."
       ],
       "other": []
+    },
+    "downloads": {
+      "windows": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.18/Stratos-Setup.exe",
+        "sha256": "101cd7c8d20147528a7263e4b212b15dc76f0b6684b7ffddbf78b0142e215f35",
+        "size": 103859294
+      },
+      "mac-arm64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.18/Stratos-2.1.18-mac-arm64.dmg",
+        "sha256": "6ba5fce9dd6e4b715d31b16f658a7bbc72653d7873e87e86798d4f35c2c4887b",
+        "size": 119571795
+      },
+      "mac-x64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.18/Stratos-2.1.18-mac-x64.dmg",
+        "sha256": "1bbf18f6caf97ced7c5843bb6ac48f20683e3e2b6a6bd7ccd2d9fc9f51eae7fe",
+        "size": 124911006
+      },
+      "linux-x64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.18/Stratos-2.1.18-linux-x64.AppImage",
+        "sha256": "6e239332a51b474eb0bc503bd0babc152022c06226941ea050db3e197f2d66a6",
+        "size": 140345691
+      }
     }
   },
   "releases": [
@@ -59,6 +81,28 @@
           "Photos load through the app's own /api/photo route, which the local dev server also serves; the desktop build supplies the header the photo service requires."
         ],
         "other": []
+      },
+      "downloads": {
+        "windows": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.18/Stratos-Setup.exe",
+          "sha256": "101cd7c8d20147528a7263e4b212b15dc76f0b6684b7ffddbf78b0142e215f35",
+          "size": 103859294
+        },
+        "mac-arm64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.18/Stratos-2.1.18-mac-arm64.dmg",
+          "sha256": "6ba5fce9dd6e4b715d31b16f658a7bbc72653d7873e87e86798d4f35c2c4887b",
+          "size": 119571795
+        },
+        "mac-x64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.18/Stratos-2.1.18-mac-x64.dmg",
+          "sha256": "1bbf18f6caf97ced7c5843bb6ac48f20683e3e2b6a6bd7ccd2d9fc9f51eae7fe",
+          "size": 124911006
+        },
+        "linux-x64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.18/Stratos-2.1.18-linux-x64.AppImage",
+          "sha256": "6e239332a51b474eb0bc503bd0babc152022c06226941ea050db3e197f2d66a6",
+          "size": 140345691
+        }
       }
     },
     {
