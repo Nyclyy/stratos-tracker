@@ -5,6 +5,7 @@ import {
   normalizeRegistration,
   photoRequest,
   photoFromPayload,
+  photoOutcome,
   photoCredit,
 } from '../app/js/lib/aircraftphoto.js';
 
@@ -51,6 +52,16 @@ test('photo: no photo is reported as none', () => {
   assert.equal(photoFromPayload({}), null);
   assert.equal(photoFromPayload(null), null);
   assert.equal(photoCredit(null), '');
+});
+
+test('photo: a missing route is not the same answer as a missing photo', () => {
+  assert.equal(photoOutcome(404, null).state, 'unavailable');
+  assert.equal(photoOutcome(502, null).state, 'unavailable');
+  assert.equal(photoOutcome(0, null).state, 'unavailable');
+  assert.equal(photoOutcome(200, { photos: [] }).state, 'none');
+  const found = photoOutcome(200, payload);
+  assert.equal(found.state, 'ok');
+  assert.match(found.photo.src, /plnspttrs\.net/);
 });
 
 test('photo: only an https image is accepted, and a thumbnail is the fallback', () => {

@@ -3,57 +3,44 @@
   "product": "stratos",
   "source": "https://github.com/Nyclyy/stratos-tracker",
   "latest": {
-    "version": "2.1.18",
+    "version": "2.1.19",
     "releasedAt": "2026-10-23",
     "severity": "normal",
-    "summary": "One aircraft card with a spotter photo of its registration, drag it where you want and expand it for the rest.",
+    "summary": "The aircraft card now tells a missing photo route apart from a registration that has no photo.",
     "changelog": {
-      "features": [
-        "Selecting an aircraft opens one card on the left: a spotter photo of its registration, the callsign, type, altitude, speed, heading and vertical speed. The duplicate panel on the right is gone.",
-        "The card drags by its header, stays where you put it, and expands for registration, type, source, position, trail and the altitude profile.",
-        "The registration is read from the ADS-B feed, or from the simulator for your own aircraft, and matched to a published photo."
-      ],
+      "features": [],
       "improvements": [
-        "A registration with no published photo says so, with the aircraft type, instead of showing an unrelated airframe.",
-        "Track, Center and Clear trail moved into the card, so following an aircraft no longer needs a second panel."
+        "The card separates three answers: a photo, no published photo for that registration, and a deployment that cannot look photos up at all."
       ],
       "fixes": [
-        "The aircraft subtitle no longer repeats the type and registration, and names the live feed the position came from.",
-        "VATSIM pilots report no registration, and the card now says it was not reported rather than leaving a blank line."
+        "A build without the photo route said no photo was published for the registration; it now says the lookup is unavailable there instead of making a claim it cannot check."
       ],
       "performance": [],
-      "ui": [
-        "Every photo credits its photographer and links to the photo page on Planespotters, whose terms ask for both."
-      ],
-      "compatibility": [
-        "Photos load through the app's own /api/photo route, which the local dev server also serves; the desktop build supplies the header the photo service requires."
-      ],
+      "ui": [],
+      "compatibility": [],
       "other": []
-    },
-    "downloads": {
-      "windows": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.18/Stratos-Setup.exe",
-        "sha256": "101cd7c8d20147528a7263e4b212b15dc76f0b6684b7ffddbf78b0142e215f35",
-        "size": 103859294
-      },
-      "mac-arm64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.18/Stratos-2.1.18-mac-arm64.dmg",
-        "sha256": "6ba5fce9dd6e4b715d31b16f658a7bbc72653d7873e87e86798d4f35c2c4887b",
-        "size": 119571795
-      },
-      "mac-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.18/Stratos-2.1.18-mac-x64.dmg",
-        "sha256": "1bbf18f6caf97ced7c5843bb6ac48f20683e3e2b6a6bd7ccd2d9fc9f51eae7fe",
-        "size": 124911006
-      },
-      "linux-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.18/Stratos-2.1.18-linux-x64.AppImage",
-        "sha256": "6e239332a51b474eb0bc503bd0babc152022c06226941ea050db3e197f2d66a6",
-        "size": 140345691
-      }
     }
   },
   "releases": [
+    {
+      "version": "2.1.19",
+      "releasedAt": "2026-10-23",
+      "severity": "normal",
+      "summary": "The aircraft card now tells a missing photo route apart from a registration that has no photo.",
+      "changelog": {
+        "features": [],
+        "improvements": [
+          "The card separates three answers: a photo, no published photo for that registration, and a deployment that cannot look photos up at all."
+        ],
+        "fixes": [
+          "A build without the photo route said no photo was published for the registration; it now says the lookup is unavailable there instead of making a claim it cannot check."
+        ],
+        "performance": [],
+        "ui": [],
+        "compatibility": [],
+        "other": []
+      }
+    },
     {
       "version": "2.1.18",
       "releasedAt": "2026-10-23",

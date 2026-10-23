@@ -1,4 +1,20 @@
 {
+  "2.1.19": {
+    "summary": "The aircraft card now tells a missing photo route apart from a registration that has no photo.",
+    "changelog": {
+      "features": [],
+      "improvements": [
+        "The card separates three answers: a photo, no published photo for that registration, and a deployment that cannot look photos up at all."
+      ],
+      "fixes": [
+        "A build without the photo route said no photo was published for the registration; it now says the lookup is unavailable there instead of making a claim it cannot check."
+      ],
+      "performance": [],
+      "ui": [],
+      "compatibility": [],
+      "other": []
+    }
+  },
   "2.1.18": {
     "summary": "One aircraft card with a spotter photo of its registration, drag it where you want and expand it for the rest.",
     "changelog": {

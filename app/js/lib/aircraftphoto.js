@@ -48,6 +48,16 @@ export function photoFromPayload(payload) {
   };
 }
 
+/** What a photo request told us, in the three states the card can show.
+ *  A 404 means the app has no photo route at all (a static deployment), which is
+ *  not the same answer as "this registration has no photo". */
+export function photoOutcome(status, payload) {
+  if (status === 404) return { state: 'unavailable' };
+  if (!Number.isFinite(Number(status)) || status < 200 || status >= 300) return { state: 'unavailable' };
+  const photo = photoFromPayload(payload);
+  return photo ? { state: 'ok', photo } : { state: 'none' };
+}
+
 /** The credit the photographer is owed, or the site that supplied the photo. */
 export function photoCredit(photo) {
   if (!photo) return '';

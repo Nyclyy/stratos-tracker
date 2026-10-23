@@ -1254,13 +1254,22 @@ async function fcPhoto(reg){
   if(!reg||PHOTOS.has(reg))return;
   PHOTOS.set(reg,{state:'loading'});
   const direct='https://api.planespotters.net/pub/photos/reg/'+encodeURIComponent(reg);
-  const ask=async url=>{const r=await fetch(url,{cache:'force-cache'});if(!r.ok)throw new Error('HTTP '+r.status);return window.PHOTO.photoFromPayload(await r.json())};
-  let photo=null;
-  if(location.protocol!=='file:'){try{photo=await ask(window.PHOTO.photoRequest(reg))}catch(_){photo=null}}
+  // missingOn404 separates "the service has no photo for this registration" from
+  // "this deployment has no photo route at all", which are different answers.
+  const ask=async(missingOn404,url)=>{
+    let r;
+    try{r=await fetch(url,{cache:'force-cache'})}catch(_){return {state:'unavailable'}}
+    let payload=null;
+    try{payload=await r.json()}catch(_){payload=null}
+    if(missingOn404&&r.status===404)return {state:'none'};
+    return window.PHOTO.photoOutcome(r.status,payload);
+  };
   // The desktop build has no same-origin API; its main process supplies the
   // User-Agent the service requires, so the direct call is the working path there.
-  if(photo===null&&location.protocol=='file:'){try{photo=await ask(direct)}catch(_){photo=null}}
-  PHOTOS.set(reg,photo?{state:'ok',photo}:{state:'none'});
+  const outcome=location.protocol==='file'
+    ? await ask(true,direct)
+    : await ask(false,window.PHOTO.photoRequest(reg));
+  PHOTOS.set(reg,outcome&&outcome.state?outcome:{state:'unavailable'});
   fCard();
 }
 function fcPhotoHtml(o){
@@ -1268,6 +1277,7 @@ function fcPhotoHtml(o){
   if(!reg)return '<div class="fcph none"><span class="fcph-t">'+esc(label)+'</span><span class="fcph-c">Registration not reported, so no photo can be matched</span></div>';
   const p=PHOTOS.get(reg);
   if(!p||p.state=='loading')return '<div class="fcph load"><span class="fcph-t">Looking up '+esc(reg)+'…</span><span class="fcph-c">Planespotters.net</span></div>';
+  if(p.state=='unavailable')return '<div class="fcph none"><span class="fcph-t">'+esc(label)+'</span><span class="fcph-c">Photo lookup is unavailable here · registration '+esc(reg)+'</span></div>';
   if(p.state!='ok'||!p.photo)return '<div class="fcph none"><span class="fcph-t">'+esc(label)+'</span><span class="fcph-c">No spotter photo published for '+esc(reg)+'</span></div>';
   const credit=esc(window.PHOTO.photoCredit(p.photo));
   const cap=p.photo.link?'<a href="'+esc(p.photo.link)+'" target="_blank" rel="noopener">'+credit+'</a>':credit;
