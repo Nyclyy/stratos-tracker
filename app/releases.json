@@ -3,30 +3,70 @@
   "product": "stratos",
   "source": "https://github.com/Nyclyy/stratos-tracker",
   "latest": {
-    "version": "2.1.16",
-    "releasedAt": "2026-10-21",
+    "version": "2.1.17",
+    "releasedAt": "2026-10-22",
     "severity": "normal",
-    "summary": "The flight plan now lives on the Flight Deck map.",
+    "summary": "Live VATSIM traffic, a flight plan you can edit on its own map, and a flight overview split into tabs.",
     "changelog": {
       "features": [
-        "The planned route draws on the Flight Deck map as soon as it exists, fitted into view and labelled, instead of appearing only on a separate planning map.",
-        "The route has its own layer toggle, so it can be hidden while keeping airports, navaids and traffic on screen."
+        "Traffic source in Map layers: VATSIM shows pilots online now with callsign, type, altitude and speed, next to the existing live ADS-B feeds; an airport panel also names the controllers online for that airport.",
+        "The route planner's map now shows the plan: select a waypoint or the leg between two of them for its coordinates, altitude, distances and connected legs, then Move up, Move down, Direct or Delete it, or drag to move it.",
+        "Flight overview is split into Overview, Route, Flight data and Weather, with the aircraft identified by type and matched to a silhouette where artwork exists.",
+        "SimBrief is connected once: Settings saves the Pilot ID or username and every import reuses it."
       ],
       "improvements": [
-        "The map and the planner share one active route: adding or clearing waypoints on the map updates the plan, and a route edited in the planner appears on the map without pressing Send to map."
+        "Live ADS-B works from a local copy of the app: npm run dev serves it and fetches the feeds server-side, so the browser's cross-origin rules no longer block them.",
+        "Map layers offers only the traffic sources that answer. Volanta, ElevateX and Flightradar24 were removed instead of sitting there with no data."
       ],
       "fixes": [
-        "A route opened on the map is zoomed to fit, so it no longer loads correctly and still sits off the edge of the last view."
+        "The first ADS-B mirror was read with the wrong key, so its aircraft were thrown away and every poll fell through to a slower fallback.",
+        "VATSIM pilots appeared only after a delayed retry because the first poll ran before the feed parser had loaded.",
+        "The corner traffic badge said 'aircrafts' for a count of aircraft.",
+        "The desktop build could not read VATSIM's live feed or one ADS-B mirror because those hosts were missing from its CORS allowlist."
       ],
       "performance": [],
       "ui": [
-        "The planner button is now Show on Flight Deck, because the route is already on the map."
+        "The corner badge counts aircraft or pilots according to the source in use, and names it in the tooltip."
       ],
       "compatibility": [],
-      "other": []
+      "other": [
+        "npm run dev starts a local server with the same traffic proxy the hosted build uses; a plain static server still serves the files but cannot reach the ADS-B feeds."
+      ]
     }
   },
   "releases": [
+    {
+      "version": "2.1.17",
+      "releasedAt": "2026-10-22",
+      "severity": "normal",
+      "summary": "Live VATSIM traffic, a flight plan you can edit on its own map, and a flight overview split into tabs.",
+      "changelog": {
+        "features": [
+          "Traffic source in Map layers: VATSIM shows pilots online now with callsign, type, altitude and speed, next to the existing live ADS-B feeds; an airport panel also names the controllers online for that airport.",
+          "The route planner's map now shows the plan: select a waypoint or the leg between two of them for its coordinates, altitude, distances and connected legs, then Move up, Move down, Direct or Delete it, or drag to move it.",
+          "Flight overview is split into Overview, Route, Flight data and Weather, with the aircraft identified by type and matched to a silhouette where artwork exists.",
+          "SimBrief is connected once: Settings saves the Pilot ID or username and every import reuses it."
+        ],
+        "improvements": [
+          "Live ADS-B works from a local copy of the app: npm run dev serves it and fetches the feeds server-side, so the browser's cross-origin rules no longer block them.",
+          "Map layers offers only the traffic sources that answer. Volanta, ElevateX and Flightradar24 were removed instead of sitting there with no data."
+        ],
+        "fixes": [
+          "The first ADS-B mirror was read with the wrong key, so its aircraft were thrown away and every poll fell through to a slower fallback.",
+          "VATSIM pilots appeared only after a delayed retry because the first poll ran before the feed parser had loaded.",
+          "The corner traffic badge said 'aircrafts' for a count of aircraft.",
+          "The desktop build could not read VATSIM's live feed or one ADS-B mirror because those hosts were missing from its CORS allowlist."
+        ],
+        "performance": [],
+        "ui": [
+          "The corner badge counts aircraft or pilots according to the source in use, and names it in the tooltip."
+        ],
+        "compatibility": [],
+        "other": [
+          "npm run dev starts a local server with the same traffic proxy the hosted build uses; a plain static server still serves the files but cannot reach the ADS-B feeds."
+        ]
+      }
+    },
     {
       "version": "2.1.16",
       "releasedAt": "2026-10-21",

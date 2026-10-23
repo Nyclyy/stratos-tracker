@@ -1,5 +1,22 @@
 # Sources and licensing
 
+## Aircraft icons
+
+Aircraft image sources and licenses:
+
+- **Plane Watch aircraft sprite atlas and silhouette artwork** — Plane Watch Contributors, [pw-silhouettes](https://github.com/plane-watch/pw-silhouettes), CC BY-NC-SA 4.0. The supplied `spritesheet.png` and `spritesheet.json` are used with Stratos' aircraft-code mapping; this is an adaptation and is provided under the same share-alike license. **Non-commercial use only**: the upstream license prohibits commercial use without a separate commercial license from the maintainers. See [the local attribution and license notice](app/images/aircraft/ATTRIBUTION.md). The upstream repository notes that third-party reference artwork may appear in its source SVGs but is not part of the final silhouette artwork; Stratos bundles the generated sheet, not those source SVGs.
+
+
+- **Boeing 737-700** — Peter James Lowden, [Boeing 737-700 silhouette.svg](https://commons.wikimedia.org/wiki/File:Boeing_737-700_silhouette.svg), CC BY-SA 4.0. Used across the 737 family.
+- **Airbus A380** — Saburny, [Airbus A380 silhouette.svg](https://commons.wikimedia.org/wiki/File:Airbus_A380_silhouette.svg), CC BY-SA 3.0 (also available under GFDL and CC BY-SA 2.1 Japan).
+- **Boeing 747-400** — Peter James Lowden, [Boeing 747-400 silhouette.svg](https://commons.wikimedia.org/wiki/File:Boeing_747-400_silhouette.svg), CC BY-SA 4.0. Used for the 747 family.
+- **Boeing 757-200 and 757-300** — Peter James Lowden, [Boeing 757-200 silhouette.svg](https://commons.wikimedia.org/wiki/File:Boeing_757-200_silhouette.svg) and [Boeing 757-300 silhouette.svg](https://commons.wikimedia.org/wiki/File:Boeing_757-300_silhouette.svg), CC BY-SA 4.0. These have separate source drawings; Stratos currently bundles the 757-300 drawing as its family icon.
+- **Boeing 777-200** — Peter James Lowden, [Boeing 777-200 silhouette.svg](https://commons.wikimedia.org/wiki/File:Boeing_777-200_silhouette.svg), CC BY-SA 4.0. Used for the 777 family.
+- **Boeing 787-8 and 787-9** — Peter James Lowden, [Boeing 787-8 silhouette.svg](https://commons.wikimedia.org/wiki/File:Boeing_787-8_silhouette.svg) and [Boeing 787-9 silhouette.svg](https://commons.wikimedia.org/wiki/File:Boeing_787-9_silhouette.svg), CC BY-SA 4.0.
+- **Neutral fallback** — Carport, [Plane icon.svg](https://commons.wikimedia.org/wiki/File:Plane_icon.svg), dedicated to the public domain (PD-self). Used for types without a verified model silhouette; it does not pretend to identify the model.
+
+The separately bundled Commons images and adaptations remain under their respective CC BY-SA terms. Several other common types intentionally use a neutral fallback rather than a falsely labelled model drawing.
+
 ## Airport and navigation data
 
 - **OurAirports** — public domain (CC0). CSV data is downloaded at runtime from `ourairports.com` / the maintained GitHub mirror and cached. Attribution is included in the UI even though CC0 does not require it.
@@ -60,8 +77,7 @@ The pairing QR is drawn by **qrcode-generator 1.4.4** by Kazuhiko Arase, vendore
 
 ### Chart viewer and caching rules
 
-- The catalogue request is answered by the bridge (`/charts?icao=`) or the hosted API (`/api/charts?icao=`). Both only ever read the FAA publication. An airport whose provider is not integrated is answered from the local registry without a network request, which is why a publisher link never looks like a failed chart fetch.
-- A document request names a cycle and a PDF filename and nothing else: `^\d{4}$` for the cycle, `^[A-Z0-9]{1,12}\.PDF$` for the file. No arbitrary URL, header or credential is forwarded. The bridge refuses a document from a cycle other than the one it currently holds.
+- The catalogue request is answered by the bridge (`/charts?icao=`) or the hosted API (`/api/charts?icao=`). Both only ever read the FAA publication. A document request names a cycle and a PDF filename and nothing else: `^\d{4}$` for the cycle, `^[A-Z0-9]{1,12}\.PDF$` for the file. No arbitrary URL, header or credential is forwarded. The bridge refuses a document from a cycle other than the one it currently holds.
 - Downloaded documents are cached in a separate IndexedDB database (`stratos_charts`), capped at 40 documents / 30 days. Clearing site data clears them.
 - The FAA publication window from the metafile is shown with every chart. A document whose window has passed is labelled expired; if the window is missing it is labelled unverified. Stratos never calls a chart current without the publisher's dates.
 

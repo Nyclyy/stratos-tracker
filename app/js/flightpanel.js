@@ -1,6 +1,7 @@
 // Flight summary panel for the Flight Planning sheet. Builds the summary from the
 // route and the saved SimBrief plan, then renders it as HTML. Pure apart from
 // buildSummary's clock, so the Flight Deck page can call it from its classic script.
+import { overviewHeader, overviewAircraft, OVERVIEW_TABS, activeTab } from './lib/overview.js';
 import {
   buildSummary,
   parseOfp,
@@ -22,6 +23,54 @@ export function plannedAltitudeFt(ofp, ident) {
 }
 
 const SOURCE_LABEL = { ofp: 'SimBrief', stratos: 'Stratos', live: 'Live' };
+const spriteAtlas = typeof Image === 'undefined' ? null : new Image();
+if (spriteAtlas) spriteAtlas.src = 'images/aircraft/spritesheet.png';
+
+function queueAircraftSprite() {
+  // HTML is inserted by the caller immediately after rendering the panel.
+  if (!spriteAtlas || typeof document === 'undefined') return;
+  const schedule = globalThis.requestAnimationFrame || (callback => setTimeout(callback, 0));
+  schedule(() => {
+    document.querySelectorAll('canvas[data-aircraft-sprite]').forEach(canvas => {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const ids = (canvas.dataset.aircraftFrames || '').split(',').map(Number).filter(Number.isFinite);
+      if (!ids.length) return;
+      let frame = 0;
+      const paint = () => {
+        if (!canvas.isConnected) return;
+        if (spriteAtlas?.complete && spriteAtlas.naturalWidth) {
+          ctx.clearRect(0, 0, 72, 72);
+          ctx.drawImage(spriteAtlas, (ids[frame] % 8) * 72, Math.floor(ids[frame] / 8) * 72, 72, 72, 0, 0, 72, 72);
+        }
+        if (ids.length > 1) setTimeout(() => { frame = (frame + 1) % ids.length; paint(); }, 50);
+      };
+      if (!spriteAtlas) return;
+      if (spriteAtlas.complete) paint();
+      else spriteAtlas.addEventListener('load', paint, { once: true });
+    });
+  });
+}
+
+/** Header and aircraft block for the overview. Every value is real or a dash. */
+export function overviewBlockHtml({ header, aircraft }) {
+  const img = aircraft.sprite
+    ? `<canvas class="ov-aircraft-img ov-aircraft-sprite" width="72" height="72" data-aircraft-sprite="${esc(aircraft.sprite.name)}" data-aircraft-frames="${esc(aircraft.sprite.ids.join(','))}" aria-label="${esc(aircraft.name)} icon" role="img"></canvas>`
+    : aircraft.image
+      ? `<img class="ov-aircraft-img" src="${esc(aircraft.image)}" alt="${esc(aircraft.name)} illustration" loading="lazy">`
+      : '<div class="ov-aircraft-img ov-aircraft-none">No image</div>';
+  const time = (t) => `${esc(t.scheduled)} sched · ${esc(t.estimated)} est`;
+  const status = (t) => (t.status ? `<span class="ov-status ov-${esc(t.status.key)}">${esc(t.status.label)}</span>` : '');
+  return `<div class="ov-head">
+    <div><b class="ov-callsign">${esc(header.callsign)}</b> <span class="m">${esc(header.operator)}</span></div>
+    <div class="ov-route"><b>${esc(header.dep)}</b> <span class="m">→</span> <b>${esc(header.arr)}</b>${header.alternate ? ` <span class="m">· alt ${esc(header.alternate.icao)}${header.alternate.name !== '\u2014' ? ' ' + esc(header.alternate.name) : ''}</span>` : ''}</div>
+    <div class="m">Dep ${time(header.departure)} ${status(header.departure)} · Arr ${time(header.arrival)} ${status(header.arrival)} <span class="m">(${esc(header.timeZone)})</span></div>
+  </div>
+  <div class="ov-aircraft">${img}
+    <div><b>${esc(aircraft.name)}</b> <span class="m">${esc(aircraft.type)}</span>
+    <div class="m">Registration ${esc(aircraft.registration)}${aircraft.livery ? ' · ' + esc(aircraft.livery) : ''}</div></div>
+  </div>`;
+}
 
 function esc(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({
@@ -148,19 +197,25 @@ function headerHtml(summary) {
 }
 
 /** Full panel HTML for an already-built summary. */
-export function renderFlightPanel(summary) {
+export function renderFlightPanel(summary, tab = 'overview') {
+  queueAircraftSprite();
   const notes = summary.notes.length
     ? `<div class="fs-notes">${summary.notes.map(n => `<div class="m">${esc(n)}</div>`).join('')}</div>`
     : '';
+  const current = activeTab(tab);
+  const bar = `<div class="ov-tabs" role="tablist" aria-label="Flight overview sections">${OVERVIEW_TABS.map(t => `<button type="button" role="tab" class="ov-tab${t.key === current ? ' on' : ''}" data-ov-tab="${t.key}" aria-selected="${t.key === current}">${esc(t.label)}</button>`).join('')}</div>`;
+  // Each tab keeps the same panel; it only changes which sections are shown.
+  const sections = {
+    overview: [    summary.identity ? overviewBlockHtml(summary.identity) : '', section('Overview', overviewHtml(summary))],
+    route: [section('Procedures', proceduresHtml(summary)), section('Route', routeHtml(summary))],
+    data: [section('Weights', weightsHtml(summary), false), section('Fuel', fuelHtml(summary), false)],
+    weather: [section('Weather', weatherHtml(summary), false)],
+  };
   return [
     headerHtml(summary),
     notes,
-    section('Overview', overviewHtml(summary)),
-    section('Procedures', proceduresHtml(summary)),
-    section('Route', routeHtml(summary)),
-    section('Weights', weightsHtml(summary), false),
-    section('Fuel', fuelHtml(summary), false),
-    section('Weather', weatherHtml(summary), false),
+    bar,
+    ...sections[current],
   ].join('');
 }
 
@@ -168,7 +223,7 @@ export function renderFlightPanel(summary) {
  * Convenience wrapper for the page: takes raw route points and the stored OFP.
  * route: [{ id, name, lat, lon, k }] as kept by the Flight Planning sheet.
  */
-export function flightSummaryHtml({ route, ofp, cruiseKts, weightUnit, metars, position, now } = {}) {
+export function flightSummaryHtml({ route, ofp, cruiseKts, weightUnit, metars, position, now, tab } = {}) {
   const summary = buildSummary({
     route: (route || []).map(p => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, kind: p.k })),
     ofp: ofp || null,
@@ -178,5 +233,9 @@ export function flightSummaryHtml({ route, ofp, cruiseKts, weightUnit, metars, p
     position: position || null,
     now,
   });
-  return renderFlightPanel(summary);
+  summary.identity = {
+    header: overviewHeader({ ofp: ofp || null, route: (route || []).map(p => ({ id: p.id })) }),
+    aircraft: overviewAircraft({ simbrief: ofp && ofp.aircraft ? ofp.aircraft.icao : null, registration: ofp && ofp.aircraft ? ofp.aircraft.reg : null }),
+  };
+  return renderFlightPanel(summary, tab);
 }

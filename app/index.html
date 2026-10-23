@@ -58,6 +58,8 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 #tel{display:none;left:12px;right:12px;bottom:76px;max-width:540px;border-radius:18px;padding:8px 4px;z-index:3}
 .live #tel{display:grid}.live #sheet{bottom:142px}
 #lay{width:240px}#ms{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#lay select{width:100%;padding:8px 9px;border-radius:9px;border:1px solid var(--ui2);background:var(--ui2);color:var(--txt);font:inherit;font-size:12.5px}
+#lay option:disabled{color:var(--mut)}
 
 :root[data-theme=night]{--bg:#060c14;--land:#0d1721;--coast:#28425a;--grid:rgba(140,180,220,.08);--ap:#f6c453;--nav:#5eead4;--route:#22d3ee;--own:#f8b84e;--txt:#e8f1fa;--ui:rgba(9,16,25,.96);--ui2:#152230;--mut:#8299ae;--trf:#8fb8ff;--acc:#38bdf8}
 #tel{display:none!important}.live #sheet{bottom:76px}
@@ -188,7 +190,25 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 #tabs .tab.act{box-shadow:none}
 #tabs .tab.act::before{left:-5px;top:8px;bottom:8px;width:2px;border-radius:0 2px 2px 0;background:var(--acc);box-shadow:none}
 }
-.fs-body{padding:4px 0 2px}.fs-sec{border-top:1px solid color-mix(in srgb,var(--coast) 30%,transparent);padding:4px 0}.fs-sec>summary{cursor:pointer;font-weight:700;padding:4px 0;list-style:none}.fs-sec>summary::-webkit-details-marker{display:none}.fs-sec>summary::before{content:'\25B8  '}.fs-sec[open]>summary::before{content:'\25BE  '}.fs-t{width:100%;border-collapse:collapse;font-size:13px}.fs-t td,.fs-t th{padding:3px 4px;text-align:left;vertical-align:top}.fs-route{font-size:12px}.fs-link{background:none;border:0;padding:0;color:inherit;text-decoration:underline;cursor:pointer;font:inherit}.fs-src{font-size:10px;opacity:.6;margin-left:4px}.fs-warn{color:#e0a030}.fs-on td{background:rgba(127,127,127,.15)}.fs-wx{border-top:1px solid rgba(127,127,127,.2);padding:6px 0;font-size:13px}.fs-metar{display:block;white-space:pre-wrap;font-size:11px;word-break:break-all}</style><link rel="stylesheet" href="shell.css"></head><body><div class="app-shell">
+.fs-body{padding:4px 0 2px}.fs-sec{border-top:1px solid color-mix(in srgb,var(--coast) 30%,transparent);padding:4px 0}.fs-sec>summary{cursor:pointer;font-weight:700;padding:4px 0;list-style:none}.fs-sec>summary::-webkit-details-marker{display:none}.fs-sec>summary::before{content:'\25B8  '}.fs-sec[open]>summary::before{content:'\25BE  '}.fs-t{width:100%;border-collapse:collapse;font-size:13px}.fs-t td,.fs-t th{padding:3px 4px;text-align:left;vertical-align:top}.fs-route{font-size:12px}.fs-link{background:none;border:0;padding:0;color:inherit;text-decoration:underline;cursor:pointer;font:inherit}.fs-src{font-size:10px;opacity:.6;margin-left:4px}.fs-warn{color:#e0a030}.fs-on td{background:rgba(127,127,127,.15)}.fs-wx{border-top:1px solid rgba(127,127,127,.2);padding:6px 0;font-size:13px}.fs-metar{display:block;white-space:pre-wrap;font-size:11px;word-break:break-all}.ov-head{padding:6px 0;font-size:13px;display:grid;gap:3px}.ov-callsign{font-size:16px}.ov-route{font-size:15px}.ov-status{font-size:11px;padding:1px 6px;border-radius:999px;border:1px solid currentColor;margin-left:4px}.ov-on-time{color:#4caf7a}.ov-delayed{color:#e0a030}.ov-early{color:#5aa9e6}.ov-aircraft{display:flex;gap:10px;align-items:center;padding:6px 0;font-size:13px;border-top:1px solid rgba(127,127,127,.2)}.ov-aircraft-img{width:120px;height:auto;max-height:64px;flex:0 0 120px;color:var(--mut,#8a9bb0);object-fit:contain}.ov-aircraft-sprite{width:64px;height:64px;flex-basis:64px;image-rendering:auto}.ov-aircraft-none{display:flex;align-items:center;justify-content:center;font-size:11px;opacity:.6}@media (max-width:700px){.ov-aircraft-img{width:88px;flex-basis:88px}}
+/* Floating route card: waypoint and leg details open next to the click, on the map. */
+#wpcard{position:absolute;z-index:7;width:330px;max-width:calc(100% - 20px);max-height:calc(100% - 20px);overflow:auto;padding:14px 16px;border-radius:16px;background:var(--surface);border:1px solid color-mix(in srgb,var(--coast) 45%,transparent);box-shadow:var(--sh-2);color:var(--txt);font-size:13px;line-height:1.45;text-align:left}
+#wpcard .wc-top{display:flex;align-items:center;gap:10px}
+#wpcard .wc-count{flex:1;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);font-weight:700}
+#wpcard .wc-x{width:30px;height:30px;min-height:0;padding:0;border-radius:9px;background:transparent;border:1px solid color-mix(in srgb,var(--coast) 40%,transparent);color:var(--mut);font-size:12px;line-height:1;font-weight:700}
+#wpcard h4{margin:4px 0 10px;font-size:18px;letter-spacing:.01em}
+#wpcard .wc-rows{display:grid;grid-template-columns:1fr auto;margin:0}
+#wpcard .wc-rows dt{margin:0;padding:7px 0;color:var(--mut);font-size:12.5px;border-top:1px solid color-mix(in srgb,var(--coast) 26%,transparent)}
+#wpcard .wc-rows dd{margin:0;padding:7px 0;text-align:right;font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;border-top:1px solid color-mix(in srgb,var(--coast) 26%,transparent);max-width:62%}
+#wpcard .wc-sec{margin:12px 0 4px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);font-weight:700}
+#wpcard .wc-legs{margin:0;padding-left:16px}
+#wpcard .wc-legs li{font-size:12.5px;padding:2px 0}
+#wpcard .wc-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+#wpcard .wc-btns button{min-height:32px;padding:6px 12px;font-size:12.5px;border-radius:9px}
+#wpcard .wc-btns .wc-del{color:#f17b89;border-color:color-mix(in srgb,#f17b89 45%,transparent)}
+#wpcard button:disabled{opacity:.4;cursor:not-allowed}
+@media(max-width:520px){#wpcard{width:min(320px,calc(100% - 20px));padding:12px 13px}}
+</style><link rel="stylesheet" href="shell.css"></head><body><div class="app-shell">
 <header id="appbar" class="tb" data-title="Flight Deck" data-context="Live Map"></header>
 <nav id="tabs" aria-label="Sections"><button class="tab" id="bMap" data-group="Flight Operations" data-label="Flight Deck"><b>&#8982;</b><span>Flight Deck</span></button><a class="tab" href="discover.html" data-group="Flight Operations" data-label="Route Discovery"><b>&#10022;</b><span>Route Discovery</span></a><button class="tab" id="bLive" data-group="Flight Operations" data-label="Live Tracking"><b>&#9673;</b><span>Live Tracking</span></button><button class="tab" id="bRoute" data-group="Flight Operations" data-label="Flight Planning"><b>&#8599;</b><span>Flight Planning</span></button><button class="tab" id="bCh" data-group="Flight Operations" data-label="Charts"><b>&#9707;</b><span>Charts</span></button><a class="tab" href="logbook.html" data-group="Flight Operations" data-label="Flight Logbook"><b>&#9776;</b><span>Flight Logbook</span></a><button class="tab" id="bWx" data-group="Flight Intelligence" data-label="Weather"><b>&#9729;</b><span>Weather</span></button><a class="tab" href="pilot.html#airports" data-group="Flight Intelligence" data-label="Airports"><b>&#9678;</b><span>Airports</span></a><a class="tab" href="pilot.html#career" data-group="Flight Intelligence" data-label="Flight Statistics"><b>&#9733;</b><span>Flight Statistics</span></a><button class="tab" id="bData" data-group="Application" data-label="Data &amp; Performance"><b>&#9636;</b><span>Data &amp; Performance</span></button><a class="tab" href="pilot.html#settings" data-group="Application" data-label="Settings"><b>&#9881;</b><span>Settings</span></a><button class="tab rail-toggle" data-rail-toggle type="button" title="Collapse sidebar" aria-label="Collapse sidebar"><b>&#8249;</b><span>Collapse</span></button></nav>
 <div class="app-main">
@@ -205,7 +225,7 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 <div id="online" class="box"><b id="olPlace">–</b><span id="olCount">–</span></div>
 <div id="fab"><button id="bTheme" class="fab" title="Theme">Day</button>
 <button id="bLay" class="fab" title="Layers">&#9776;</button><button id="bPlan" class="fab" title="Add waypoints">&#9998;</button><button id="bFol" class="fab" title="Follow aircraft">&#9992;</button><button id="bZi" class="fab" title="Zoom in">+</button><button id="bZo" class="fab" title="Zoom out">−</button>
-</div><div id="lay"><b>Map layers</b><button data-l="apt" class="on">Airports</button><button data-l="nav" class="on">Navaids</button><button data-l="trf" class="on">Traffic</button><button data-l="trl">All trails</button><button data-l="rte" class="on">Route</button><button data-l="grid">Grid</button><b>Map style</b><div id="ms"></div></div>
+</div><div id="lay"><b>Map layers</b><button data-l="apt" class="on">Airports</button><button data-l="nav" class="on">Navaids</button><button data-l="trf" class="on">Traffic</button><button data-l="trl">All trails</button><button data-l="rte" class="on">Route</button><button data-l="grid">Grid</button><b>Traffic source</b><select id="trs" aria-label="Traffic source"><option value="vatsim">VATSIM — live pilots</option><option value="adsb">ADS-B — community feeds</option></select><div class="m" id="trsnote" style="max-width:220px;margin-top:2px">Both sources are keyless and free.</div><b>Map style</b><div id="ms"></div></div>
 
 <div id="cv"><div class="cvh"><button id="cvx" aria-label="Back">&#8592;</button><div class="cvt"><b id="cvi"></b><span id="cvn"></span><span id="cvm"></span></div><button id="cvf">Fit</button></div><div class="seg" id="cvs"></div></div><div id="ci"></div>
 <div id="chart"></div>
@@ -215,6 +235,33 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 </div>
 </div>
 <script src="js/data/world.js"></script>
+<script type="module">
+import { aircraftSprite } from './js/lib/aircraft.js';
+const spriteAtlas = new Image();
+spriteAtlas.src = 'images/aircraft/spritesheet.png';
+const spriteCanvas = document.createElement('canvas');
+spriteCanvas.width = spriteCanvas.height = 72;
+const spriteCtx = spriteCanvas.getContext('2d');
+const spriteCache = new Map();
+function aircraftIcon(type, color) {
+  const sprite = aircraftSprite(type);
+  if (!sprite || !spriteAtlas.complete || !spriteAtlas.naturalWidth) return null;
+  const key = `${sprite.name}:${color}`;
+  if (spriteCache.has(key)) return spriteCache.get(key);
+  const frameId = sprite.ids[0];
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 72;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(spriteAtlas, (frameId % 8) * 72, Math.floor(frameId / 8) * 72, 72, 72, 0, 0, 72, 72);
+  ctx.globalCompositeOperation = 'source-in';
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, 72, 72);
+  spriteCache.set(key, canvas);
+  return canvas;
+}
+spriteAtlas.addEventListener('load', () => { spriteCache.clear(); window.dispatchEvent(new Event('aircraft-atlas-ready')); });
+window.aircraftIcon = aircraftIcon;
+</script>
 <script>
 const A=`KSFO|San Francisco Intl|37.619|-122.375|13|10,1|120.5|135.1|29012KT 10SM FEW015 16/11 A3002
 KOAK|Oakland Intl|37.721|-122.221|9|12,30|118.3|128.5|28010KT 10SM CLR 17/10 A3001
@@ -466,6 +513,7 @@ function refreshRoute(fit){
   const before=JSON.stringify(route);
   if(!load())return;
   if(JSON.stringify(route)===before)return;
+  closeRouteCard();
   trav=0;
   if(fit&&route.length>1)fitRoute();
   if(panel=='route')render();
@@ -483,7 +531,9 @@ T.forEach(a=>{const p=fwd(a,a.hdg,a.gs/3600*dt*WARP);a.lat=p.lat;a.lon=p.lon});
 const el=route.length>1?t-trav:0;$('#tGS').textContent=CRUISE;$('#tAL').textContent=Math.round(own.alt/10)*10;$('#tHD').textContent=String(Math.round(own.hdg)%360).padStart(3,'0');$('#tVS').textContent=Math.round(own.vs/50)*50;$('#tDS').textContent=el.toFixed(1);$('#tEt').textContent=hm(el/CRUISE);
 if(V.fol){V.lon=own.lon;V.lat=own.lat}}
 /* drawing */
-function draw(){cx.setTransform(dpr,0,0,dpr,0,0);cx.fillStyle=C.bg;cx.fillRect(0,0,W,H);
+const ACI=new Map();function acImg(t,col){const key=t+'|'+col;if(ACI.has(key))return ACI.get(key);const icon=window.aircraftIcon?.(t,col);if(icon)ACI.set(key,icon);return icon}
+function drawAircraft(type,x,y,heading,color,size){const im=type&&acImg(type,color);cx.save();cx.translate(x,y);cx.rotate(((Number(heading)||0)*R));if(im){cx.drawImage(im,-size/2,-size/2,size,size)}else{cx.strokeStyle=color;cx.lineWidth=2;cx.beginPath();PL.forEach((p,i)=>i?cx.lineTo(p[0]*.7,p[1]*.7):cx.moveTo(p[0]*.7,p[1]*.7));cx.closePath();cx.fillStyle=color;cx.fill()}cx.restore()}
+function draw(){if(wpCard){const ck=V.lon.toFixed(5)+','+V.lat.toFixed(5)+','+V.z.toFixed(4)+','+W+'x'+H;if(ck!==cardView){cardView=ck;positionRouteCard()}}cx.setTransform(dpr,0,0,dpr,0,0);cx.fillStyle=C.bg;cx.fillRect(0,0,W,H);
 if(CH.on&&CH.pg!='sat'){cx.fillStyle='#fbfaf6';cx.fillRect(0,0,W,H)}else if(L.style=='world'){worldLayer()}else{cx.beginPath();[LAND,...EX].forEach(po=>{po.forEach((p,i)=>{const[x,y]=sc(p[0],p[1]);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.closePath()});if(!SAT()){cx.fillStyle=C.land;cx.fill();cx.strokeStyle=C.coast;cx.lineWidth=1.5;cx.stroke()}else drawTiles()}
 const tl=wpx(V.lon,V.lat);
 if(L.grid&&V.z<12&&!CH.on){const s=V.z<4?10:V.z<5.5?5:V.z<7?2:V.z<8.5?1:V.z<10?.5:.1,a=wun(tl[0]-W/2,tl[1]-H/2),b=wun(tl[0]+W/2,tl[1]+H/2);cx.strokeStyle=C.grid;cx.lineWidth=1;cx.fillStyle=C.coast;cx.font='10px sans-serif';cx.beginPath();
@@ -495,11 +545,12 @@ if(L.apt)A.forEach(a=>{if(CH.on&&a!==CH.a)return;const[x,y]=sc(a.lon,a.lat);if(a
 if(V.z>8.5)drawReal(a,x,y);else a.det=false;if(0)pairs(a).forEach(pr=>{const n=pr[0],h=n*10,p=ppn(a.lat)*1.4,dx=Math.sin(h*R)*p,dy=-Math.cos(h*R)*p;cx.strokeStyle=C.ap;cx.lineWidth=Math.max(3,p/9);cx.lineCap='butt';cx.beginPath();cx.moveTo(x-dx,y-dy);cx.lineTo(x+dx,y+dy);cx.stroke()});
 cx.beginPath();cx.arc(x,y,a.det?0:V.z>8.5?3:5,0,7);cx.fillStyle=C.land;cx.fill();cx.strokeStyle=C.ap;cx.lineWidth=2.2;cx.stroke();
 if(V.z>(a.x?7:4.8)){cx.font='bold 12px sans-serif';if(SAT()){cx.lineWidth=3;cx.strokeStyle=DKM()?'rgba(0,0,0,.7)':'rgba(255,255,255,.85)';cx.strokeText(a.id,x+9,y-6)}cx.fillStyle=SAT()?(DKM()?'#fff':'#111'):C.txt;cx.fillText(a.id,x+9,y-6)}});
-if(route.length&&!CH.on&&L.rte){cx.strokeStyle=C.route;cx.lineWidth=3;cx.setLineDash([9,5]);cx.beginPath();route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke();cx.setLineDash([]);if(liveOk()&&route.length>1){const pr=routeProg(),pts=[route[0]];let acc=0;for(let i=0;i<route.length-1;i++){acc+=dist(route[i],route[i+1]);if(acc<pr)pts.push(route[i+1])}pts.push(pos(pr));cx.strokeStyle=C.route;cx.lineWidth=5;cx.beginPath();pts.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke()}
-route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat),big=/^(TOC|TOD)$/.test(p.id),s=big?16:(i===0||i===route.length-1)?11:8;cx.fillStyle=C.route;cx.fillRect(x-s/2,y-s/2,s,s);if(big){cx.font='bold 14px sans-serif';cx.lineWidth=3;cx.strokeStyle='rgba(0,0,0,.75)';cx.strokeText(p.id,x+11,y+18);cx.fillStyle='#fff';cx.fillText(p.id,x+11,y+18)}else if(V.z>=4||i===0||i===route.length-1){cx.font='11px sans-serif';cx.lineWidth=3;cx.strokeStyle='rgba(0,0,0,.7)';cx.strokeText(p.id,x+7,y+14);cx.fillStyle=C.route;cx.fillText(p.id,x+7,y+14)}})}
-trails();if(L.trf&&!CH.on)T.forEach(a=>{const[x,y]=sc(a.lon,a.lat);cx.save();cx.translate(x,y);cx.rotate(a.hdg*R);cx.strokeStyle=C.trf;cx.lineWidth=2;cx.beginPath();PL.forEach((p,i)=>i?cx.lineTo(p[0]*.7,p[1]*.7):cx.moveTo(p[0]*.7,p[1]*.7));cx.closePath();cx.fillStyle=C.trf;cx.fill();cx.restore();if(V.z>6){cx.fillStyle=C.trf;cx.font='10px sans-serif';cx.fillText(a.id+' '+Math.round(a.alt/100),x+9,y+3)}});
-if(liveOk()){const[x,y]=sc(own.lon,own.lat);cx.save();cx.translate(x,y);cx.rotate(own.hdg*R);cx.beginPath();cx.arc(0,0,15,0,7);cx.strokeStyle=C.own;cx.globalAlpha=.4;cx.lineWidth=1.5;cx.stroke();cx.globalAlpha=1;cx.beginPath();PL.forEach((p,i)=>i?cx.lineTo(p[0]*1.15,p[1]*1.15):cx.moveTo(p[0]*1.15,p[1]*1.15));cx.closePath();cx.fillStyle=C.own;cx.fill();cx.strokeStyle=C.land;cx.lineWidth=1.5;cx.stroke();cx.restore()}
+if(route.length&&!CH.on&&L.rte){cx.save();cx.globalAlpha=.35;cx.strokeStyle=C.route;cx.lineWidth=12;cx.lineCap='round';cx.lineJoin='round';cx.beginPath();route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke();if(liveOk()&&route.length>1){const pr=routeProg(),pts=[route[0]];let acc=0;for(let i=0;i<route.length-1;i++){acc+=dist(route[i],route[i+1]);if(acc<pr)pts.push(route[i+1])}pts.push(pos(pr));cx.globalAlpha=.6;cx.beginPath();pts.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke()}cx.restore()
+route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat),big=/^(TOC|TOD)$/.test(p.id),r=big?6:(i===0||i===route.length-1)?5:4;cx.save();cx.translate(x,y);cx.rotate(Math.PI/4);cx.fillStyle=DKM()?'#0b1118':'#ffffff';cx.fillRect(-r,-r,r*2,r*2);cx.lineWidth=1.8;cx.strokeStyle=C.route;cx.strokeRect(-r,-r,r*2,r*2);cx.fillStyle=C.route;cx.fillRect(-r+2,-r+2,r*2-4,r*2-4);cx.restore();if(big){cx.font='bold 14px sans-serif';cx.lineWidth=3;cx.strokeStyle='rgba(0,0,0,.75)';cx.strokeText(p.id,x+11,y+18);cx.fillStyle='#fff';cx.fillText(p.id,x+11,y+18)}else if(V.z>=4||i===0||i===route.length-1){cx.font='11px sans-serif';cx.lineWidth=3;cx.strokeStyle='rgba(0,0,0,.7)';cx.strokeText(p.id,x+7,y+14);cx.fillStyle=C.route;cx.fillText(p.id,x+7,y+14)}})}
+trails();if(L.trf&&!CH.on)T.forEach(a=>{const[x,y]=sc(a.lon,a.lat);drawAircraft(a.type,x,y,a.hdg,C.trf,32);if(V.z>6){cx.fillStyle=C.trf;cx.font='10px sans-serif';cx.fillText(a.id+' '+Math.round(a.alt/100),x+12,y+4)}});
+if(liveOk()){const[x,y]=sc(own.lon,own.lat);cx.beginPath();cx.arc(x,y,19,0,7);cx.strokeStyle=C.own;cx.globalAlpha=.38;cx.lineWidth=1.5;cx.stroke();cx.globalAlpha=1;drawAircraft(live.d?.type||live.d?.aircraft||live.d?.aircraftType,x,y,own.hdg,C.own,40)}
 if(CH.on)chartFx();if(sel&&!CH.on){const q=sel.k=='own'?own:sel,[x,y]=sc(q.lon,q.lat);cx.strokeStyle=C.txt;cx.lineWidth=2;cx.beginPath();cx.arc(x,y,16+(tk?3*Math.sin(performance.now()/260):0),0,7);cx.stroke()}}
+window.addEventListener('aircraft-atlas-ready', draw);
 let last=performance.now(),lastDraw=0;
 const frameMs=1000/RP.fps;
 requestAnimationFrame(function loop(t){
@@ -513,9 +564,9 @@ requestAnimationFrame(function loop(t){
 });
 /* interaction */
 let drag=null,pinch=null;
-cv.onpointerdown=e=>{V.in=null;V.tz=null;V.anchor=null;cv.setPointerCapture(e.pointerId);drag={startX:e.clientX,startY:e.clientY,startLon:V.lon,startLat:V.lat,m:0,t:performance.now(),px:e.clientX,py:e.clientY}};
-cv.onpointermove=e=>{if(!drag||pinch)return;const nw=performance.now();if(drag.t){const k=Math.max(1,nw-drag.t);drag.vx=(e.clientX-drag.px)/k*1000;drag.vy=(e.clientY-drag.py)/k*1000}drag.t=nw;drag.px=e.clientX;drag.py=e.clientY;const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;drag.m=Math.max(drag.m,Math.hypot(dx,dy));if(drag.m>4){setFol(false);tk=false;const c0=wpx(drag.startLon,drag.startLat,V.z),p=wun(c0[0]-dx,c0[1]-dy,V.z);V.lon=p[0];V.lat=p[1]}};
-cv.onpointerup=e=>{if(drag&&drag.m>4&&drag.vx!=null&&performance.now()-drag.t<90)V.in=[drag.vx,drag.vy];if(drag&&drag.m<=4&&!pinch)tap(e.clientX,e.clientY);drag=null};
+cv.onpointerdown=e=>{V.in=null;V.tz=null;V.anchor=null;cv.setPointerCapture(e.pointerId);drag={startX:e.clientX,startY:e.clientY,startLon:V.lon,startLat:V.lat,m:0,t:performance.now(),px:e.clientX,py:e.clientY,wp:plan&&!CH.on?wpAt(e.clientX,e.clientY):-1}};
+cv.onpointermove=e=>{if(!drag||pinch)return;const nw=performance.now();if(drag.t){const k=Math.max(1,nw-drag.t);drag.vx=(e.clientX-drag.px)/k*1000;drag.vy=(e.clientY-drag.py)/k*1000}drag.t=nw;drag.px=e.clientX;drag.py=e.clientY;const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;drag.m=Math.max(drag.m,Math.hypot(dx,dy));if(drag.wp>=0&&drag.m>4){moveWp(drag.wp,e.clientX,e.clientY);return}if(drag.m>4){setFol(false);tk=false;const c0=wpx(drag.startLon,drag.startLat,V.z),p=wun(c0[0]-dx,c0[1]-dy,V.z);V.lon=p[0];V.lat=p[1]}};
+cv.onpointerup=e=>{if(drag&&drag.wp>=0&&drag.m>4){moveWp(drag.wp,e.clientX,e.clientY);save();render();drag=null;return}if(drag&&drag.m>4&&drag.vx!=null&&performance.now()-drag.t<90)V.in=[drag.vx,drag.vy];if(drag&&drag.m<=4&&!pinch&&drag.wp>=0&&route[drag.wp]){wpIdx=drag.wp;openRouteCard({kind:'wp',index:drag.wp},e.clientX,e.clientY)}else if(drag&&drag.m<=4&&!pinch)tap(e.clientX,e.clientY);drag=null};
 cv.addEventListener('touchstart',e=>{if(e.touches.length==2){drag=null;V.in=null;V.tz=null;V.anchor=null;const t1=e.touches[0],t2=e.touches[1],d=Math.max(1,Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY)),mx=(t1.clientX+t2.clientX)/2,my=(t1.clientY+t2.clientY)/2,c=wpx(V.lon,V.lat,V.z);pinch={d,mx,my,z:V.z,geo:wun(c[0]+mx-W/2,c[1]+my-H/2,V.z)}}},{passive:true});
 cv.addEventListener('touchmove',e=>{if(e.touches.length==2){const t1=e.touches[0],t2=e.touches[1],d=Math.max(1,Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY)),mx=(t1.clientX+t2.clientX)/2,my=(t1.clientY+t2.clientY)/2;if(!pinch){const c=wpx(V.lon,V.lat,V.z);pinch={d,mx,my,z:V.z,geo:wun(c[0]+mx-W/2,c[1]+my-H/2,V.z)};return}setFol(false);tk=false;const newZ=Math.max(2.5,Math.min(17.5,pinch.z+Math.log2(d/pinch.d))),pNew=wpx(pinch.geo[0],pinch.geo[1],newZ),dx=mx-W/2,dy=my-H/2,cNew=[pNew[0]-dx,pNew[1]-dy],p=wun(cNew[0],cNew[1],newZ);V.lon=p[0];V.lat=p[1];V.z=newZ}},{passive:true});
 cv.addEventListener('touchend',e=>{if(e.touches.length<2){pinch=null;drag=null}});
@@ -574,21 +625,153 @@ async function importSB(){
 $('#bPlan').onclick=()=>{plan=!plan;$('#bPlan').classList.toggle('on',plan);if(plan){panel='route';render()}};
 $('#bRoute').onclick=()=>{panel=panel=='route'?null:'route';render()};
 document.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{L[b.dataset.l]^=1;b.classList.toggle('on')});
-function tap(x,y){if(CH.on)return;let best=null,bd=28;const items=[...(L.trf?T:[]),...(L.apt?A.filter(a=>!a.x||V.z>=6):[]),...(L.nav?N:[]),...(liveOk()?[{k:'own',id:'Own-ship',...own}]:[])];
-items.forEach(o=>{const[a,b]=sc(o.lon,o.lat),d0=Math.hypot(a-x,b-y),d=o.det?Math.max(d0-(o.rpx||0),20):d0;if(d<bd){bd=d;best=o}});
-if(best){sel=best;if(plan&&(best.k=='apt'||best.k=='nav'))addWp(best);else{if(best.k=='trf'){tk=true;setFol(false)}panel='sel';render()}}
-else if(plan){const p=wun(...wpx(V.lon,V.lat).map((c,i)=>c+(i?y-H/2:x-W/2)));addWp({id:'WPT'+(route.length+1),name:'User waypoint',lat:p[1],lon:p[0],k:'fix'})}
-else{sel=null;panel=null;render()}}
+/* Traffic source. VATSIM publishes a keyless feed of its live pilots, and the
+   community ADS-B mirrors need no key either, so these are the only two
+   sources the picker offers. */
+let TRS=(()=>{try{const v=localStorage.getItem('stratos.trafficSource');return v=='adsb'?'adsb':'vatsim'}catch(_){return'vatsim'}})();
+const TR_LABEL={vatsim:'VATSIM',adsb:'ADS-B'};
+function trsLabel(){return TR_LABEL[TRS]||TRS}
+function applyTrafficSource(next,save){
+  TRS=next=='adsb'?'adsb':'vatsim';
+  if(save){try{localStorage.setItem('stratos.trafficSource',TRS)}catch(_){}}
+  T.length=0;WT.n=0;WT.fail=0;WT.src='';
+  const el=document.getElementById('trs');if(el&&el.value!=TRS)el.value=TRS;
+  if(TRS=='vatsim'){
+    startVatsimTraffic();
+    // A cached feed is applied at once; otherwise the 15 s timer is the first fetch.
+    if(vatsimFeed&&!vatsimFeed.error&&Date.now()-vatsimAt<VATSIM_TTL)vatsimTraffic();else loadVatsim().then(vatsimTraffic);
+  } else wtPoll();
+  const t=wtTxt();if(panel=='live'||panel=='sel')render();
+  const st=document.getElementById('st');if(st&&!liveOk()&&!deskStatus)st.textContent=t;
+}
+/* Index of the route waypoint under a screen point, or -1. */
+function wpAt(x,y){const r=cv.getBoundingClientRect();x-=r.left;y-=r.top;let best=-1,bd=16;route.forEach((p,i)=>{const[a,b]=sc(p.lon,p.lat),d=Math.hypot(a-x,b-y);if(d<bd){bd=d;best=i}});return best}
+/* Move one waypoint to the point under the pointer (live, no undo stack here). */
+function moveWp(i,x,y){const r=cv.getBoundingClientRect();x-=r.left;y-=r.top;const c=wpx(V.lon,V.lat,V.z);const p=wun(c[0]+x-W/2,c[1]+y-H/2,V.z);route[i]={...route[i],lat:p[1],lon:p[0]};trav=Math.min(trav,total());if(panel=='route')render()}
+/* Index of the route leg under a screen point (its start waypoint), or -1. */
+function legAt(x,y){const r=cv.getBoundingClientRect();x-=r.left;y-=r.top;let best=-1,bd=10;for(let i=0;i<route.length-1;i++){const[ax,ay]=sc(route[i].lon,route[i].lat),[bx,by]=sc(route[i+1].lon,route[i+1].lat),dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy,t=l2?Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/l2)):0,d=Math.hypot(ax+dx*t-x,ay+dy*t-y);if(d<bd){bd=d;best=i}}return best}
+/* ── Route card ──────────────────────────────────────────────────────────
+   Clicking a waypoint, or the line between two waypoints, opens a small
+   floating card next to that point. It is the only thing a route click does:
+   the sheet stays closed. Clicking empty land closes the card and any open
+   sheet, and never selects something that was not drawn. */
+let wpCard=null,cardView='';
+function fmtLat(v){return Math.abs(v).toFixed(4)+'°'+(v>=0?'N':'S')}
+function fmtLon(v){return Math.abs(v).toFixed(4)+'°'+(v>=0?'E':'W')}
+function deg(v){return v==null?'–':String(Math.round(v)%360).padStart(3,'0')+'°'}
+function cardRow(k,v){return '<dt>'+esc(k)+'</dt><dd>'+v+'</dd>'}
+function wpAltText(p){const alt=Number(p.elev)||0;if(p.k=='apt')return alt>0?Math.round(alt).toLocaleString()+' ft (field elevation)':'Not in the plan';return alt>0?Math.round(alt).toLocaleString()+' ft (planned altitude)':'Not in the plan'}
+function wpKind(p){return p.k=='apt'?'Airport':p.k=='nav'?'Navaid':'Waypoint'}
+function cumNm(i){let c=0;for(let j=1;j<=i;j++)c+=dist(route[j-1],route[j]);return c}
+function routeCardHtml(){
+  if(!wpCard)return'';
+  if(wpCard.kind=='leg'){
+    const i=wpCard.index,a=route[i],b=route[i+1];
+    if(!a||!b)return'';
+    const d=dist(a,b);
+    return '<div class="wc-top"><span class="wc-count">Leg '+(i+1)+' of '+(route.length-1)+'</span><button type="button" class="wc-x" data-wc="close" aria-label="Close">✕</button></div>'
+      +'<h4>'+esc(a.id)+' → '+esc(b.id)+'</h4>'
+      +'<dl class="wc-rows">'
+      +cardRow('Distance',d.toFixed(1)+' nm')
+      +cardRow('True course',deg(brg(a,b)))
+      +cardRow('ETE @ '+CRUISE+' kt',hm(d/CRUISE))
+      +cardRow('From altitude',wpAltText(a))
+      +cardRow('To altitude',wpAltText(b))
+      +'</dl>'
+      +'<div class="m">'+esc(a.name||a.id)+' → '+esc(b.name||b.id)+'</div>';
+  }
+  const i=wpCard.index,p=route[i];
+  if(!p)return'';
+  const prev=route[i-1],next=route[i+1],last=route.length-1;
+  const legs=[];
+  if(prev)legs.push('<li>From '+esc(prev.id)+' · '+dist(prev,p).toFixed(1)+' nm · '+deg(brg(prev,p))+' T</li>');
+  if(next)legs.push('<li>To '+esc(next.id)+' · '+dist(p,next).toFixed(1)+' nm · '+deg(brg(p,next))+' T</li>');
+  return '<div class="wc-top"><span class="wc-count">Waypoint '+(i+1)+' of '+route.length+'</span><button type="button" class="wc-x" data-wc="close" aria-label="Close">✕</button></div>'
+    +'<h4>'+esc(p.id)+'</h4>'
+    +(p.name&&p.name!=p.id?'<div class="m wc-name">'+esc(p.name)+'</div>':'')
+    +'<dl class="wc-rows">'
+    +cardRow('Identifier',esc(p.id))
+    +cardRow('Coordinates',fmtLat(p.lat)+' '+fmtLon(p.lon))
+    +cardRow('Altitude',wpAltText(p))
+    +cardRow('Distance from departure',cumNm(i).toFixed(1)+' nm')
+    +cardRow('Distance from previous',prev?dist(prev,p).toFixed(1)+' nm':'–')
+    +cardRow('Distance to next',next?dist(p,next).toFixed(1)+' nm':'–')
+    +cardRow('Type',wpKind(p))
+    +'</dl>'
+    +(legs.length?'<div class="wc-sec">Connected legs</div><ul class="wc-legs">'+legs.join('')+'</ul>':'')
+    +'<div class="wc-btns">'
+    +'<button type="button" data-wc="up"'+(i>0?'':' disabled')+'>Move up</button>'
+    +'<button type="button" data-wc="down"'+(i<last?'':' disabled')+'>Move down</button>'
+    +'<button type="button" data-wc="direct" title="Drop the intermediate waypoints and fly direct to this point"'+(i>0&&i<last?'':' disabled')+'>Direct</button>'
+    +'<button type="button" class="wc-del" data-wc="delete">Delete</button>'
+    +'</div>';
+}
+function positionRouteCard(){
+  const el=document.getElementById('wpcard'),host=$('#app');
+  if(!el||!wpCard||!host)return;
+  const [sx,sy]=sc(wpCard.anchor.lon,wpCard.anchor.lat);
+  const bw=el.offsetWidth||320,bh=el.offsetHeight||0,rw=host.clientWidth,rh=host.clientHeight;
+  let left=sx+22,top=sy-16;
+  if(left+bw>rw-8)left=sx-bw-22;
+  if(top+bh>rh-8)top=rh-bh-8;
+  el.style.left=Math.max(8,Math.min(left,Math.max(8,rw-bw-8)))+'px';
+  el.style.top=Math.max(8,Math.min(top,Math.max(8,rh-bh-8)))+'px';
+}
+function paintRouteCard(){
+  const host=$('#app');if(!host)return;
+  let el=document.getElementById('wpcard');
+  const html=routeCardHtml();
+  if(!wpCard||!html){if(el)el.remove();return}
+  if(!el){el=document.createElement('div');el.id='wpcard';el.setAttribute('role','dialog');host.appendChild(el)}
+  el.innerHTML=html;
+  positionRouteCard();
+}
+function openRouteCard(card,x,y){
+  const host=$('#app'),r=host.getBoundingClientRect();
+  const p=card.kind=='leg'?route[card.index]:route[card.index];
+  if(!p)return;
+  wpCard={...card,anchor:{lat:p.lat,lon:p.lon},click:{x:x-r.left,y:y-r.top}};
+  paintRouteCard();
+  const el=document.getElementById('wpcard');
+  if(el&&wpCard.click){/* the click point wins over the marker while it is visible */
+    const bw=el.offsetWidth||320,bh=el.offsetHeight||0;
+    let left=wpCard.click.x+18,top=wpCard.click.y+14;
+    if(left+bw>r.width-8)left=Math.max(8,wpCard.click.x-bw-18);
+    if(top+bh>r.height-8)top=Math.max(8,r.height-bh-8);
+    el.style.left=Math.max(8,Math.min(left,r.width-bw-8))+'px';
+    el.style.top=Math.max(8,Math.min(top,r.height-bh-8))+'px';
+  }
+}
+function closeRouteCard(){wpCard=null;paintRouteCard()}
+function routeCardAction(act){
+  if(act=='close'){closeRouteCard();return}
+  const c=wpCard;if(!c)return;
+  if(act=='delete'){route.splice(c.index,1);trav=Math.min(trav,total());save();closeRouteCard();if(panel=='route'||panel=='fsum')render();return}
+  if(act=='up'){const i=c.index;if(i<=0)return;const t=route[i-1];route[i-1]=route[i];route[i]=t;c.index=i-1;c.anchor={lat:route[i-1].lat,lon:route[i-1].lon};save();paintRouteCard();if(panel=='route')render();return}
+  if(act=='down'){const i=c.index;if(i>=route.length-1)return;const t=route[i+1];route[i+1]=route[i];route[i]=t;c.index=i+1;c.anchor={lat:route[i+1].lat,lon:route[i+1].lon};save();paintRouteCard();if(panel=='route')render();return}
+  if(act=='direct'){const i=c.index;if(i<=0||i>=route.length-1)return;if(!confirm('Drop the intermediate waypoints and fly direct to this point?'))return;route=[route[0],route[i]];trav=Math.min(trav,total());save();closeRouteCard();if(panel=='route'||panel=='fsum')render()}
+}
+$('#app').addEventListener('click',e=>{const b=e.target.closest('[data-wc]');if(!b||!wpCard)return;routeCardAction(b.dataset.wc)});
+addEventListener('keydown',e=>{if(e.key=='Escape'&&wpCard)closeRouteCard()});
+function tap(x,y){if(CH.on)return;const rect=cv.getBoundingClientRect();
+if(route.length&&L.rte){const wi=wpAt(x,y);if(wi>=0){wpIdx=wi;openRouteCard({kind:'wp',index:wi},x,y);return}const li=legAt(x,y);if(li>=0){wpIdx=li;openRouteCard({kind:'leg',index:li},x,y);return}}
+closeRouteCard();wpIdx=null;sel=null;
+x-=rect.left;y-=rect.top;let best=null,bestD=Infinity;
+const items=[...(L.trf?T.map(o=>[o,18]):[]),...(L.apt?A.filter(a=>!a.x||V.z>=6).map(o=>[o,14]):[]),...(L.nav&&V.z>=6?N.map(o=>[o,12]):[]),...(liveOk()?[[{k:'own',id:'Own-ship',...own},22]]:[])];
+items.forEach(([o,rad])=>{const[a,b]=sc(o.lon,o.lat);let d=Math.hypot(a-x,b-y);if(o.det&&o.rpx)d=Math.max(d-o.rpx,0);if(d<=rad&&d<bestD){bestD=d;best=o}});
+if(best){sel=best;if(best.k=='trf'){tk=true;setFol(false)}panel='sel';render()}
+else{panel=null;render()}}
 /* search */
 $('#q').oninput=e=>{const q=e.target.value.trim().toLowerCase(),r=$('#res');if(!q){r.style.display='none';return}
 const m=[...A,...N].filter(o=>o.id.toLowerCase().includes(q)||o.name.toLowerCase().includes(q)).sort((a,b)=>b.id.toLowerCase().startsWith(q)-a.id.toLowerCase().startsWith(q)).slice(0,8);
 r.innerHTML=m.map(o=>`<div data-id="${esc(o.id)}" data-k="${esc(o.k)}"><b>${esc(o.id)}</b> ${esc(o.name)} <span class="m">${o.k=='apt'?'airport':esc(o.type||'')}</span></div>`).join('')||'<div class="m">No match in bundled data</div>';r.style.display='block'};
 $('#res').onclick=e=>{const d=e.target.closest('[data-id]');if(!d)return;const o=[...A,...N].find(x=>x.id==d.dataset.id&&x.k==d.dataset.k);setFol(false);V.lon=o.lon;V.lat=o.lat;V.tz=null;V.z=o.k=='apt'?11.5:9;sel=o;panel='sel';$('#res').style.display='none';$('#q').value='';render();if(o.k=='apt')openCharts(o)};
 /* flight summary: built from the route and the saved SimBrief plan (flightpanel.js) */
-function fsumHtml(){const stored=window.FP?FP.loadOfp(localStorage):null;const metars={};A.forEach(a=>{if(a.metar&&a.mt)metars[a.id]={metar:a.metar,fetchedAt:a.mt,source:'METAR'}});const position=liveOk()?{lat:own.lat,lon:own.lon}:null;const body=window.FP?FP.flightSummaryHtml({route,ofp:stored?stored.ofp:null,cruiseKts:CRUISE,weightUnit:'kg',metars,position}):'<div class="m">The summary is still loading. Try again in a moment.</div>';return'<h3>Flight summary</h3>'+body+'<div class="row"><button onclick="fsRefresh()">Refresh OFP</button><button onclick="panel=\'route\';render()">Back to route</button></div>'}
+let fsTab='overview';
+function fsumHtml(){const stored=window.FP?FP.loadOfp(localStorage):null;const metars={};A.forEach(a=>{if(a.metar&&a.mt)metars[a.id]={metar:a.metar,fetchedAt:a.mt,source:'METAR'}});const position=liveOk()?{lat:own.lat,lon:own.lon}:null;const body=window.FP?FP.flightSummaryHtml({route,ofp:stored?stored.ofp:null,cruiseKts:CRUISE,weightUnit:'kg',metars,position,tab:fsTab}):'<div class="m">The summary is still loading. Try again in a moment.</div>';return'<h3>Flight summary</h3>'+body+'<div class="row"><button onclick="fsRefresh()">Refresh OFP</button><button onclick="panel=\'route\';render()">Back to route</button></div>'}
 async function fsRefresh(){await importSB();panel='fsum';render()}
 function fsFocus(id){const p=route.find(x=>x.id==id)||[...A,...N].find(x=>x.id==id);if(!p)return;setFol(false);V.lon=p.lon;V.lat=p.lat;V.tz=null;if(p.k=='apt')V.z=Math.max(V.z,11.5);if(innerWidth<768)panel=null;render()}
-$('#sheet').addEventListener('click',e=>{const b=e.target.closest('[data-fs-focus]');if(b)fsFocus(b.dataset.fsFocus)});
+$('#sheet').addEventListener('click',e=>{const b=e.target.closest('[data-fs-focus]');if(b){fsFocus(b.dataset.fsFocus);return}const t=e.target.closest('[data-ov-tab]');if(t){fsTab=t.dataset.ovTab;panel='fsum';render()}});
 /* panels */
 function wind(m){const r=m.match(/(\d{3}|VRB)(\d{2,3})(G(\d{2,3}))?KT/);return r?{d:r[1]=='VRB'?null:+r[1],s:+r[2],g:r[4]?+r[4]:0}:null}
 function rwTable(a){const w=wind(a.metar);if(!w)return'<div class="m">No wind data without a live METAR.</div>';if(w.d==null)return'<div class="m">Variable wind – no component.</div>';const sp=Math.max(w.s,w.g);let h='<table><tr><th>Runway</th><th>Head/tail</th><th>Cross</th></tr>';
@@ -618,8 +801,6 @@ if(w&&w.d!=null)s+=`<g transform="translate(60 56)" fill="${C.route}"><g transfo
 s+=`<line x1="30" y1="568" x2="${30+1000*(a.rws&&a._k?a._k:k)}" y2="568" stroke="${C.txt}" stroke-width="3"/><text x="30" y="556" font-size="13" fill="${C.txt}">1000 ft</text></svg>`;
 const el=$('#chart');el.innerHTML=`<div class="row" style="justify-content:space-between;margin:0 0 6px"><div><h3>${a.id} · ${a.name}</h3><div class="m">Elev ${a.elev} ft · TWR ${a.twr} · ATIS ${a.atis}</div></div><button onclick="closeChart()">Close</button></div>${s}<code>${a.metar}</code><div class="m">${mAge(a)}</div>${rwTable(a)}<div class="m">${pr.map((p,i)=>pad(p[0])+'/'+pad(p[1])+' · '+(ln[i]||'?')+' ft').join('  |  ')}</div>${faaHtml(a)}<div class="row"><button onclick="chartMap()">Show on map</button><button onclick="addSel();closeChart()">Add to route</button></div><div class="m" style="margin-top:8px">Runway diagram. Positions are real only when connected through the bridge; otherwise runways are centered schematically. Not for navigation.</div>`;el.style.display='block';el.scrollTop=0}
 var tk=false;
-function planeHtml(o){return `<h3>${o.id}</h3><div class="m">${o.k=='own'?'Your aircraft ('+((live.d&&live.d.src)||'simulator')+')':'Live ADS-B traffic'+(o.cc?' - '+o.cc:'')}</div><div id="pv"></div><div class="row">${o.k=='trf'?`<button onclick="tk=!tk;if(tk)setFol(false);render()" class="${tk?'on':''}">${tk?'Tracking (tap to stop)':'Track this aircraft'}</button>`:''}<button onclick="panel=null;sel=null;tk=false;render()">Close</button></div>`}
-function updPl(){const e=$('#pv');if(!e||!sel)return;const o=sel.k=='own'?{...own,gs:live.d?live.d.gs:0}:sel,r=(a,b,u)=>`<tr><td>${a}</td><td><b>${b}</b> ${u}</td></tr>`;e.innerHTML='<table>'+r('Altitude',Math.round(o.alt/10)*10,'ft')+r('Ground speed',Math.round(o.gs||0),'kt')+r('Heading',String(Math.round(o.hdg+360)%360).padStart(3,'0'),'deg')+(o.vs!=null?r('Vertical speed',Math.round(o.vs/10)*10,'fpm'):'')+(sel.k=='trf'&&liveOk()?r('Distance from you',Math.round(dist(own,o)),'nm'):'')+'</table>'}
 function hs(s){let h=7;for(const c of s)h=(h*31+c.charCodeAt(0))>>>0;return h}
 /* Original procedural airport layouts: runways from data, taxiways/aprons/terminals generated */
 function layout(a){const pr=pairs(a),ln=RL[a.id]||[],H0=hs(a.id),g={rw:[],tw:[],ap:null},L0=ln[0]||8000,q=pr[0][0]*10*R,u0=[Math.sin(q),Math.cos(q)];
@@ -827,11 +1008,26 @@ const tx='Imagery © Esri, Maxar, Earthstar Geographics';cx.font='10px sans-seri
 var fcS='',aTab='info';
 function routeProg(){let best=1e9,acc=0,at=0;for(let i=0;i<route.length-1;i++){const a=route[i],b=route[i+1],L2=dist(a,b),k=Math.cos(a.lat*R),bx=(b.lon-a.lon)*k*60,by=(b.lat-a.lat)*60,px=(own.lon-a.lon)*k*60,py=(own.lat-a.lat)*60,d2=bx*bx+by*by||1e-9,t=Math.max(0,Math.min(1,(px*bx+py*by)/d2)),dd=Math.hypot(px-bx*t,py-by*t);if(dd<best){best=dd;at=acc+t*L2}acc+=L2}return at}
 
+/* VATSIM online ATC for an airport: confirmed positions and inferred centers (lib/vatsim.js). */
+const VATSIM_URL='https://data.vatsim.net/v3/vatsim-data.json',VATSIM_TTL=15000;
+let vatsimFeed=null,vatsimAt=0;
+async function loadVatsim(){if(vatsimFeed&&Date.now()-vatsimAt<VATSIM_TTL)return vatsimFeed;try{const r=await fetch(location.protocol=='https:'?'/api/traffic?url='+encodeURIComponent(VATSIM_URL):VATSIM_URL);if(!r.ok)throw new Error('HTTP '+r.status);vatsimFeed=await r.json();vatsimAt=Date.now();return vatsimFeed}catch(e){vatsimFeed={error:e.message||'unreachable'};vatsimAt=Date.now();return vatsimFeed}}
+/* VATSIM pilots go into the same traffic list the map already draws, marked by source. */
+let vatsimTimer=null;
+/* The VATSIM parser is a module, so it is not on window yet while this classic
+   script runs. A tick that arrives first waits for it instead of throwing. */
+function startVatsimTraffic(){if(vatsimTimer)return;const tick=()=>{if(TRS!='vatsim')return;if(!window.VATSIM){setTimeout(tick,200);return}loadVatsim().then(vatsimTraffic)};tick();vatsimTimer=setInterval(tick,VATSIM_TTL)}
+/* Only pilots in or just outside the view are kept, so the map stays readable
+   and the badge counts what is actually on screen. The next poll fills in the
+   view after a pan; nothing is invented for gaps. */
+function vatsimTraffic(){for(let i=T.length-1;i>=0;i--)if(T[i].source=='vatsim')T.splice(i,1);if(TRS!='vatsim'||!vatsimFeed||vatsimFeed.error||!window.VATSIM){WT.n=T.length;return}const pilots=window.VATSIM.parsePilots(vatsimFeed);const pad=.75,inView=p=>{if(!W||!H)return true;const[x,y]=sc(p.lon,p.lat);return x>=-W*pad&&x<=W*(1+pad)&&y>=-H*pad&&y<=H*(1+pad)};pilots.filter(inView).forEach(p=>{T.push({k:'trf',seen:vatsimAt,source:'vatsim',id:p.id,lat:p.lat,lon:p.lon,alt:p.alt==null?0:p.alt,gs:p.gs==null?0:p.gs,hdg:p.hdg,hx:p.id,type:p.aircraft})});WT.n=T.length;WT.src='vatsim'}
+function vatsimHtml(o){if(!window.VATSIM)return'<div class="m">VATSIM: the parser is still loading.</div>';if(!vatsimFeed)return'<div class="m">VATSIM: loading online controllers…</div>';if(vatsimFeed.error)return'<div class="m">VATSIM feed unavailable ('+vatsimFeed.error+'). Controllers are not shown.</div>';const cov=window.VATSIM.airportCoverage(window.VATSIM.parseControllers(vatsimFeed),o.id);if(!cov.hasCoverage)return'<div class="m">No VATSIM controllers online for '+o.id+'.</div>';const row=c=>'<tr><td>'+c.callsign+'</td><td>'+c.facility.label+'</td><td>'+c.frequency+'</td></tr>';return'<div class="vatsim-online"><h3>Online ATC</h3><table><tr><th>Position</th><th>Level</th><th>Frequency</th></tr>'+cov.confirmed.map(row).join('')+'</table><div class="m">Positions named for this airport. Live from data.vatsim.net, refreshed every 15 s.</div></div>'}
 function aptHtml(o){const tb=[['info','Info'],['wx','Weather'],['ch','Charts']];
-let h='<div class="ah"><div><b class="ic">'+o.id+'</b><div class="m">'+o.name+'</div></div><div class="chips"><span>'+o.elev+' ft</span>'+(liveOk()?'<span>'+Math.round(dist(own,o))+' nm</span>':'')+'</div></div><div class="seg">'+tb.map(t=>'<button class="'+(aTab==t[0]?'on':'')+'" data-t="'+t[0]+'" onclick="aTab=this.dataset.t;render()">'+t[1]+'</button>').join('')+'</div>';
+let h='<div class="ah"><div><b class="ic">'+o.id+'</b><div class="m">'+o.name+'</div></div><div class="chips"><span>'+o.elev+' ft</span>'+(liveOk()?'<span>'+Math.round(dist(own,o))+' nm</span>':'')+'</div></div><div id="vatsim-apt">'+vatsimHtml(o)+'</div><div class="seg">'+tb.map(t=>'<button class="'+(aTab==t[0]?'on':'')+'" data-t="'+t[0]+'" onclick="aTab=this.dataset.t;render()">'+t[1]+'</button>').join('')+'</div>';
 if(aTab=='wx')return h+'<code>'+o.metar+'</code><div class="m">'+dec(o.metar)+'</div><div class="m">'+mAge(o)+'</div>'+rwTable(o);
 if(aTab=='ch')return h+chBody(o);
 h+='<table><tr><td>Tower</td><td>'+o.twr+'</td></tr><tr><td>ATIS</td><td>'+o.atis+'</td></tr><tr><td>Position</td><td>'+o.lat.toFixed(4)+', '+o.lon.toFixed(4)+'</td></tr></table>';
+if(!vatsimFeed||Date.now()-vatsimAt>=VATSIM_TTL)loadVatsim().then(()=>{const el=document.getElementById('vatsim-apt');if(el&&sel==o)el.innerHTML=vatsimHtml(o)});
 if(o.rws&&o.rws.length)h+='<table><tr><th>Runway</th><th>Length</th><th>Width</th></tr>'+o.rws.map(r=>'<tr><td>'+r[0]+' / '+r[1]+'</td><td>'+r[6]+' ft</td><td>'+(r[7]||'-')+' ft</td></tr>').join('')+'</table>';
 else h+='<div class="m">Runway positions load from the airport database (needs internet or the data pack).</div>';
 return h+'<div class="row"><button onclick="addSel()">Add to route</button><button onclick="chartMap()">Zoom in</button><button class="on" onclick="openTaxiChart(sel)">Taxi Chart</button><button onclick="openCharts(sel)">All Charts</button></div>'}
@@ -840,7 +1036,6 @@ function chartMap(){closeChart();setFol(false);V.lon=sel.lon;V.lat=sel.lat;V.tz=
 /* X-Plane live link */
 function liveStep(dt){T.forEach(a=>{if(Date.now()-(a.seen||0)<45000){const p=fwd(a,a.hdg,a.gs/3600*dt);a.lat=p.lat;a.lon=p.lon}});if(tk&&sel&&sel.k=='trf'){V.lon=sel.lon;V.lat=sel.lat}if(panel=='sel'&&sel&&(sel.k=='trf'||sel.k=='own')&&(live.f=(live.f||0)+1)%10==0)updPl();const d=live.d;own.lat=d.lat;own.lon=d.lon;trlAdd('own',d.lat,d.lon,d.alt,8000);own.hdg=d.hdg||0;own.alt=d.alt;own.vs=d.vs||0;const gs=d.gs||0,el=route.length?dist(own,route.at(-1)):NaN;
 $('#tGS').textContent=Math.round(gs);$('#tAL').textContent=Math.round(own.alt);$('#tHD').textContent=String(Math.round(own.hdg+360)%360).padStart(3,'0');$('#tVS').textContent=Math.round(own.vs/10)*10;$('#tDS').textContent=isFinite(el)?el.toFixed(1):'–';$('#tEt').textContent=isFinite(el)&&gs>30?hm(el/gs):'–';if(V.fol){V.lon=own.lon;V.lat=own.lat}}
-function getMetar(a){if(location.protocol!='http:'||(a.mf&&Date.now()-a.mf<600000))return;a.mf=Date.now();fetch('/metar?ids='+a.id).then(r=>r.text()).then(t=>{t=t.trim().split('\n')[0];if(t){a.metar=t;a.mt=Date.now();if(panel=='sel'&&sel==a)render();if($('#chart').style.display=='block'&&sel==a)openChart(a)}}).catch(()=>{})}
 let wxList=[];try{wxList=JSON.parse(localStorage.getItem('dl.wx')||'[]')}catch(_){}
 function wxAdd(a){if(!wxList.includes(a.id)){wxList.unshift(a.id);wxList=wxList.slice(0,8);try{localStorage.setItem('dl.wx',JSON.stringify(wxList))}catch(_){}}}
 function mRef(a){if(CH.on&&CH.a===a)chHead();if(panel=='sel'&&sel==a)render();if($('#chart').style.display=='block'&&sel==a)openChart(a)}
@@ -924,7 +1119,7 @@ for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++)jobs.push([x,y]);
 let out=[],bad=0;
 for(let i=0;i<jobs.length;i+=6)await Promise.all(jobs.slice(i,i+6).map(async([x,y])=>{try{const r=await fetch(OFMT.replace('{z}',z).replace('{x}',x).replace('{y}',y));if(!r.ok)return;let b=await r.arrayBuffer();const u=new Uint8Array(b);if(u[0]==31&&u[1]==139)b=await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();out=out.concat(mvtAero(b,z,x,y))}catch(e){bad++}}));
 if(!out.length){a.err=bad?'map tiles unreachable':'no airfield data in tiles';return null}return out}catch(e){a.err='map tiles: '+((e&&e.message)||e);return null}}
-function connect(base){disc();live.on=true;fetch(base+'/airports.json').then(r=>r.json()).then(l=>{l.forEach(a=>{const e=A.find(z=>z.id==a[0]);if(e){e.rws=a[7];e._rl=null;e.lat=a[2];e.lon=a[3];e.elev=a[4];e.rw=a[5];RL[a[0]]=a[6];e.twr=(a[8]||{}).TWR||'—';e.atis=(a[8]||{}).ATIS||'—';e.fqs=a[8]||{};return}A.push({rws:a[7],k:'apt',x:1,id:a[0],name:a[1],lat:a[2],lon:a[3],elev:a[4],rw:a[5],twr:(a[8]||{}).TWR||'—',atis:(a[8]||{}).ATIS||'—',fqs:a[8]||{},metar:'No METAR loaded'});RL[a[0]]=a[6]})}).catch(()=>{});fetch(base+'/navaids.json').then(r=>r.json()).then(l=>{N.length=0;l.forEach(n=>N.push({k:'nav',id:n[0],name:n[1],type:n[2],lat:n[3],lon:n[4],freq:n[5]}))}).catch(()=>{});try{live.es=new EventSource(base+'/stream');live.es.onmessage=e=>{try{live.d=JSON.parse(e.data);live.at=performance.now();if(live.d.trt!==live.trt){live.trt=live.d.trt;T.length=0;(live.d.tr||[]).forEach(a=>{T.push({k:'trf',seen:Date.now(),...a});trlAdd(a.hx||a.id,a.lat,a.lon,a.alt,400)});if(sel&&sel.k=='trf'){const n=T.find(a=>a.id==sel.id);if(n)sel=n}}if(live.d.lat!=null&&!live.seen){live.seen=1;V.lon=live.d.lon;V.lat=live.d.lat;V.tz=null;V.z=Math.max(V.z,9);setFol(true);if(panel=='live')render()}}catch(_){}}}catch(_){live.on=false}$('#bLive').classList.add('on');loadDescentRate()}
+function connect(base){disc();live.on=true;startVatsimTraffic();fetch(base+'/airports.json').then(r=>r.json()).then(l=>{l.forEach(a=>{const e=A.find(z=>z.id==a[0]);if(e){e.rws=a[7];e._rl=null;e.lat=a[2];e.lon=a[3];e.elev=a[4];e.rw=a[5];RL[a[0]]=a[6];e.twr=(a[8]||{}).TWR||'—';e.atis=(a[8]||{}).ATIS||'—';e.fqs=a[8]||{};return}A.push({rws:a[7],k:'apt',x:1,id:a[0],name:a[1],lat:a[2],lon:a[3],elev:a[4],rw:a[5],twr:(a[8]||{}).TWR||'—',atis:(a[8]||{}).ATIS||'—',fqs:a[8]||{},metar:'No METAR loaded'});RL[a[0]]=a[6]})}).catch(()=>{});fetch(base+'/navaids.json').then(r=>r.json()).then(l=>{N.length=0;l.forEach(n=>N.push({k:'nav',id:n[0],name:n[1],type:n[2],lat:n[3],lon:n[4],freq:n[5]}))}).catch(()=>{});try{live.es=new EventSource(base+'/stream');live.es.onmessage=e=>{try{live.d=JSON.parse(e.data);live.at=performance.now();if(live.d.trt!==live.trt){live.trt=live.d.trt;T.length=0;(live.d.tr||[]).forEach(a=>{T.push({k:'trf',seen:Date.now(),...a});trlAdd(a.hx||a.id,a.lat,a.lon,a.alt,400)});if(sel&&sel.k=='trf'){const n=T.find(a=>a.id==sel.id);if(n)sel=n}}if(live.d.lat!=null&&!live.seen){live.seen=1;V.lon=live.d.lon;V.lat=live.d.lat;V.tz=null;V.z=Math.max(V.z,9);setFol(true);if(panel=='live')render()}}catch(_){}}}catch(_){live.on=false}$('#bLive').classList.add('on');loadDescentRate()}
 function disc(){if(live.es)live.es.close();live.on=false;live.d=null;live.seen=0;$('#bLive').classList.remove('on');if(panel=='live')render()}
 function liveHtml(){const web=location.protocol=='http:'||location.protocol=='file:',ok=liveOk(),lb=location.protocol=='http:'?location.origin:'http://127.0.0.1:8765';return `<h3>Live tracking</h3><div class="m"><b>Traffic:</b> ${wtTxt()}${WT.src?' via '+WT.src:''}. Live aircraft load automatically in Stratos; no Python process is needed for public traffic.</div><div class="m" style="margin-top:8px"><b>Simulator link (optional)</b></div><div class="m">${ok?'● Receiving live data from the simulator':live.on?'Connected to bridge, waiting for simulator data…':'Not connected'}</div>`+(web?'':'<div class="m" style="margin-top:6px">This hosted copy cannot reach your PC. Use the bridge address in step 4 instead.</div>')+'<div class="m">To see your own aircraft from X-Plane or MSFS 2020/2024, run the Stratos bridge on your PC.</div><ol class="m" style="padding-left:18px"><li>The Stratos desktop app starts the bridge for you. Manual start: <b>python stratos_bridge.py</b>. For MSFS 2020/2024, run it on the same Windows PC as the sim after a one-time <b>pip install SimConnect</b>, then start a flight. No other MSFS setup.</li><li>X-Plane only: Settings → Data Output: tick “Network via UDP” for rows 3, 17 and 20</li><li>X-Plane only: tick “Send network data output”, enter the IP the bridge prints, port 49003</li><li>On iPhone Safari open <b>http://PC-IP:8765</b>, then Share → Add to Home Screen</li></ol>'+(web?'<div class="row"><button onclick="connect(\''+lb+'\')">Reconnect</button><button onclick="disc()">Disconnect</button></div>':'')}
 $('#bLive').onclick=()=>{panel=panel=='live'?null:'live';render()};
@@ -938,20 +1133,29 @@ render();
 function mAge(a){return a.mt?'Live METAR, checked '+new Date(a.mt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' (updates every 5 min)':(a.me||'Loading METAR...')}
 setInterval(()=>{A.forEach(a=>{if(a.mf&&Date.now()-a.mf>=300000)getMetar(a)})},60000);
 
-/* Stratos: built-in live ADS-B traffic, no bridge needed. Real data only: nothing is simulated. */
+/* Stratos: built-in live ADS-B traffic, no bridge needed. Real data only: nothing is simulated.
+   Mirrors are tried in order. adsb.one and airplanes.live answer 403 to every
+   request from a server (checked with a browser user agent too), so they were
+   two guaranteed failures per poll and are no longer queried. */
 const WSRC=[
 {n:'adsb.fi',u:(la,lo,r)=>'https://opendata.adsb.fi/api/v2/lat/'+la+'/lon/'+lo+'/dist/'+r,p:wtAdsb},
-{n:'adsb.one',u:(la,lo,r)=>'https://api.adsb.one/v2/point/'+la+'/'+lo+'/'+r,p:wtAdsb},
 {n:'adsb.lol',u:(la,lo,r)=>'https://api.adsb.lol/v2/point/'+la+'/'+lo+'/'+r,p:wtAdsb},
-{n:'airplanes.live',u:(la,lo,r)=>'https://api.airplanes.live/v2/point/'+la+'/'+lo+'/'+r,p:wtAdsb},
 {n:'OpenSky',u:(la,lo,r)=>{const dl=r/60,dn=dl/Math.max(.2,Math.cos(la*R));return'https://opensky-network.org/api/states/all?lamin='+(la-dl).toFixed(2)+'&lomin='+(lo-dn).toFixed(2)+'&lamax='+(la+dl).toFixed(2)+'&lomax='+(lo+dn).toFixed(2)},p:wtSky}];
-function wtUrl(u){return location.protocol=='https:'?'/api/traffic?url='+encodeURIComponent(u):u}
-function wtAdsb(j){return j&&Array.isArray(j.ac)?j.ac.filter(a=>a.lat!=null&&a.lon!=null&&a.alt_baro!='ground').slice(0,400).map(a=>({hx:a.hex,id:((a.flight||'').trim()||a.r||a.hex||'?').toUpperCase(),lat:a.lat,lon:a.lon,hdg:a.track??a.true_heading??0,gs:a.gs||0,alt:typeof a.alt_baro=='number'?a.alt_baro:0,vs:a.baro_rate||0,cc:[a.t,a.r].filter(Boolean).join(' · ')})):null}
+/* The ADS-B mirrors send no CORS headers, so a browser cannot read them from a
+   plain http origin. The hosted build and the local dev server (npm run dev)
+   answer /api/traffic and fetch them server-side; the desktop app injects the
+   headers itself. Probe once, then take whichever path exists. */
+let wtProxy=null;
+function wtApi(u){return'/api/traffic?url='+encodeURIComponent(u)}
+async function wtUseProxy(){if(wtProxy!==null)return wtProxy;if(location.protocol=='https:'){wtProxy=true;return true}try{const r=await fetch('/api/traffic',{cache:'no-store'});wtProxy=r.status==400}catch(_){wtProxy=false}return wtProxy}
+function wtAdsb(j){const ac=j&&(j.ac||j.aircraft);return Array.isArray(ac)?ac.filter(a=>a.lat!=null&&a.lon!=null&&a.alt_baro!='ground').slice(0,400).map(a=>({hx:a.hex,id:((a.flight||'').trim()||a.r||a.hex||'?').toUpperCase(),lat:a.lat,lon:a.lon,hdg:a.track??a.true_heading??0,gs:a.gs||0,alt:typeof a.alt_baro=='number'?a.alt_baro:0,vs:a.baro_rate||0,cc:[a.t,a.r].filter(Boolean).join(' · ')})):null}
 function wtSky(j){return j&&Array.isArray(j.states)?j.states.filter(s=>s[5]!=null&&s[6]!=null&&!s[8]).slice(0,400).map(s=>({hx:s[0],id:((s[1]||'').trim()||s[0]).toUpperCase(),lon:s[5],lat:s[6],alt:Math.round((s[7]||0)*3.281),gs:Math.round((s[9]||0)*1.944),hdg:s[10]||0,vs:Math.round((s[11]||0)*196.85),cc:s[2]||''})):(j&&j.states===null?[]:null)}
-function wtTxt(){return WT.n?'● Live traffic · '+WT.n+' aircraft':live.on?'Connecting…':WT.busy?'Loading traffic…':WT.fail>=2?'Live traffic unavailable (check your connection)':'No traffic in view'}
+function wtTxt(){if(TRS=='vatsim'){if(WT.n)return'● VATSIM · '+WT.n+' pilot'+(WT.n==1?'':'s');if(vatsimFeed&&vatsimFeed.error)return'VATSIM unavailable ('+vatsimFeed.error+')';return vatsimFeed&&!vatsimFeed.error?'No VATSIM pilots in view':'Loading VATSIM…'}const hint=wtProxy===false&&location.protocol=='http:';
+return WT.n?'● Live ADS-B · '+WT.n+' aircraft':WT.busy?'Loading traffic…':WT.fail>=2?(hint?'Live ADS-B needs the dev server (npm run dev) or the desktop app':'Live ADS-B unavailable (check your connection)'):live.on?'Connecting…':'No traffic in view'}
 function wtMerge(l){const m=new Map(T.map(a=>[a.hx,a])),n=[];l.forEach(o=>{o.seen=Date.now();trlAdd(o.hx,o.lat,o.lon,o.alt,400);const a=m.get(o.hx);if(a){Object.assign(a,o);n.push(a)}else n.push({k:'trf',...o})});if(sel&&sel.k=='trf'&&!n.includes(sel))n.push(sel);T.length=0;n.forEach(a=>T.push(a));WT.n=T.length;trlGC()}
-async function wtPoll(){if(WT.busy||document.hidden||liveOk())return;WT.busy=1;const la=+V.lat.toFixed(3),lo=+V.lon.toFixed(3),r=Math.min(250,Math.max(25,Math.ceil(Math.hypot(W,H)/2*40075016*Math.cos(la*R)/(SZ*2**V.z)/1852)));let l=null;
-for(const sr of WSRC){try{const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),8000),x=await fetch(wtUrl(sr.u(la,lo,r)),{signal:ac.signal});clearTimeout(tm);if(!x.ok)continue;l=sr.p(await x.json());if(l){WT.src=sr.n;break}}catch(_){}}
+async function wtPoll(){if(TRS!='adsb'||WT.busy||document.hidden||liveOk())return;WT.busy=1;const la=+V.lat.toFixed(3),lo=+V.lon.toFixed(3),r=Math.min(250,Math.max(25,Math.ceil(Math.hypot(W,H)/2*40075016*Math.cos(la*R)/(SZ*2**V.z)/1852)));let l=null;
+const via=await wtUseProxy();
+for(const sr of WSRC){try{const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),8000),u=sr.u(la,lo,r),x=await fetch(via?wtApi(u):u,{signal:ac.signal});clearTimeout(tm);if(!x.ok)continue;l=sr.p(await x.json());if(l){WT.src=sr.n;break}}catch(_){}}
 WT.busy=0;if(liveOk())return;if(l){WT.fail=0;WT.okAt=Date.now();wtMerge(l)}else{if(++WT.fail>=2&&Date.now()-(WT.okAt||0)>120000){T.length=0;WT.n=0}}const t=wtTxt();if(panel=='live'&&t!=WT.last)render();WT.last=t}
 function wtStep(dt){if(!T.length)return;T.forEach(a=>{if(a.gs>30&&Date.now()-(a.seen||0)<45000){const p=fwd(a,a.hdg,a.gs/3600*dt);a.lat=p.lat;a.lon=p.lon}});if(tk&&sel&&sel.k=='trf'){V.lon=sel.lon;V.lat=sel.lat}if(panel=='sel'&&sel&&sel.k=='trf'&&(WT.f=(WT.f||0)+1)%30==0)updPl()}
 Object.assign(RL,{RJTT:[8202,8202,11024],RJAA:[13123],RJBB:[13125],RJCC:[9843],RJFF:[9383],ROAH:[9843],RKSI:[12303,13123],RKSS:[10500],RCTP:[12467],ZBAA:[12467,12467],ZSPD:[11811,13123],ZGGG:[12467,12467],VHHH:[12467],WSSS:[13123],WMKK:[13123,13123],VTBS:[13123],VTBD:[12139],WIII:[9843,12008],WADD:[9843],RPLL:[11004,7200],VVTS:[10171],VVNB:[12467],VIDP:[9229,12500,14534],VABB:[11336,7454],VOBL:[13123],VOMM:[10000,7500],VECC:[11900],VCBI:[11001],VGHS:[10500],VNKT:[10007],OPKC:[10000],OPLA:[11500],OMDB:[14764],OMAA:[13123],OTHH:[16000],OERK:[13796],OEJN:[13123],LLBG:[9000,10800],SBGR:[12139],SBSP:[6365],SBKP:[10630],SBGL:[13123,10827],SBRJ:[4347],SBBR:[10827],SBCF:[9843],SBSV:[10827],SBRF:[10171],SBFZ:[8858],SBPA:[7546],SBCT:[7218],SAEZ:[10827,10187],SABE:[6847],SCEL:[12303],SUMU:[10499],SGAS:[10138],SLLP:[13123],SPJC:[11506],SPZO:[11155],SEQM:[13451],SKBO:[12467],SKRG:[11483],SVMI:[11319],YSSY:[8301,12999],YMML:[7500,11998],YBBN:[11483],YPPH:[11299,6893],YPAD:[10171,5420],YBCG:[7694],YSCB:[8800],YPDN:[10919],YBCS:[10499],NZAA:[11926],NZWN:[6351],NZCH:[10787],NZQN:[6204],NFFN:[10732],NTAA:[11204],NWWW:[10663],AYPY:[9022],AGGH:[7218]});
@@ -967,7 +1171,9 @@ const RGN={'N. America':[-98,39,4.3],Europe:[12,49,4.6],Asia:[105,28,3.7],'S. Am
 $('#lay').insertAdjacentHTML('beforeend','<b>Go to region</b><div id="rg" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>');
 Object.keys(RGN).forEach(k=>{const b=document.createElement('button');b.textContent=k;b.onclick=()=>{const r=RGN[k];setFol(false);V.in=null;V.lon=r[0];V.lat=r[1];V.tz=null;V.z=r[2];$('#lay').style.display='none'};$('#rg').appendChild(b)});
 const AIP={Y:['Australia AIP','https://www.airservicesaustralia.com/aip/aip.asp'],NZ:['New Zealand AIP','https://www.aip.net.nz'],SB:['Brazil AIS','https://aisweb.decea.mil.br'],SD:['Brazil AIS','https://aisweb.decea.mil.br'],SI:['Brazil AIS','https://aisweb.decea.mil.br'],SJ:['Brazil AIS','https://aisweb.decea.mil.br'],SN:['Brazil AIS','https://aisweb.decea.mil.br'],SS:['Brazil AIS','https://aisweb.decea.mil.br'],SW:['Brazil AIS','https://aisweb.decea.mil.br'],VI:['India AIP','https://aim-india.aai.gov.in'],RJ:['Japan AIP','https://www.aisjapan.mlit.go.jp'],RO:['Japan AIP','https://www.aisjapan.mlit.go.jp']};
-wtPoll();setInterval(wtPoll,RP.wt);document.addEventListener('visibilitychange',()=>{if(!document.hidden)wtPoll()});
+{const trs=document.getElementById('trs');if(trs){trs.value=TRS;trs.onchange=()=>applyTrafficSource(trs.value,true)}}
+if(TRS=='vatsim')startVatsimTraffic();else wtPoll();
+setInterval(()=>{if(TRS=='adsb')wtPoll()},RP.wt);document.addEventListener('visibilitychange',()=>{if(!document.hidden&&TRS=='adsb')wtPoll()});
 loadOA();
 if(location.protocol=='http:')connect(location.origin);
 else if(location.protocol=='file:')connect('http://127.0.0.1:8765');
@@ -980,7 +1186,7 @@ function olPlace(){const wd=WD;if(!wd||!wd.countries)return'';const c=wpx(V.lon,
 const scan=list=>{for(const it of list){const q=wpx(it.x,it.y,V.z),dx=q[0]-c[0],dy=q[1]-c[1],d=dx*dx+dy*dy;if(d<bd){bd=d;best=it.n}}};
 scan(wd.countries);scan(wd.continents);scan(wd.oceans);return best}
 function olTick(){const now=performance.now();if(now-olAt<900)return;olAt=now;
-const place=olPlace(),n=T.length,count=n?(n===1?'1 aircraft online':n+' aircraft online'):liveOk()?'Simulator online':WT.fail>=2?'Traffic offline':WT.n?'No aircraft in view':'Connecting…';
+const place=olPlace(),n=T.length,unit=TRS=='vatsim'?'pilot':'aircraft',count=n?(n===1?'1 '+unit+' online':n+(unit=='aircraft'?' aircraft':' pilots')+' online'):liveOk()?'Simulator online':TRS=='vatsim'?(vatsimFeed?'No VATSIM pilots in view':'Loading VATSIM…'):WT.fail>=2?'Traffic offline':WT.n?'No aircraft in view':'Connecting…';
 const key=place+'|'+count;if(key===olKey)return;olKey=key;
 $('#olPlace').textContent=place;$('#olPlace').style.display=place?'':'none';
 $('#olCount').textContent=count;
@@ -1003,7 +1209,7 @@ function trCenter(){if(!sel)return;setFol(false);const q=sel.k=='own'?own:sel;V.
 function trClear(){if(!sel)return;TRL.delete(sel.k=='own'?'own':(sel.hx||sel.id));updPl()}
 function spark(tr){if(tr.length<3)return '<div class="m">The altitude profile appears as the trail builds.</div>';const W2=300,H2=56,al=tr.map(p=>p[2]||0),mn=Math.min(...al),mx=Math.max(...al),r=Math.max(mx-mn,500),pts=al.map((v,i)=>(i/(al.length-1)*W2).toFixed(1)+','+(H2-4-(v-mn)/r*(H2-8)).toFixed(1)).join(' ');
 return '<svg class="spark" viewBox="0 0 '+W2+' '+H2+'" preserveAspectRatio="none"><polyline points="'+pts+'" fill="none" stroke="var(--acc)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg><div class="m" style="display:flex;justify-content:space-between"><span>'+Math.round(mn).toLocaleString()+' ft</span><span>altitude profile</span><span>'+Math.round(mx).toLocaleString()+' ft</span></div>'}
-function planeHtml(o){const io=o.k=='own';return '<div class="ah"><div><b class="ic">'+(io?'Your aircraft':esc(o.id))+'</b><div class="m">'+(io?'Live from '+esc((live.d&&live.d.src)||'simulator'):esc(o.cc||'Live ADS-B traffic'))+'</div></div><span class="pill'+((io||tk)?' on':'')+'">'+(io?'&#9679; LIVE':tk?'&#9679; TRACKING':'SELECTED')+'</span></div><div id="pv"></div><div class="row">'+(io?'':'<button class="'+(tk?'on':'')+'" onclick="tk=!tk;if(tk)setFol(false);render()">'+(tk?'Stop tracking':'Track')+'</button>')+'<button onclick="trCenter()">Center</button><button onclick="trClear()">Clear trail</button><button onclick="panel=null;sel=null;tk=false;render()">Close</button></div>'}
+function planeHtml(o){const io=o.k=='own';const src=o.source=='vatsim'?'VATSIM pilot':o.source=='adsb'?'Live ADS-B traffic':(o.cc||'');return '<div class="ah"><div><b class="ic">'+(io?'Your aircraft':esc(o.id))+'</b><div class="m">'+(io?'Live from '+esc((live.d&&live.d.src)||'simulator'):esc(o.cc||src))+'</div></div><span class="pill'+((io||tk)?' on':'')+'">'+(io?'&#9679; LIVE':tk?'&#9679; TRACKING':'SELECTED')+'</span></div><div id="pv"></div><div class="row">'+(io?'':'<button class="'+(tk?'on':'')+'" onclick="tk=!tk;if(tk)setFol(false);render()">'+(tk?'Stop tracking':'Track')+'</button>')+'<button onclick="trCenter()">Center</button><button onclick="trClear()">Clear trail</button><button onclick="panel=null;sel=null;tk=false;render()">Close</button></div>'}
 function updPl(){const e=$('#pv');if(!e||!sel)return;const io=sel.k=='own',o=io?{...own,gs:live.d?live.d.gs:0}:sel,alt=Math.round((o.alt||0)/10)*10,fl=alt>=18000?'FL'+String(Math.round(alt/100)).padStart(3,'0'):alt.toLocaleString()+' ft',vs=Math.round((o.vs||0)/10)*10,ar=vs>200?'&#9650;':vs<-200?'&#9660;':'&#9644;',hd=String(Math.round((o.hdg+360)%360)%360).padStart(3,'0'),tr=TRL.get(io?'own':(sel.hx||sel.id))||[],lost=!io&&Date.now()-(sel.seen||0)>45000;
 let nm=0;for(let i=1;i<tr.length;i++)nm+=dist({lat:tr[i-1][0],lon:tr[i-1][1]},{lat:tr[i][0],lon:tr[i][1]});const mins=tr.length>1?Math.round((tr[tr.length-1][3]-tr[0][3])/60000):0;
 e.innerHTML=(lost?'<div class="m" style="color:#fbbf24">Signal lost '+Math.round((Date.now()-sel.seen)/1000)+'s ago. Showing the last known position.</div>':'')+'<div class="mg"><div class="big"><span>ALTITUDE</span><b>'+fl+' <small style="font-size:15px">'+ar+' '+Math.abs(vs)+' fpm</small></b></div><div><span>GROUND SPEED</span><b>'+Math.round(o.gs||0)+' kt</b></div><div><span>HEADING</span><b>'+hd+'&deg;</b></div>'+(!io&&liveOk()?'<div><span>FROM YOU</span><b>'+Math.round(dist(own,o))+' nm</b></div>':'')+'<div><span>TRAIL</span><b>'+nm.toFixed(0)+' nm</b><span>'+mins+' min recorded</span></div></div>'+spark(tr)}
@@ -1023,8 +1229,7 @@ function fcRender(ok){
   let s;
   if(tr){
     const o=sel,alt=Math.round((o.alt||0)/10)*10,vs=Math.round((o.vs||0)/10)*10,lost=Date.now()-(o.seen||0)>45000;
-    s='<div class="fh"><span class="dot'+(lost?' lost':'')+'"></span><b>'+esc(o.id||o.hx||'Unknown')+'</b><span class="sp"></span><i>'+esc((String(o.cc||'').split(' · ')[0])||'ADS-B')+'</i><em>'+(lost?'Signal lost':'Tracked')+'</em></div>'
-     +'<div class="fcd">'+esc(o.cc||'Live ADS-B traffic')+'</div>'
+    s='<div class="fh"><span class="dot'+(lost?' lost':'')+'"></span><b>'+esc(o.id||o.hx||'Unknown')+'</b><span class="sp"></span><i>'+esc((String(o.cc||'').split(' · ')[0])||'ADS-B')+'</i><em>'+(lost?'Signal lost':'Tracked')+'</em></div>'      +'<div class="fcd">'+esc(o.cc||(o.source=='vatsim'?'VATSIM pilot':'Live ADS-B traffic'))+'</div>'
      +'<div class="fg">'+fcField(alt>=18000?'FL'+String(Math.round(alt/100)).padStart(3,'0'):alt.toLocaleString(),alt>=18000?'LEVEL':'ALT FT')
      +fcField(Math.round(o.gs||0),'GS KT')+fcField(String(Math.round((o.hdg+360)%360)%360).padStart(3,'0'),'HDG°')
      +fcField((vs>0?'+':'')+vs,'VS FPM')+fcField('–','DEST NM')+'</div>';
@@ -1078,6 +1283,10 @@ try{if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').t
 </script>
 <script type="module">
   import * as FP from './js/flightpanel.js';
+  import * as VATSIM from './js/lib/vatsim.js';
+  import * as AC from './js/lib/aircraft.js';
+  window.VATSIM = VATSIM;
+  window.AC = AC;
   window.FP = FP;
 </script>
 </body></html>

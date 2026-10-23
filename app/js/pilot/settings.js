@@ -8,6 +8,7 @@ import {
 import { esc, fmtDateTime, relTime, toast, pickFile, currentTheme, setTheme, tag } from '../ui.js';
 import { APP_VERSION } from '../lib/version.js';
 import { mountUpdateCenter } from '../update-ui.js';
+import { loadSimbriefId, saveSimbriefId, clearSimbriefId, validateSimbriefId } from '../lib/simbrief.js';
 
 export async function mount(root, ctx) {
   let mode = (await getSetting('resourceMode', detectResourceMode()).catch(() => detectResourceMode())) || 'normal';
@@ -32,6 +33,8 @@ export async function mount(root, ctx) {
   // never throws away a download in progress.
   let updateHost = null;
   const desktop = window.stratosDesktop || null;
+  let simbriefId = loadSimbriefId(localStorage);
+  let simbriefMessage = null;
 
   async function refreshBridge() {
     busy = true;
@@ -313,6 +316,17 @@ export async function mount(root, ctx) {
         </div>
       </div>
 
+      <div class="section-title"><h2>Flight planning</h2><span class="hint">Saved on this device</span></div>
+      <div class="card" id="simbrief-card">
+        <div class="card-head"><h2>SimBrief Pilot ID</h2><span class="spacer"></span>${simbriefId ? tag('configured', 'good') : tag('not set', 'muted')}</div>
+        <p class="help" style="margin-bottom:10px">Enter your SimBrief Pilot ID or username once. The route planner and Flight Deck reuse it for every import; it is never shared or sent anywhere except SimBrief.</p>
+        ${simbriefId ? `<dl class="kv"><dt>Pilot ID</dt><dd class="mono">${esc(simbriefId)}</dd></dl>
+        <div class="btn-row" style="margin-top:10px"><button class="btn small" id="simbrief-edit">Edit</button><button class="btn small danger" id="simbrief-disconnect">Disconnect</button></div>` : `<div class="field"><label for="simbrief-id">Pilot ID or username</label>
+          <input class="input" id="simbrief-id" autocomplete="off" placeholder="e.g. 123456"></div>
+        <div class="btn-row" style="margin-top:10px"><button class="btn primary" id="simbrief-save">Save</button></div>`}
+        ${simbriefMessage ? `<div class="notice ${simbriefMessage.bad ? 'bad' : ''}" style="margin-top:10px">${esc(simbriefMessage.text)}</div>` : ''}
+      </div>
+
       <div class="section-title"><h2>Data</h2></div>
       <div class="grid grid-2">
         <div class="card">
@@ -455,6 +469,28 @@ export async function mount(root, ctx) {
       } catch (error) { toast(error.message, 'bad'); }
       render();
     }));
+    document.getElementById('simbrief-save')?.addEventListener('click', () => {
+      const input = document.getElementById('simbrief-id');
+      const check = validateSimbriefId(input?.value);
+      if (!check.ok) { simbriefMessage = { bad: true, text: check.error }; render(); return; }
+      saveSimbriefId(localStorage, check.id);
+      simbriefId = check.id;
+      simbriefMessage = { text: 'SimBrief Pilot ID saved. Imports will use it automatically.' };
+      render();
+    });
+    document.getElementById('simbrief-edit')?.addEventListener('click', () => {
+      simbriefId = '';
+      simbriefMessage = null;
+      render();
+      document.getElementById('simbrief-id')?.focus();
+    });
+    document.getElementById('simbrief-disconnect')?.addEventListener('click', () => {
+      if (!confirm('Remove the saved SimBrief Pilot ID? You will be asked for it again on the next import.')) return;
+      clearSimbriefId(localStorage);
+      simbriefId = '';
+      simbriefMessage = { text: 'SimBrief disconnected.' };
+      render();
+    });
     document.getElementById('pair-relay')?.addEventListener('click', doPair);
     document.getElementById('refresh-relay')?.addEventListener('click', refreshRelay);
     document.getElementById('relay-url')?.addEventListener('input', event => { relayUrl = event.target.value.trim(); });

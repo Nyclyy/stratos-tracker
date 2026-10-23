@@ -12,6 +12,7 @@ const ALLOWED_HOSTS = new Set([
   'api.adsb.lol',
   'api.airplanes.live',
   'opensky-network.org',
+  'data.vatsim.net',
 ]);
 
 function allowedTarget(value) {

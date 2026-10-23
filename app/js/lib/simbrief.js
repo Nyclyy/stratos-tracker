@@ -20,6 +20,22 @@ export function saveSimbriefId(storage, entered) {
   } catch (_) { /* storage unavailable: the ID is simply asked for again */ }
 }
 
+export function clearSimbriefId(storage) {
+  try {
+    if (storage) storage.removeItem(SIMBRIEF_ID_KEY);
+  } catch (_) { /* storage unavailable: nothing was saved */ }
+}
+
+/** A SimBrief Pilot ID is numeric; a username is letters, digits, dot, dash or underscore. */
+export function validateSimbriefId(entered) {
+  const id = String(entered || '').trim();
+  if (!id) return { ok: false, error: 'Enter your SimBrief Pilot ID or username.' };
+  if (id.length > 64 || !/^[A-Za-z0-9._-]+$/.test(id)) {
+    return { ok: false, error: 'That does not look like a SimBrief Pilot ID. Use the number from your SimBrief account, or your username.' };
+  }
+  return { ok: true, id, kind: /^\d+$/.test(id) ? 'pilot' : 'username' };
+}
+
 export function simbriefQuery(entered) {
   const id = String(entered || '').trim();
   return /^\d+$/.test(id) ? `userid=${encodeURIComponent(id)}` : `username=${encodeURIComponent(id)}`;

@@ -3,18 +3,18 @@ import {
   validateRoute, routeTotals, moveWaypoint, removeWaypoint, directTo, insertWaypoint,
   parseWaypointText, exportPln, exportFms, exportGpx, importRoute, createSavedRoute,
   duplicateSavedRoute, searchPlaces, defaultRouteName, routeProfile, routeLegs,
-  legDetails, routeProgress, setWaypointPosition,
+  legDetails, routeProgress,
 } from '../lib/planner.js';
 import { BUNDLED_NAVAIDS } from '../data/airports.js';
 import { fetchSimbriefPlan, loadSimbriefId, saveSimbriefId } from '../lib/simbrief.js';
 import { formatLatLon } from '../lib/geo.js';
-import { MiniMap } from '../minimap.js';
 import { esc, fmtDate, fmtDateTime, num, tag, toast, downloadText, pickFile, askText } from '../ui.js';
 import { wireSearch } from './common.js';
 import {
   analyseRouteWeather, pickWeatherStations, withRouteCourses,
 } from '../lib/routeweather.js';
 import { legWinds, parseWindsAloft, windsAreStale } from '../lib/windsaloft.js';
+import { MiniMap } from '../minimap.js';
 
 const WEATHER_TTL = 5 * 60 * 1000;
 /** The winds-aloft table is published a few times a day; half an hour is plenty. */
@@ -47,10 +47,8 @@ export async function mount(root, ctx) {
   let dirty = false;
   let cruiseKts = 450;
   let cruiseAlt = 35000;
-  let map = null;
   let cleanups = [];
   let undoStack = [];
-  let dragOrigin = null;
   let selection = null;
   let sidebarOpen = readSidebarOpen();
   let lastValidation = null;
@@ -65,6 +63,8 @@ export async function mount(root, ctx) {
   let windsStatus = 'idle';
   let windsError = '';
   let windsTable = null;
+  let planMap = null;
+  let dragSnapshotTaken = false;
 
   const findAirport = code => ctx.directory.find(airport => airport.id === String(code || '').toUpperCase()) || null;
 
@@ -96,7 +96,6 @@ export async function mount(root, ctx) {
   function updateLiveUi() {
     const stats = document.getElementById('plan-stats');
     if (stats) stats.innerHTML = statsHtml();
-    if (map && livePosition) map.setPosition(livePosition, null);
   }
 
   /* ── route editing ───────────────────────────────────────────────── */
@@ -180,30 +179,6 @@ export async function mount(root, ctx) {
     setPoints(directTo(points, index));
   }
 
-  function dragWaypoint(index, position, { committed = false } = {}) {
-    if (index < 0 || index >= points.length) return;
-    if (!committed) {
-      // Preview only: the map draws the moving waypoint itself, so the route
-      // array is not replaced (and no DOM is rebuilt) for every pointer move.
-      // The pre-drag route is captured once here, before the first move, so
-      // undo restores where the waypoint actually started.
-      if (!dragOrigin) dragOrigin = snapshot();
-      points = setWaypointPosition(points, index, position);
-      paintStats();
-      return;
-    }
-    if (dragOrigin) {
-      pushSnapshot(dragOrigin);
-      dragOrigin = null;
-    } else {
-      pushUndo();
-    }
-    setPoints(setWaypointPosition(points, index, position));
-    selection = { kind: 'waypoint', index };
-    paintSelection();
-    toast(`${esc(points[index].id)} moved to ${formatLatLon(points[index].lat, points[index].lon)}.`, 'good');
-  }
-
   /* ── selection ───────────────────────────────────────────────────── */
 
   function select(next) {
@@ -211,20 +186,66 @@ export async function mount(root, ctx) {
     paintSelection();
   }
 
-  function segmentsForCurrent() {
-    if (!selection) return [];
-    if (selection.kind === 'leg') return [selection.index];
-    const index = selection.index;
-    return [index - 1, index].filter(i => i >= 0 && i <= points.length - 2);
+  /* ── map ─────────────────────────────────────────────────────────── */
+
+  /**
+   * The map is created once and moved into the new markup on every render, so
+   * its tile cache, listeners and view survive a route edit. Clicking a
+   * waypoint or a leg on it selects exactly what the sidebar rows select. */
+  function ensurePlanMap() {
+    const host = document.getElementById('plan-map-canvas');
+    if (!host) return;
+    if (!planMap) {
+      try {
+        const canvas = document.createElement('canvas');
+        planMap = new MiniMap(canvas, {
+          padding: 30,
+          onSelect(hit) {
+            if (!hit) { select(null); return; }
+            select({ kind: hit.kind === 'segment' ? 'leg' : 'waypoint', index: hit.index });
+          },
+          onDragWaypoint(index, position, meta) {
+            if (!points[index]) return;
+            if (!meta || !meta.committed) {
+              if (!dragSnapshotTaken) { pushUndo(); dragSnapshotTaken = true; }
+              points[index] = { ...points[index], lat: position.lat, lon: position.lon };
+              planMap.setRoute(points.map(p => ({ id: p.id, lat: p.lat, lon: p.lon })));
+              return;
+            }
+            dragSnapshotTaken = false;
+            dirty = true;
+            select({ kind: 'waypoint', index });
+            persistActive();
+            render();
+          },
+        });
+      } catch (_) {
+        // No canvas or no ResizeObserver (tests, very old browsers): the plan
+        // stays usable, it just does not draw a map.
+        planMap = null;
+        return;
+      }
+    }
+    planMap.attach(host);
+    planMap.setRoute(points.map(p => ({ id: p.id, lat: p.lat, lon: p.lon })));
+    syncMapSelection();
+  }
+
+  function syncMapSelection() {
+    if (!planMap) return;
+    if (!selection) {
+      planMap.setSelection({ segments: [], segmentIndex: null, waypointIndex: null });
+      return;
+    }
+    if (selection.kind === 'leg') {
+      planMap.setSelection({ segments: [selection.index], segmentIndex: selection.index, waypointIndex: null });
+      return;
+    }
+    const segments = [selection.index - 1, selection.index].filter(index => index >= 0 && index < points.length - 1);
+    planMap.setSelection({ segments, segmentIndex: null, waypointIndex: selection.index });
   }
 
   function paintSelection() {
-    if (map) {
-      map.setSelection({
-        segments: segmentsForCurrent(),
-        waypointIndex: selection && selection.kind === 'waypoint' ? selection.index : null,
-      });
-    }
     root.querySelectorAll('[data-leg]').forEach(row => {
       row.classList.toggle('is-selected', Boolean(selection) && selection.kind === 'leg' && Number(row.dataset.leg) === selection.index);
       row.setAttribute('aria-selected', row.classList.contains('is-selected') ? 'true' : 'false');
@@ -235,6 +256,7 @@ export async function mount(root, ctx) {
     });
     paintInspector();
     paintProfileSelection();
+    syncMapSelection();
   }
 
   function paintProfileSelection() {
@@ -814,11 +836,8 @@ export async function mount(root, ctx) {
 
   function render() {
     // A render ends any interaction that was in flight.
-    dragOrigin = null;
     cleanups.forEach(fn => { try { fn(); } catch (_) {} });
     cleanups = [];
-    map?.destroy();
-    map = null;
 
     const validation = validateRoute(points);
     lastValidation = validation;
@@ -861,20 +880,13 @@ export async function mount(root, ctx) {
 
         <div class="plan-body">
           <div class="plan-mapbox" id="plan-mapbox">
-            <canvas id="route-map" aria-label="Interactive route map. Select a leg or waypoint; drag a waypoint to move it."></canvas>
-            <div class="plan-map-tools" role="group" aria-label="Map controls">
-              <button class="plan-icon-btn" data-map="in" aria-label="Zoom in">+</button>
-              <button class="plan-icon-btn" data-map="out" aria-label="Zoom out">−</button>
-              <button class="plan-icon-btn" data-map="fit" aria-label="Fit the route" title="Fit the route">⤢</button>
-              <button class="plan-icon-btn" data-map="tiles" aria-label="Toggle map tiles" title="Map tiles" aria-pressed="true">▦</button>
-            </div>
+            <div class="plan-map-canvas" id="plan-map-canvas" aria-label="Route map"></div>
             <div class="plan-inspector" id="plan-inspector" hidden></div>
             ${points.length < 2 ? `<div class="plan-empty" id="plan-empty">
               <b>Start a flight plan</b>
               <span>Search an airport in the plan panel to set a departure, then add a destination. Tap a leg for course and time; drag a waypoint to move it.</span>
               <button class="plan-btn" id="plan-empty-add">Add departure</button>
             </div>` : ''}
-            <div class="plan-map-hint">Tap a leg or waypoint for details · drag a waypoint to move it · this route is already on the Flight Deck map</div>
           </div>
 
           <aside class="plan-side" id="plan-side" aria-label="Flight plan">
@@ -963,24 +975,6 @@ export async function mount(root, ctx) {
         </div>
       </div>`;
 
-    const canvas = document.getElementById('route-map');
-    if (canvas) {
-      map = new MiniMap(canvas, {
-        padding: 46,
-        layers: { tiles: true, track: false, route: true },
-        onSelect: hit => select(hit),
-        onDragWaypoint: (index, position, options) => dragWaypoint(index, position, options),
-      });
-      map.setRoute(points);
-      if (livePosition) map.setPosition(livePosition, null);
-      if (selection) {
-        map.setSelection({
-          segments: segmentsForCurrent(),
-          waypointIndex: selection.kind === 'waypoint' ? selection.index : null,
-        });
-      }
-    }
-
     const workspace = document.getElementById('plan-workspace');
     const toggleSidebar = () => {
       sidebarOpen = !sidebarOpen;
@@ -992,8 +986,6 @@ export async function mount(root, ctx) {
         button.title = sidebarOpen ? 'Hide the flight plan' : 'Show the flight plan';
         button.innerHTML = `<span aria-hidden="true">${sidebarOpen ? '‹' : '☰'}</span><span class="plan-side-toggle-label">Plan</span>`;
       }
-      // The map container changes size with the sidebar; one redraw is enough.
-      map?.resize();
     };
     document.getElementById('plan-side-toggle')?.addEventListener('click', toggleSidebar);
     document.getElementById('plan-empty-add')?.addEventListener('click', () => {
@@ -1020,19 +1012,6 @@ export async function mount(root, ctx) {
       if (points.length >= 2) loadRouteWeather(true);
     });
     if (points.length >= 2 && routeWeather.status === 'idle') loadRouteWeather();
-
-    document.querySelectorAll('[data-map]').forEach(button => button.addEventListener('click', () => {
-      if (!map) return;
-      const action = button.dataset.map;
-      if (action === 'in') map.zoomBy(1);
-      else if (action === 'out') map.zoomBy(-1);
-      else if (action === 'fit') map.resetZoom();
-      else if (action === 'tiles') {
-        const on = !map.layers.tiles;
-        map.setLayers({ tiles: on });
-        button.setAttribute('aria-pressed', String(on));
-      }
-    }));
 
     // Selection is a local DOM update plus one canvas redraw: the map, the
     // route rows and the simulator feed all keep their existing state.
@@ -1150,6 +1129,7 @@ export async function mount(root, ctx) {
     }));
     document.querySelectorAll('[data-delete]').forEach(button => button.addEventListener('click', () => deleteRoute(button.dataset.delete)));
 
+    ensurePlanMap();
     paintInspector();
   }
 
@@ -1177,7 +1157,7 @@ export async function mount(root, ctx) {
       }
       weatherControllers.clear();
       cleanups.forEach(fn => { try { fn(); } catch (_) {} });
-      map?.destroy();
+      if (planMap) { try { planMap.destroy(); } catch (_) {} planMap = null; }
       root.innerHTML = '';
     },
   };

@@ -17,7 +17,9 @@ import {
   searchPlaces, createSavedRoute, renameSavedRoute, duplicateSavedRoute, estimateFlightTime,
 } from '../app/js/lib/planner.js';
 import { parseTelemetry, getResourceProfile, RESOURCE_MODES } from '../app/js/lib/telemetry.js';
-import { fetchSimbriefPlan, simbriefQuery } from '../app/js/lib/simbrief.js';
+import {
+  fetchSimbriefPlan, simbriefQuery, validateSimbriefId, saveSimbriefId, loadSimbriefId, clearSimbriefId, SIMBRIEF_ID_KEY,
+} from '../app/js/lib/simbrief.js';
 import { plannedAltitudeFt } from '../app/js/flightpanel.js';
 
 test('waypoint altitude comes from the saved SimBrief plan by identifier', () => {
@@ -377,6 +379,23 @@ test('resource profiles expose consistent keys', () => {
 test('simbrief: query uses userid for numeric Pilot IDs and username otherwise', () => {
   assert.equal(simbriefQuery('123456'), 'userid=123456');
   assert.equal(simbriefQuery(' pilot 1 '), 'username=pilot%201');
+});
+
+test('simbrief: the saved Pilot ID is validated, stored once, and can be disconnected', () => {
+  const store = new Map();
+  const storage = { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
+  assert.equal(validateSimbriefId('').ok, false);
+  assert.equal(validateSimbriefId('  ').ok, false);
+  assert.equal(validateSimbriefId('abc def').ok, false);
+  assert.equal(validateSimbriefId('x'.repeat(65)).ok, false);
+  assert.deepEqual(validateSimbriefId(' 123456 '), { ok: true, id: '123456', kind: 'pilot' });
+  assert.equal(validateSimbriefId('jane.doe_1').kind, 'username');
+  assert.equal(loadSimbriefId(storage), '');
+  saveSimbriefId(storage, ' 123456 ');
+  assert.equal(store.get(SIMBRIEF_ID_KEY), '123456');
+  assert.equal(loadSimbriefId(storage), '123456');
+  clearSimbriefId(storage);
+  assert.equal(loadSimbriefId(storage), '');
 });
 
 test('simbrief: reads navlog fixes from JSON and rejects a plan with no waypoints', async () => {

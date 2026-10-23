@@ -37,6 +37,7 @@ See [README-DEPLOY.md](README-DEPLOY.md) for build and deployment, [PERFORMANCE.
 ## Quick start
 
 - Website: open `index.html`, then `app/`.
+- Local development: `npm run dev` serves `app/` on http://127.0.0.1:8123 and proxies live ADS-B traffic, which browsers cannot fetch directly (the mirrors send no CORS headers). A plain static server can still serve the files, but live ADS-B then reports why it is unavailable.
 - Windows: download `Stratos-Setup.exe` from the latest GitHub release, or build with `npm ci && npm run dist:win`.
 - Simulator bridge: `python3 stratos_bridge.py` (the desktop app starts it automatically).
 - Tests: `npm test`, `npm run test:py`, `npm run test:integration`.

@@ -386,19 +386,38 @@ export class MiniMap {
     // Waypoint markers; labels only when the route is short enough to read.
     const labels = points.length <= 30;
     points.forEach((p, i) => {
-      const end = i === 0 || i === points.length - 1;
+      const origin = i === 0;
+      const destination = i === points.length - 1;
+      const end = origin || destination;
       const active = waypointIndex === i || (drag && drag.index === i);
-      const radius = active ? 7 : end ? 4 : 2.2;
+      const radius = active ? 7 : end ? 5 : 3;
       if (active) {
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(121,201,187,.22)';
+        ctx.arc(p.x, p.y, 11, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(121,201,187,.24)';
         ctx.fill();
       }
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
-      ctx.fillStyle = active ? accent : '#9bb7ff';
-      ctx.fill();
+      // Route ends use distinct airport-style markers; en-route fixes remain
+      // small numbered dots so dense routes stay readable.
+      if (origin || destination) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius + 3, 0, Math.PI * 2);
+        ctx.fillStyle = origin ? '#34d399' : '#f17b89';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#07131a';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 1.7, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = active ? accent : '#9bb7ff';
+        ctx.fill();
+      }
       if (active) {
         ctx.strokeStyle = '#06121a';
         ctx.lineWidth = 1.5;
@@ -407,7 +426,7 @@ export class MiniMap {
       if (labels && p.id && (end || active || points.length <= 12)) {
         ctx.font = '600 10px system-ui, sans-serif';
         ctx.fillStyle = '#e7f0f2';
-        ctx.fillText(p.id, p.x + 8, p.y - 7);
+        ctx.fillText(p.id, p.x + 10, p.y - 8);
       }
     });
   }
