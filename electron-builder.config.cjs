@@ -5,7 +5,11 @@ const fs = require('node:fs');
 // Python 3 installation.
 const extraResources = [
   { from: 'stratos_bridge.py', to: 'bridge/stratos_bridge.py' },
+  { from: 'stratos_cifp.py', to: 'bridge/stratos_cifp.py' },
   { from: 'bridge_logbook_addon.py', to: 'bridge/bridge_logbook_addon.py' },
+  // The bundled SID/STAR dataset, read by stratos_cifp when the simulator has
+  // no procedure data of its own.
+  { from: 'navdata', to: 'bridge/navdata' },
   { from: 'app', to: 'bridge/app' },
 ];
 

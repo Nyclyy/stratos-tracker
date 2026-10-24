@@ -423,3 +423,20 @@ test('simbrief: reads navlog fixes from JSON and rejects a plan with no waypoint
     globalThis.fetch = realFetch;
   }
 });
+
+test('trail colours: white on the ground, a ramp in between, magenta at the top', async () => {
+  const { trailInk, TRAIL_RAMP, trailGradient } = await import('../app/js/lib/trailcolor.js');
+  assert.equal(trailInk(0), 'rgb(255,255,255)', 'the aircraft on the ground is white');
+  assert.equal(trailInk(-50), 'rgb(255,255,255)', 'a negative height is still the ground');
+  assert.equal(trailInk(42000), 'rgb(216,72,240)', 'the top of the ramp is magenta');
+  assert.equal(trailInk(90000), trailInk(42000), 'above the last stop the top colour holds');
+  assert.notEqual(trailInk(12000), trailInk(20000), 'the colour keeps changing with height');
+  for (const [height, hex] of TRAIL_RAMP) {
+    const ink = trailInk(height).match(/\d+/g).map(Number);
+    const stated = [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+    // Channels are quantised in steps of 8 so a long climb strokes in runs.
+    ink.forEach((value, index) => assert.ok(Math.abs(value - stated[index]) <= 8, `stop ${height} ft matches ${hex}`));
+    assert.ok(ink.every(channel => channel >= 0 && channel <= 255), 'no channel leaves the byte range');
+  }
+  assert.match(trailGradient(), /^#ffffff 0%/, 'the legend starts at white');
+});

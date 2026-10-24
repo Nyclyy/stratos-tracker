@@ -117,6 +117,17 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 #fc .fcm div{min-width:0}
 #fc .fcm span{display:block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
 #fc .fcm b{display:block;font-size:11.5px;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Minimized card: one compact line of live numbers, then the planned SID and
+   STAR with their runways underneath. Nothing here covers the route line. */
+#fc .fcs{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;font-size:11.5px;color:var(--mut);font-variant-numeric:tabular-nums;letter-spacing:.01em}
+#fc .fcs b{color:var(--txt);font-weight:700}
+#fc .fcproc{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-top:9px;padding-top:9px;border-top:1px solid color-mix(in srgb,var(--coast) 30%,transparent)}
+#fc .fcp{min-width:0}
+#fc .fcp-k{display:block;font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--mut);font-weight:700}
+#fc .fcp b{display:block;font-size:12.5px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#fc .fcp b small{font-size:10px;font-weight:600;color:var(--mut)}
+#fc .fcp-r{display:block;font-size:10.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#fc .fcp-hint{margin-top:5px;font-size:9.5px;letter-spacing:.02em;color:var(--mut)}
 #fc .fca{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
 #fc .fca button{padding:5px 9px;border-radius:7px;font-size:11px;font-weight:600;border:1px solid color-mix(in srgb,var(--coast) 45%,transparent);background:var(--ui2);color:var(--txt);cursor:pointer}
 #fc .fca button:hover{border-color:var(--acc)}
@@ -514,13 +525,17 @@ function mirrorRoute(){try{
 function load(){
   try{const a=JSON.parse(localStorage.getItem('stratos.activeRoute')||'null');
     if(a&&Array.isArray(a.points)){
-      route=a.points.map(p=>({id:p.id,name:p.name||p.id,lat:+p.lat,lon:+p.lon,k:p.kind||p.k||'fix',elev:Number(p.elev)||0,ss:p.ss||'',aw:p.aw||''}));
+      route=a.points.map(p=>({id:p.id,name:p.name||p.id,lat:+p.lat,lon:+p.lon,k:routeKindName(p.kind||p.k),elev:Number(p.elev)||0,ss:p.ss||'',aw:p.aw||''}));
       return true;
     }
   }catch(e){}
-  try{const r=JSON.parse(localStorage.getItem('dl.route'));if(r&&r.length){route=r;return true}}catch(e){}
+  try{const r=JSON.parse(localStorage.getItem('dl.route'));if(r&&r.length){route=r.map(p=>({...p,k:routeKindName(p.k)}));return true}}catch(e){}
   return false
 }
+/* The planner calls its points 'airport' and 'navaid'; the map draws 'apt' and
+   'nav'. Both names describe the same fix, so a route from either page keeps its
+   airport ring instead of falling back to an ordinary waypoint crosshair. */
+function routeKindName(kind){const k=String(kind||'fix').toLowerCase();return k=='airport'?'apt':k=='navaid'?'nav':k||'fix'}
 /* Zoom and centre so the whole route is on screen; a route planned in another
    page used to load correctly and still be invisible because the map stayed
    wherever it was last left. */
@@ -566,7 +581,7 @@ if(V.fol){V.lon=own.lon;V.lat=own.lat}}
 /* drawing */
 const ACI=new Map();function acImg(t,col){const key=t+'|'+col;if(ACI.has(key))return ACI.get(key);const icon=window.aircraftIcon?.(t,col);if(icon)ACI.set(key,icon);return icon}
 function drawAircraft(type,x,y,heading,color,size){const im=type&&acImg(type,color);cx.save();cx.translate(x,y);cx.rotate(((Number(heading)||0)*R));if(im){cx.drawImage(im,-size/2,-size/2,size,size)}else{cx.strokeStyle=color;cx.lineWidth=2;cx.beginPath();PL.forEach((p,i)=>i?cx.lineTo(p[0]*.7,p[1]*.7):cx.moveTo(p[0]*.7,p[1]*.7));cx.closePath();cx.fillStyle=color;cx.fill()}cx.restore()}
-function draw(){if(wpCard){const ck=V.lon.toFixed(5)+','+V.lat.toFixed(5)+','+V.z.toFixed(4)+','+W+'x'+H;if(ck!==cardView){cardView=ck;positionRouteCard()}}cx.setTransform(dpr,0,0,dpr,0,0);cx.fillStyle=C.bg;cx.fillRect(0,0,W,H);
+function draw(){procTick();if(wpCard){const ck=V.lon.toFixed(5)+','+V.lat.toFixed(5)+','+V.z.toFixed(4)+','+W+'x'+H;if(ck!==cardView){cardView=ck;positionRouteCard()}}cx.setTransform(dpr,0,0,dpr,0,0);cx.fillStyle=C.bg;cx.fillRect(0,0,W,H);
 if(CH.on&&CH.pg!='sat'){cx.fillStyle='#fbfaf6';cx.fillRect(0,0,W,H)}else if(L.style=='world'){worldLayer()}else{cx.beginPath();[LAND,...EX].forEach(po=>{po.forEach((p,i)=>{const[x,y]=sc(p[0],p[1]);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.closePath()});if(!SAT()){cx.fillStyle=C.land;cx.fill();cx.strokeStyle=C.coast;cx.lineWidth=1.5;cx.stroke()}else drawTiles()}
 const tl=wpx(V.lon,V.lat);
 if(L.grid&&V.z<12&&!CH.on){const s=V.z<4?10:V.z<5.5?5:V.z<7?2:V.z<8.5?1:V.z<10?.5:.1,a=wun(tl[0]-W/2,tl[1]-H/2),b=wun(tl[0]+W/2,tl[1]+H/2);cx.strokeStyle=C.grid;cx.lineWidth=1;cx.fillStyle=C.coast;cx.font='10px sans-serif';cx.beginPath();
@@ -578,7 +593,7 @@ if(L.apt)A.forEach(a=>{if(CH.on&&a!==CH.a)return;const[x,y]=sc(a.lon,a.lat);if(a
 if(V.z>8.5)drawReal(a,x,y);else a.det=false;if(0)pairs(a).forEach(pr=>{const n=pr[0],h=n*10,p=ppn(a.lat)*1.4,dx=Math.sin(h*R)*p,dy=-Math.cos(h*R)*p;cx.strokeStyle=C.ap;cx.lineWidth=Math.max(3,p/9);cx.lineCap='butt';cx.beginPath();cx.moveTo(x-dx,y-dy);cx.lineTo(x+dx,y+dy);cx.stroke()});
 if(a.det){}else if(V.z>8.5){cx.beginPath();cx.arc(x,y,3,0,7);cx.fillStyle=C.land;cx.fill();cx.strokeStyle=C.ap;cx.lineWidth=2.2;cx.stroke()}else mkRing(x,y,mkR()*.9,mkColor('apt'),1);
 if(V.z>(a.x?7:4.8)&&x>-40&&x<W+40&&y>-40&&y<H+40&&!(L.rte&&planTocTod().ids.has(String(a.id).toUpperCase())))mkText(a.id,x+Math.round(mkR()*.62)-3,y-6,SAT()?(DKM()?'#fff':'#111'):C.txt,12.5,true)});
-if(route.length&&!CH.on&&L.rte){cx.save();cx.globalAlpha=.35;cx.strokeStyle=C.route;cx.lineWidth=12;cx.lineCap='round';cx.lineJoin='round';cx.beginPath();route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke();if(liveOk()&&route.length>1){const pr=routeProg(),pts=[route[0]];let acc=0;for(let i=0;i<route.length-1;i++){acc+=dist(route[i],route[i+1]);if(acc<pr)pts.push(route[i+1])}pts.push(pos(pr));cx.globalAlpha=.6;cx.beginPath();pts.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke()}cx.restore()
+drawProcedurePaths();if(route.length&&!CH.on&&L.rte){cx.save();cx.globalAlpha=.35;cx.strokeStyle=C.route;cx.lineWidth=12;cx.lineCap='round';cx.lineJoin='round';cx.beginPath();route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke();if(liveOk()&&route.length>1){const pr=routeProg(),pts=[route[0]];let acc=0;for(let i=0;i<route.length-1;i++){acc+=dist(route[i],route[i+1]);if(acc<pr)pts.push(route[i+1])}pts.push(pos(pr));cx.globalAlpha=.6;cx.beginPath();pts.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke()}cx.restore()
 drawRouteMarkers();}
 trails();if(L.trf&&!CH.on)T.forEach(a=>{const[x,y]=sc(a.lon,a.lat);drawAircraft(a.type,x,y,a.hdg,C.trf,32);if(V.z>6&&x>-40&&x<W+40&&y>-20&&y<H+20)mkText(a.id+' '+Math.round(a.alt/100),x+4,y+4,C.trf,10,false)});
 if(liveOk()){const[x,y]=sc(own.lon,own.lat);cx.beginPath();cx.arc(x,y,19,0,7);cx.strokeStyle=C.own;cx.globalAlpha=.38;cx.lineWidth=1.5;cx.stroke();cx.globalAlpha=1;drawAircraft(live.d?.type||live.d?.aircraft||live.d?.aircraftType,x,y,own.hdg,C.own,40)}
@@ -626,8 +641,20 @@ function mkSquare(x,y,r,c){mkPen(c,1.9);cx.rect(x-r*.66,y-r*.66,r*1.32,r*1.32);c
 function mkHex(x,y,r,c){mkPen(c,1.8);for(let k=0;k<6;k++){const a=k*Math.PI/3-Math.PI/2,px=x+Math.cos(a)*r*.78,py=y+Math.sin(a)*r*.78;k?cx.lineTo(px,py):cx.moveTo(px,py)}cx.closePath();cx.stroke()}
 function mkClimb(x,y,r,c,up){mkPen(c,2);cx.arc(x,y,r*.72,0,7);cx.stroke();
   mkPen(c,2.1);cx.moveTo(x-r*.32,y+(up?r*.2:-r*.2));cx.lineTo(x,y+(up?-r*.22:r*.22));cx.lineTo(x+r*.32,y+(up?r*.2:-r*.2));cx.stroke()}
-function mkDraw(kind,x,y,r){
-  const c=mkColor(kind);
+/* A selected point is redrawn in the app's purple, over a soft halo. The
+   halo is the selection indicator; it is painted after every marker so it
+   cannot be covered, and the route line beneath it is never touched. */
+const MKSELN='#a855f7',MKSELD='#7c3aed';
+function mkSelColor(){return mkLightBg()?MKSELD:MKSELN}
+function mkSelHalo(x,y,r){
+  const c=mkSelColor();
+  cx.beginPath();cx.arc(x,y,r*1.32,0,7);
+  cx.fillStyle=mkLightBg()?'rgba(124,58,237,.14)':'rgba(168,85,247,.2)';cx.fill();
+  cx.strokeStyle=c;cx.lineWidth=2.4;cx.stroke();
+  cx.strokeStyle=mkLightBg()?'rgba(124,58,237,.5)':'rgba(216,180,254,.55)';cx.lineWidth=1;
+  cx.beginPath();cx.arc(x,y,r*1.72,0,7);cx.stroke()}
+function mkDraw(kind,x,y,r,override){
+  const c=override||mkColor(kind);
   if(kind=='apt'||kind=='vor')mkRing(x,y,r,c,1);
   else if(kind=='ndb')mkSquare(x,y,r,c);
   else if(kind=='int')mkHex(x,y,r,c);
@@ -710,50 +737,126 @@ function routeKind(p){
   if(p.k=='nav'){const t=navType(p.id);return /NDB/.test(t)?'ndb':/VOR|TACAN|DME/.test(t)?'vor':'int'}
   return p.aw?'air':'wp'}
 function altText(alt){const v=Math.round(Number(alt)||0);return v>=1000?'FL'+Math.round(v/100):v?v+' ft':''}
-/* TOC/TOD from the plan the route already carries: the cruise level is the
-   highest planned altitude, the climb point is where it is first reached and
-   the descent point where it is last left. Nothing is inserted into the
-   route, so the drawn line cannot move; a route whose plan carries no
-   altitudes gets no TOC/TOD at all rather than a guessed one. */
-let MTP={key:'',toc:null,tod:null,cruise:0,hasToc:false,hasTod:false,ids:new Set()};
+/* TOC/TOD come from the vertical profile of the route the plan already
+   carries: the planned altitude at each fix is a constraint, the climb and
+   descent gradients fill the gaps, and the marker is interpolated inside the
+   leg where it belongs. Nothing is inserted into the route, so the drawn line
+   cannot move, and a plan with no usable levels gets no marker rather than a
+   guess. The profile is cached on the route, the levels and the measured
+   descent rate, so telemetry frames never recompute or move it. */
+let MTP={key:'',toc:null,tod:null,cruise:0,hasToc:false,hasTod:false,ids:new Set(),method:'none'};
 function planTocTod(){
   let key='';
   for(let i=0;i<route.length;i++){const p=route[i];key+=p.id+':'+Math.round(Number(p.elev)||0)+':'+p.lat.toFixed(3)+':'+p.lon.toFixed(3)+'|'}
+  key+='|'+Math.round(DESC_FT_PER_NM)+'|'+(window.PROFILE?1:0);
   if(MTP.key==key)return MTP;
-  const out={key,toc:null,tod:null,cruise:0,hasToc:false,hasTod:false,ids:new Set(route.map(p=>String(p.id||'').toUpperCase()))};
+  const out={key,toc:null,tod:null,cruise:0,hasToc:false,hasTod:false,ids:new Set(route.map(p=>String(p.id||'').toUpperCase())),method:'none'};
   out.hasToc=route.some(p=>String(p.id||'').toUpperCase()=='TOC');
   out.hasTod=route.some(p=>String(p.id||'').toUpperCase()=='TOD');
-  for(let i=0;i<route.length;i++){const e=Math.round(Number(route[i].elev)||0);if(e>out.cruise)out.cruise=e}
-  if(out.cruise>=10000&&route.length>3){
-    let toc=-1,tod=-1;
-    for(let i=1;i<route.length-1;i++){
-      if(Math.abs(Math.round(Number(route[i].elev)||0)-out.cruise)>100)continue;
-      if(toc<0)toc=i;
-      tod=i}
-    if(toc>0&&toc<route.length-1&&!out.hasToc)out.toc={lat:route[toc].lat,lon:route[toc].lon};
-    if(tod>toc&&!out.hasTod)out.tod={lat:route[tod].lat,lon:route[tod].lon}}
+  /* The vertical profile is computed on the route's own ordered legs, using
+     the planned altitude at each fix as the constraint. It reads the route and
+     returns positions; it never adds a point, so the drawn line cannot move. */
+  if(window.PROFILE&&route.length>2){
+    const profile=window.PROFILE.computeVerticalProfile({
+      route:route.map(p=>({id:String(p.id||''),lat:Number(p.lat),lon:Number(p.lon),elev:Number(p.elev)||0,k:p.k})),
+      descentFtPerNm:DESC_FT_PER_NM,
+      destinationElevFt:Number(route[route.length-1].elev)||0,
+    });
+    if(profile&&profile.ok){
+      out.cruise=profile.cruiseFt;out.method=profile.toc.source;
+      if(!out.hasToc)out.toc={lat:profile.toc.lat,lon:profile.toc.lon,altFt:profile.toc.altFt,source:profile.toc.source,nm:profile.toc.nm};
+      if(!out.hasTod)out.tod={lat:profile.tod.lat,lon:profile.tod.lon,altFt:profile.tod.altFt,source:profile.tod.source,nm:profile.tod.nm}}
+  }
   MTP=out;return out}
-function mkPlanLabel(kind,x,y,r,alt){
+/* ── Published procedure geometry ─────────────────────────────────────
+   The SID and STAR paths come from navigation data the simulator already has
+   installed: the bridge reads X-Plane 12's CIFP folder and returns the ordered
+   legs and runway thresholds. Only the plan's own SID/STAR and runway are
+   used, and only the runway connection the plan does not already draw is
+   painted. The waypoint-to-waypoint line below is never touched, and without
+   that data nothing is drawn and the card says why. */
+const PROCG={key:'',sid:null,star:null,notes:[],seen:{}};
+function procWanted(){
+  const ofp=fcPlanInfo();if(!ofp)return null;
+  const o=ofp.origin||{},d=ofp.destination||{};
+  return {dep:o.icao||'',sid:o.sid||'',depRwy:o.rwy||'',arr:d.icao||'',star:d.star||'',arrRwy:d.rwy||d.approachRwy||''}
+}
+function procKey(){
+  const w=procWanted();if(!w)return '';
+  if(!(w.sid||w.star))return '';
+  const tags=route.filter(p=>p.ss).map(p=>String(p.id||'').toUpperCase()).join(',');
+  return [w.dep,w.sid,w.depRwy,w.arr,w.star,w.arrRwy,tags].join('|')
+}
+async function procLoad(endpoint){
+  if(PROCG.seen[endpoint])return PROCG.seen[endpoint];
+  try{
+    const r=await fetch(endpoint,{cache:'no-store',credentials:location.protocol=='file:'?'omit':'include'});
+    const payload=await r.json().catch(()=>null);
+    if(!r.ok||!payload||!payload.ok)return {ok:false,error:(payload&&payload.error)||('Procedure data unavailable (HTTP '+r.status+')')};
+    PROCG.seen[endpoint]=payload;
+    return payload
+  }catch(_){return {ok:false,error:'Procedure data unreachable — start the bridge on this PC.'}}
+}
+async function procSync(){
+  const w=procWanted();
+  if(!w||!window.PROC){PROCG.sid=null;PROCG.star=null;PROCG.notes=[];return}
+  const routeIds=route.map(p=>String(p.id||'').toUpperCase());
+  const notes=[];
+  PROCG.sid=null;PROCG.star=null;
+  for(const kind of ['sid','star']){
+    const ident=kind=='sid'?w.sid:w.star,airport=kind=='sid'?w.dep:w.arr,rwy=kind=='sid'?w.depRwy:w.arrRwy;
+    if(!ident||!airport)continue;
+    const endpoint=window.PROC.procedureEndpoint(airport,kind,ident);
+    if(!endpoint)continue;
+    const payload=await procLoad(endpoint);
+    const path=window.PROC.procedurePath(payload,{kind,ident,runway:rwy,routeIds});
+    if(!path.ok){notes.push(kind.toUpperCase()+': '+(path.error||'not available'));continue}
+    const points=window.PROC.connectorFor(kind,path.points,routeIds);
+    PROCG[kind]={points};
+    notes.push(window.PROC.procedureNote(path))
+  }
+  PROCG.notes=notes;
+  fCard()
+}
+function procTick(){
+  if(!window.PROC){PROCG.key='';return}
+  const key=procKey();
+  if(key===PROCG.key)return;
+  PROCG.key=key;PROCG.sid=null;PROCG.star=null;PROCG.notes=[];
+  if(key)procSync()
+}
+function drawProcedurePaths(){
+  if(!L.rte||CH.on)return;
+  const list=[PROCG.sid,PROCG.star].filter(item=>item&&item.points&&item.points.length>1);
+  if(!list.length)return;
+  cx.save();cx.globalAlpha=.8;cx.strokeStyle=C.route;cx.lineWidth=9;cx.lineCap='round';cx.lineJoin='round';
+  list.forEach(item=>{cx.beginPath();item.points.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke()});
+  cx.restore()
+}
+function mkPlanLabel(kind,x,y,r,alt,source){
   const c=mkColor(kind),mark=kind=='toc'?'TOC':'TOD';
   mkClimb(x,y,r,c,kind=='toc');
   const box=mkText(mark,x+Math.round(r*.72)-3,y+4,c,11.5,true);
-  const sub=altText(alt);
+  const sub=window.PROFILE?window.PROFILE.altitudeLabel(alt,source):altText(alt);
   if(box&&sub)mkText(sub,box.x-8,box.y+box.h+8,mkColor('int'),9.5,false)}
 function drawRouteMarkers(){
   if(!route.length||CH.on||!L.rte)return;
+  if(wpIdx!=null&&!route[wpIdx])wpIdx=null;
   const plan=planTocTod(),n=route.length,r=mkR();
   for(let i=0;i<n;i++){
     const p=route[i],[x,y]=sc(p.lon,p.lat);
     if(x<-30||x>W+30||y<-30||y>H+30)continue;
-    const kind=routeKind(p),end=i===0||i===n-1;
+    const kind=routeKind(p),end=i===0||i===n-1,chosen=wpIdx===i,col=chosen?mkSelColor():null;
     if(kind=='toc'||kind=='tod'){
-      mkPlanLabel(kind,x,y,r*1.05,kind=='toc'?(Number(p.elev)||plan.cruise):(Number(route[n-1].elev)||0));
+      if(chosen)mkSelHalo(x,y,r*1.1);
+      mkPlanLabel(kind,x,y,r*1.05,kind=='toc'?(Number(p.elev)||plan.cruise):(Number(route[n-1].elev)||0),chosen?'plan':'');
       continue}
-    mkDraw(kind,x,y,kind=='apt'?r*1.05:r);
-    if(V.z>=4||end)mkText(String(p.id||'').toUpperCase(),x+Math.round(r*.55)-4,y+14,mkColor(kind),12,end)}
-  const planPoint=(kind,m,alt)=>{const[x,y]=sc(m.lon,m.lat);if(x<-30||x>W+30||y<-30||y>H+30)return;mkPlanLabel(kind,x,y,r*1.05,alt)};
-  if(plan.toc&&!plan.hasToc)planPoint('toc',plan.toc,plan.cruise);
-  if(plan.tod&&!plan.hasTod)planPoint('tod',plan.tod,Number(route[n-1].elev)||0);
+    if(chosen)mkSelHalo(x,y,kind=='apt'?r*1.05:r);
+    mkDraw(kind,x,y,kind=='apt'?r*1.05:r,col);
+    if(V.z>=4||end||chosen)mkText(String(p.id||'').toUpperCase(),x+Math.round(r*.55)-4,y+14,col||mkColor(kind),12,end||chosen)}
+  const planPoint=(kind,m,alt,src)=>{const[x,y]=sc(m.lon,m.lat);if(x<-30||x>W+30||y<-30||y>H+30)return;mkPlanLabel(kind,x,y,r*1.05,alt,src)};
+  if(plan.toc&&!plan.hasToc)planPoint('toc',plan.toc,plan.toc.altFt||plan.cruise,plan.toc.source);
+  if(plan.tod&&!plan.hasTod)planPoint('tod',plan.tod,plan.tod.altFt||Number(route[n-1].elev)||0,plan.tod.source);
   /* Every leg of LEG_MIN_NM or more carries its distance and initial heading.
      Short legs are left bare: their tag would crowd the two idents it sits
      between. */
@@ -913,6 +1016,8 @@ function routeCardHtml(){
     +cardRow('Distance from previous',prev?dist(prev,p).toFixed(1)+' nm':'–')
     +cardRow('Distance to next',next?dist(p,next).toFixed(1)+' nm':'–')
     +cardRow('Type',wpKind(p))
+    +(p.ss=='sid'||p.ss=='star'?cardRow('Procedure',p.ss=='sid'?'SID fix (departure)':'STAR fix (arrival)'):'')
+    +(p.aw?cardRow('Airway',esc(p.aw)):'')
     +'</dl>'
     +(legs.length?'<div class="wc-sec">Connected legs</div><ul class="wc-legs">'+legs.join('')+'</ul>':'')
     +'<div class="wc-btns">'
@@ -960,22 +1065,22 @@ function openRouteCard(card,x,y){
 }
 function closeRouteCard(){wpCard=null;paintRouteCard()}
 function routeCardAction(act){
-  if(act=='close'){closeRouteCard();return}
+  if(act=='close'){wpIdx=null;closeRouteCard();return}
   const c=wpCard;if(!c)return;
-  if(act=='delete'){route.splice(c.index,1);trav=Math.min(trav,total());save();closeRouteCard();if(panel=='route'||panel=='fsum')render();return}
-  if(act=='up'){const i=c.index;if(i<=0)return;const t=route[i-1];route[i-1]=route[i];route[i]=t;c.index=i-1;c.anchor={lat:route[i-1].lat,lon:route[i-1].lon};save();paintRouteCard();if(panel=='route')render();return}
-  if(act=='down'){const i=c.index;if(i>=route.length-1)return;const t=route[i+1];route[i+1]=route[i];route[i]=t;c.index=i+1;c.anchor={lat:route[i+1].lat,lon:route[i+1].lon};save();paintRouteCard();if(panel=='route')render();return}
+  if(act=='delete'){wpIdx=null;route.splice(c.index,1);trav=Math.min(trav,total());save();closeRouteCard();if(panel=='route'||panel=='fsum')render();return}
+  if(act=='up'){const i=c.index;if(i<=0)return;const t=route[i-1];route[i-1]=route[i];route[i]=t;c.index=i-1;c.anchor={lat:route[i-1].lat,lon:route[i-1].lon};wpIdx=i-1;save();paintRouteCard();if(panel=='route')render();return}
+  if(act=='down'){const i=c.index;if(i>=route.length-1)return;const t=route[i+1];route[i+1]=route[i];route[i]=t;c.index=i+1;c.anchor={lat:route[i+1].lat,lon:route[i+1].lon};wpIdx=i+1;save();paintRouteCard();if(panel=='route')render();return}
   if(act=='direct'){const i=c.index;if(i<=0||i>=route.length-1)return;if(!confirm('Drop the intermediate waypoints and fly direct to this point?'))return;route=[route[0],route[i]];trav=Math.min(trav,total());save();closeRouteCard();if(panel=='route'||panel=='fsum')render()}
 }
 $('#app').addEventListener('click',e=>{const b=e.target.closest('[data-wc]');if(!b||!wpCard)return;routeCardAction(b.dataset.wc)});
-addEventListener('keydown',e=>{if(e.key=='Escape'&&wpCard)closeRouteCard()});
+addEventListener('keydown',e=>{if(e.key=='Escape'){if(wpCard)closeRouteCard();wpIdx=null}});
 function tap(x,y){if(CH.on)return;const rect=cv.getBoundingClientRect();
 if(route.length&&L.rte){const wi=wpAt(x,y);if(wi>=0){wpIdx=wi;openRouteCard({kind:'wp',index:wi},x,y);return}const li=legAt(x,y);if(li>=0){wpIdx=li;openRouteCard({kind:'leg',index:li},x,y);return}}
 closeRouteCard();wpIdx=null;sel=null;
 x-=rect.left;y-=rect.top;let best=null,bestD=Infinity;
 const items=[...(L.trf?T.map(o=>[o,18]):[]),...(L.apt?A.filter(a=>!a.x||V.z>=6).map(o=>[o,14]):[]),...(L.nav&&V.z>=6?N.map(o=>[o,12]):[]),...(liveOk()?[[{k:'own',id:'Own-ship',...own},22]]:[])];
 items.forEach(([o,rad])=>{const[a,b]=sc(o.lon,o.lat);let d=Math.hypot(a-x,b-y);if(o.det&&o.rpx)d=Math.max(d-o.rpx,0);if(d<=rad&&d<bestD){bestD=d;best=o}});
-if(best){sel=best;if(best.k=='trf'){tk=true;setFol(false)}panel=null;render();fCard()}
+if(best){sel=best;if(best.k=='trf'){tk=true;setFol(false);trafficBackfill(best)}panel=null;render();fCard()}
 else{panel=null;render()}}
 /* search */
 $('#q').oninput=e=>{const q=e.target.value.trim().toLowerCase(),r=$('#res');if(!q){r.style.display='none';return}
@@ -995,7 +1100,9 @@ pairs(a).forEach(pr=>pr.forEach(r=>{const an=(w.d-r*10)*R,hw=Math.round(sp*Math.
 let wpIdx=null;
 function wpSel(i){wpIdx=wpIdx===i?null:i;render()}
 function wpFocus(i){const p=route[i];if(!p)return;setFol(false);V.lon=p.lon;V.lat=p.lat;V.tz=null;render()}
-function wpDetail(i){const p=route[i];if(!p)return'';const prev=route[i-1],next=route[i+1];let cum=0;for(let j=1;j<=i;j++)cum+=dist(route[j-1],route[j]);const alt=Number(p.elev)||0,planAlt=window.FP&&p.k!='apt'?FP.plannedAltitudeFt((FP.loadOfp(localStorage)||{}).ofp,p.id):null,course=next?brg(p,next):prev?brg(prev,p):null;const rows=[['Altitude',alt>0?Math.round(alt).toLocaleString()+' ft'+(p.k=='apt'?' (field elevation)':' (planned)'):planAlt?Math.round(planAlt).toLocaleString()+' ft (planned, SimBrief)':'Not in the plan'],['From previous',prev?Math.round(dist(prev,p))+' nm':'Departure'],['To next',next?Math.round(dist(p,next))+' nm':'Destination'],['Course'+(next?' to next':''),course==null?'–':String(Math.round(course)).padStart(3,'0')+'°'],['From departure',Math.round(cum)+' nm'],['ETE from departure @ '+CRUISE+' kt',hm(cum/CRUISE)]];return'<div class="wpd"><h3>'+(i+1)+'. '+esc(p.id)+' · '+esc(p.name||p.id)+'</h3><table>'+rows.map(r=>'<tr><td class="m">'+r[0]+'</td><td>'+r[1]+'</td></tr>').join('')+'</table><div class="row"><button onclick="wpFocus('+i+')">Focus on map</button></div></div>'}
+function wpDetail(i){const p=route[i];if(!p)return'';const prev=route[i-1],next=route[i+1];let cum=0;for(let j=1;j<=i;j++)cum+=dist(route[j-1],route[j]);const alt=Number(p.elev)||0,planAlt=window.FP&&p.k!='apt'?FP.plannedAltitudeFt((FP.loadOfp(localStorage)||{}).ofp,p.id):null,course=next?brg(p,next):prev?brg(prev,p):null;const rows=[['Altitude',alt>0?Math.round(alt).toLocaleString()+' ft'+(p.k=='apt'?' (field elevation)':' (planned)'):planAlt?Math.round(planAlt).toLocaleString()+' ft (planned, SimBrief)':'Not in the plan'],['From previous',prev?Math.round(dist(prev,p))+' nm':'Departure'],['To next',next?Math.round(dist(p,next))+' nm':'Destination'],['Course'+(next?' to next':''),course==null?'–':String(Math.round(course)).padStart(3,'0')+'°'],['From departure',Math.round(cum)+' nm'],['ETE from departure @ '+CRUISE+' kt',hm(cum/CRUISE)]];
+if(p.ss=='sid'||p.ss=='star')rows.push(['Procedure',p.ss=='sid'?'SID fix (departure)':'STAR fix (arrival)']);
+if(p.aw)rows.push(['Airway',esc(p.aw)]);return'<div class="wpd"><h3>'+(i+1)+'. '+esc(p.id)+' · '+esc(p.name||p.id)+'</h3><table>'+rows.map(r=>'<tr><td class="m">'+r[0]+'</td><td>'+r[1]+'</td></tr>').join('')+'</table><div class="row"><button onclick="wpFocus('+i+')">Focus on map</button></div></div>'}
 function render(){const s=$('#sheet');tabHi();if(!panel){s.style.display='none';return}s.style.display='block';
 if(panel=='fsum'){s.innerHTML=fsumHtml();return}if(panel=='live'){s.innerHTML=liveHtml();return}if(panel=='data'){s.innerHTML=dataHtml();return}if(panel=='wx'){s.innerHTML=wxHtml();return}if(panel=='charts'){s.innerHTML=chHtml();return}if(panel=='sel'&&sel){const o=sel;if(o.k=='apt'){getMetar(o);s.innerHTML=aptHtml(o);return}
 if(o.k=='apt')getMetar(o);if(o.k=='apt')s.innerHTML=`<h3>${o.id} · ${o.name}</h3><div class="m">Elev ${o.elev} ft · TWR ${o.twr} · ATIS ${o.atis}</div><div class="m">Runways: ${pairs(o).map(p=>p.map(x=>String(x).padStart(2,'0')).join('/')).join(', ')}</div><code>${o.metar}</code><div class="m">${dec(o.metar)}</div><div class="m">${mAge(o)}</div><div class="m">Real-time reports from AviationWeather.gov via the bridge. Wind uses gusts.</div><div class="m">${o.rws?'':'Unverified placeholder data. Import the data pack (Data tab) for real runways, frequencies and layout.<br>'}${o.lat.toFixed(3)}, ${o.lon.toFixed(3)}${liveOk()?' - '+Math.round(dist(own,o))+' nm from you':''}</div>${rwTable(o)}<div class="row"><button onclick="openChart(sel)">Layout</button><button onclick="chSel=sel;panel='charts';render()">Charts</button><button onclick="addSel()">Add to route</button><button onclick="chartMap()">Zoom in</button></div>`;
@@ -1236,7 +1343,54 @@ function startVatsimTraffic(){if(vatsimTimer)return;const tick=()=>{if(TRS!='vat
 /* Only pilots in or just outside the view are kept, so the map stays readable
    and the badge counts what is actually on screen. The next poll fills in the
    view after a pan; nothing is invented for gaps. */
-function vatsimTraffic(){for(let i=T.length-1;i>=0;i--)if(T[i].source=='vatsim')T.splice(i,1);if(TRS!='vatsim'||!vatsimFeed||vatsimFeed.error||!window.VATSIM){WT.n=T.length;return}const pilots=window.VATSIM.parsePilots(vatsimFeed);const pad=.75,inView=p=>{if(!W||!H)return true;const[x,y]=sc(p.lon,p.lat);return x>=-W*pad&&x<=W*(1+pad)&&y>=-H*pad&&y<=H*(1+pad)};pilots.filter(inView).forEach(p=>{T.push({k:'trf',seen:vatsimAt,source:'vatsim',id:p.id,lat:p.lat,lon:p.lon,alt:p.alt==null?0:p.alt,gs:p.gs==null?0:p.gs,hdg:p.hdg,hx:p.id,type:p.aircraft})});WT.n=T.length;WT.src='vatsim'}
+/* The bridge keeps what the page observes, so a clicked aircraft's path
+   survives a reload and the phone sees the same one. The post is throttled and
+   batched; a bridge that is not there costs one failed request, never a stall. */
+let trfPostAt=0,trfBackfill=new Set();
+function trafficPost(){
+  const now=Date.now();if(now-trfPostAt<15000)return;trfPostAt=now;
+  const points=[];
+  T.forEach(a=>{if(a.lat==null||a.lon==null)return;if(now-(a.seen||0)>90000)return;points.push([a.hx||a.id,a.lat,a.lon,a.alt||0,now])});
+  if(!points.length)return;
+  try{fetch('/traffic/track',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({points})}).catch(()=>{})}catch(_){}
+}
+/* A trail that predates this page load comes from the bridge, once per aircraft. */
+function trafficBackfill(o){
+  if(!o||o.k!='trf')return;
+  const key=String(o.hx||o.id||'');if(!key||trfBackfill.has(key))return;trfBackfill.add(key);
+  fetch('/traffic/trail?hex='+encodeURIComponent(key),{cache:'no-store',credentials:'include'}).then(r=>r.ok?r.json():null).then(j=>{
+    if(!j||!j.ok||!Array.isArray(j.points)||j.points.length<2)return;
+    const have=TRL.get(key)||[],live=have[0]?have[0][3]:Infinity;
+    const older=j.points.filter(p=>Array.isArray(p)&&Number.isFinite(p[0])&&Number.isFinite(p[1])&&p[3]<live)
+      .map(p=>[p[0],p[1],Number(p[2])||0,Number(p[3])||0,Number.isFinite(p[4])?p[4]:null]);
+    if(!older.length)return;
+    TRL.set(key,[...older,...have]);
+    fCard()
+  }).catch(()=>{})
+}
+/* The VATSIM feed carries one position per pilot, so a trail is what Stratos
+   itself has observed: every refresh appends the position to that aircraft's
+   trail, and selecting the aircraft draws it just like your own. Existing
+   objects are updated in place so an open card, a selection and its trail
+   survive the refresh instead of being replaced by new objects. */
+function vatsimTraffic(){
+  if(TRS!='vatsim'||!vatsimFeed||vatsimFeed.error||!window.VATSIM){WT.n=T.length;return}
+  const pilots=window.VATSIM.parsePilots(vatsimFeed);const pad=.75,inView=p=>{if(!W||!H)return true;const[x,y]=sc(p.lon,p.lat);return x>=-W*pad&&x<=W*(1+pad)&&y>=-H*pad&&y<=H*(1+pad)};
+  const seen=new Map();
+  pilots.filter(inView).forEach(p=>{trlAdd(p.id,p.lat,p.lon,p.alt,400);seen.set(p.id,p)});
+  const known=new Map();T.forEach(a=>{if(a.source=='vatsim')known.set(a.id,a)});
+  const out=[];
+  seen.forEach((p,id)=>{
+    const a=known.get(id)||{k:'trf',source:'vatsim'};
+    Object.assign(a,{seen:vatsimAt,id,lat:p.lat,lon:p.lon,alt:p.alt==null?0:p.alt,gs:p.gs==null?0:p.gs,hdg:p.hdg,hx:id,type:p.aircraft,dep:p.dep||'',arr:p.arr||'',cruiseFt:p.cruiseFt||null,route:p.route||''});
+    out.push(a)
+  });
+  // A selected aircraft that has left the view stays until the user clears it.
+  if(sel&&sel.k=='trf'&&sel.source=='vatsim'&&!out.includes(sel))out.push(sel);
+  const kept=T.filter(a=>a.source!='vatsim');
+  T.length=0;kept.forEach(a=>T.push(a));out.forEach(a=>T.push(a));
+  WT.n=T.length;WT.src='vatsim';trlGC();trafficPost()
+}
 function vatsimHtml(o){if(!window.VATSIM)return'<div class="m">VATSIM: the parser is still loading.</div>';if(!vatsimFeed)return'<div class="m">VATSIM: loading online controllers…</div>';if(vatsimFeed.error)return'<div class="m">VATSIM feed unavailable ('+vatsimFeed.error+'). Controllers are not shown.</div>';const cov=window.VATSIM.airportCoverage(window.VATSIM.parseControllers(vatsimFeed),o.id);if(!cov.hasCoverage)return'<div class="m">No VATSIM controllers online for '+o.id+'.</div>';const row=c=>'<tr><td>'+c.callsign+'</td><td>'+c.facility.label+'</td><td>'+c.frequency+'</td></tr>';return'<div class="vatsim-online"><h3>Online ATC</h3><table><tr><th>Position</th><th>Level</th><th>Frequency</th></tr>'+cov.confirmed.map(row).join('')+'</table><div class="m">Positions named for this airport. Live from data.vatsim.net, refreshed every 15 s.</div></div>'}
 function aptHtml(o){const tb=[['info','Info'],['wx','Weather'],['ch','Charts']];
 let h='<div class="ah"><div><b class="ic">'+o.id+'</b><div class="m">'+o.name+'</div></div><div class="chips"><span>'+o.elev+' ft</span>'+(liveOk()?'<span>'+Math.round(dist(own,o))+' nm</span>':'')+'</div></div><div id="vatsim-apt">'+vatsimHtml(o)+'</div><div class="seg">'+tb.map(t=>'<button class="'+(aTab==t[0]?'on':'')+'" data-t="'+t[0]+'" onclick="aTab=this.dataset.t;render()">'+t[1]+'</button>').join('')+'</div>';
@@ -1250,7 +1404,7 @@ return h+'<div class="row"><button onclick="addSel()">Add to route</button><butt
 function closeChart(){$('#chart').style.display='none'}
 function chartMap(){closeChart();setFol(false);V.lon=sel.lon;V.lat=sel.lat;V.tz=null;V.z=12.5;panel='sel';render()}
 /* X-Plane live link */
-function liveStep(dt){T.forEach(a=>{if(Date.now()-(a.seen||0)<45000){const p=fwd(a,a.hdg,a.gs/3600*dt);a.lat=p.lat;a.lon=p.lon}});if(tk&&sel&&sel.k=='trf'){V.lon=sel.lon;V.lat=sel.lat}const d=live.d;own.lat=d.lat;own.lon=d.lon;trlAdd('own',d.lat,d.lon,d.alt,8000);own.hdg=d.hdg||0;own.alt=d.alt;own.vs=d.vs||0;const gs=d.gs||0,el=route.length?dist(own,route.at(-1)):NaN;
+function liveStep(dt){T.forEach(a=>{if(Date.now()-(a.seen||0)<45000){const p=fwd(a,a.hdg,a.gs/3600*dt);a.lat=p.lat;a.lon=p.lon}});if(tk&&sel&&sel.k=='trf'){V.lon=sel.lon;V.lat=sel.lat}const d=live.d;own.lat=d.lat;own.lon=d.lon;trlAdd('own',d.lat,d.lon,d.alt,9000,d.agl);own.hdg=d.hdg||0;own.alt=d.alt;own.vs=d.vs||0;const gs=d.gs||0,el=route.length?dist(own,route.at(-1)):NaN;
 $('#tGS').textContent=Math.round(gs);$('#tAL').textContent=Math.round(own.alt);$('#tHD').textContent=String(Math.round(own.hdg+360)%360).padStart(3,'0');$('#tVS').textContent=Math.round(own.vs/10)*10;$('#tDS').textContent=isFinite(el)?el.toFixed(1):'–';$('#tEt').textContent=isFinite(el)&&gs>30?hm(el/gs):'–';if(V.fol){V.lon=own.lon;V.lat=own.lat}}
 let wxList=[];try{wxList=JSON.parse(localStorage.getItem('dl.wx')||'[]')}catch(_){}
 function wxAdd(a){if(!wxList.includes(a.id)){wxList.unshift(a.id);wxList=wxList.slice(0,8);try{localStorage.setItem('dl.wx',JSON.stringify(wxList))}catch(_){}}}
@@ -1335,8 +1489,28 @@ for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++)jobs.push([x,y]);
 let out=[],bad=0;
 for(let i=0;i<jobs.length;i+=6)await Promise.all(jobs.slice(i,i+6).map(async([x,y])=>{try{const r=await fetch(OFMT.replace('{z}',z).replace('{x}',x).replace('{y}',y));if(!r.ok)return;let b=await r.arrayBuffer();const u=new Uint8Array(b);if(u[0]==31&&u[1]==139)b=await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();out=out.concat(mvtAero(b,z,x,y))}catch(e){bad++}}));
 if(!out.length){a.err=bad?'map tiles unreachable':'no airfield data in tiles';return null}return out}catch(e){a.err='map tiles: '+((e&&e.message)||e);return null}}
-function connect(base){disc();live.on=true;startVatsimTraffic();fetch(base+'/airports.json').then(r=>r.json()).then(l=>{l.forEach(a=>{const e=A.find(z=>z.id==a[0]);if(e){e.rws=a[7];e._rl=null;e.lat=a[2];e.lon=a[3];e.elev=a[4];e.rw=a[5];RL[a[0]]=a[6];e.twr=(a[8]||{}).TWR||'—';e.atis=(a[8]||{}).ATIS||'—';e.fqs=a[8]||{};return}A.push({rws:a[7],k:'apt',x:1,id:a[0],name:a[1],lat:a[2],lon:a[3],elev:a[4],rw:a[5],twr:(a[8]||{}).TWR||'—',atis:(a[8]||{}).ATIS||'—',fqs:a[8]||{},metar:'No METAR loaded'});RL[a[0]]=a[6]})}).catch(()=>{});fetch(base+'/navaids.json').then(r=>r.json()).then(l=>{N.length=0;l.forEach(n=>N.push({k:'nav',id:n[0],name:n[1],type:n[2],lat:n[3],lon:n[4],freq:n[5]}))}).catch(()=>{});try{live.es=new EventSource(base+'/stream');live.es.onmessage=e=>{try{live.d=JSON.parse(e.data);live.at=performance.now();if(live.d.trt!==live.trt){live.trt=live.d.trt;T.length=0;(live.d.tr||[]).forEach(a=>{T.push({k:'trf',seen:Date.now(),...a});trlAdd(a.hx||a.id,a.lat,a.lon,a.alt,400)});if(sel&&sel.k=='trf'){const n=T.find(a=>a.id==sel.id);if(n)sel=n}}if(live.d.lat!=null&&!live.seen){live.seen=1;V.lon=live.d.lon;V.lat=live.d.lat;V.tz=null;V.z=Math.max(V.z,9);setFol(true);if(panel=='live')render()}}catch(_){}}}catch(_){live.on=false}$('#bLive').classList.add('on');loadDescentRate()}
-function disc(){if(live.es)live.es.close();live.on=false;live.d=null;live.seen=0;$('#bLive').classList.remove('on');if(panel=='live')render()}
+function connect(base){disc();live.on=true;startVatsimTraffic();fetch(base+'/airports.json').then(r=>r.json()).then(l=>{l.forEach(a=>{const e=A.find(z=>z.id==a[0]);if(e){e.rws=a[7];e._rl=null;e.lat=a[2];e.lon=a[3];e.elev=a[4];e.rw=a[5];RL[a[0]]=a[6];e.twr=(a[8]||{}).TWR||'—';e.atis=(a[8]||{}).ATIS||'—';e.fqs=a[8]||{};return}A.push({rws:a[7],k:'apt',x:1,id:a[0],name:a[1],lat:a[2],lon:a[3],elev:a[4],rw:a[5],twr:(a[8]||{}).TWR||'—',atis:(a[8]||{}).ATIS||'—',fqs:a[8]||{},metar:'No METAR loaded'});RL[a[0]]=a[6]})}).catch(()=>{});fetch(base+'/navaids.json').then(r=>r.json()).then(l=>{N.length=0;l.forEach(n=>N.push({k:'nav',id:n[0],name:n[1],type:n[2],lat:n[3],lon:n[4],freq:n[5]}))}).catch(()=>{});openStream(base);$('#bLive').classList.add('on');loadDescentRate()}
+/* One stream handler, reused by the watchdog. A bridge that restarts, or a
+   Wi-Fi change that leaves a half-open socket, does not always fire onerror:
+   the EventSource stays 'open' and the page keeps the last frame for ever.
+   The bridge writes a heartbeat at least every five seconds, so twelve
+   seconds of silence is a dead socket, and the stream is reopened. */
+function openStream(base){
+  if(!base)return;
+  live.base=base;
+  try{
+    const es=new EventSource(base+'/stream');
+    es.onmessage=e=>{try{            live.d=JSON.parse(e.data);live.at=performance.now();seedTrail(live.d.currentFlight);if(live.d.trt!==live.trt){live.trt=live.d.trt;T.length=0;(live.d.tr||[]).forEach(a=>{T.push({k:'trf',seen:Date.now(),...a});trlAdd(a.hx||a.id,a.lat,a.lon,a.alt,400)});if(sel&&sel.k=='trf'){const n=T.find(a=>a.id==sel.id);if(n)sel=n}}if(live.d.lat!=null&&!live.seen){live.seen=1;V.lon=live.d.lon;V.lat=live.d.lat;V.tz=null;V.z=Math.max(V.z,9);setFol(true);if(panel=='live')render()}}catch(_){}};
+    es.onerror=()=>{if(live.es===es)live.at=0};
+    live.es=es
+  }catch(_){live.on=false}}
+setInterval(()=>{
+  if(document.hidden||!live.on||!live.base)return;
+  try{if(navigator.onLine===false)return}catch(_){}
+  if(live.at&&performance.now()-live.at>12000){live.at=0;try{live.es&&live.es.close()}catch(_){}openStream(live.base)}
+},5000);
+addEventListener('online',()=>{if(live.on&&live.base)openStream(live.base)});
+function disc(){if(live.es)live.es.close();live.on=false;live.base='';live.d=null;live.seen=0;$('#bLive').classList.remove('on');if(panel=='live')render()}
 function liveHtml(){const web=location.protocol=='http:'||location.protocol=='file:',ok=liveOk(),lb=location.protocol=='http:'?location.origin:'http://127.0.0.1:8765';return `<h3>Live tracking</h3><div class="m"><b>Traffic:</b> ${wtTxt()}${WT.src?' via '+WT.src:''}. Live aircraft load automatically in Stratos; no Python process is needed for public traffic.</div><div class="m" style="margin-top:8px"><b>Simulator link (optional)</b></div><div class="m">${ok?'● Receiving live data from the simulator':live.on?'Connected to bridge, waiting for simulator data…':'Not connected'}</div>`+(web?'':'<div class="m" style="margin-top:6px">This hosted copy cannot reach your PC. Use the bridge address in step 4 instead.</div>')+'<div class="m">To see your own aircraft from X-Plane or MSFS 2020/2024, run the Stratos bridge on your PC.</div><ol class="m" style="padding-left:18px"><li>The Stratos desktop app starts the bridge for you. Manual start: <b>python stratos_bridge.py</b>. For MSFS 2020/2024, run it on the same Windows PC as the sim after a one-time <b>pip install SimConnect</b>, then start a flight. No other MSFS setup.</li><li>X-Plane only: Settings → Data Output: tick “Network via UDP” for rows 3, 17 and 20</li><li>X-Plane only: tick “Send network data output”, enter the IP the bridge prints, port 49003</li><li>On iPhone Safari open <b>http://PC-IP:8765</b>, then Share → Add to Home Screen</li></ol>'+(web?'<div class="row"><button onclick="connect(\''+lb+'\')">Reconnect</button><button onclick="disc()">Disconnect</button></div>':'')}
 $('#bLive').onclick=()=>{panel=panel=='live'?null:'live';render()};
 window.addSel=()=>{if(sel)addWp(sel)};window.rm=i=>{route.splice(i,1);save();trav=0;render()};window.defRoute=defRoute;
@@ -1368,7 +1542,7 @@ function wtAdsb(j){const ac=j&&(j.ac||j.aircraft);return Array.isArray(ac)?ac.fi
 function wtSky(j){return j&&Array.isArray(j.states)?j.states.filter(s=>s[5]!=null&&s[6]!=null&&!s[8]).slice(0,400).map(s=>({hx:s[0],id:((s[1]||'').trim()||s[0]).toUpperCase(),lon:s[5],lat:s[6],alt:Math.round((s[7]||0)*3.281),gs:Math.round((s[9]||0)*1.944),hdg:s[10]||0,vs:Math.round((s[11]||0)*196.85),source:'adsb',cc:s[2]||''})):(j&&j.states===null?[]:null)}
 function wtTxt(){if(TRS=='vatsim'){if(WT.n)return'● VATSIM · '+WT.n+' pilot'+(WT.n==1?'':'s');if(vatsimFeed&&vatsimFeed.error)return'VATSIM unavailable ('+vatsimFeed.error+')';return vatsimFeed&&!vatsimFeed.error?'No VATSIM pilots in view':'Loading VATSIM…'}const hint=wtProxy===false&&location.protocol=='http:';
 return WT.n?'● Live ADS-B · '+WT.n+' aircraft':WT.busy?'Loading traffic…':WT.fail>=2?(hint?'Live ADS-B needs the dev server (npm run dev) or the desktop app':'Live ADS-B unavailable (check your connection)'):live.on?'Connecting…':'No traffic in view'}
-function wtMerge(l){const m=new Map(T.map(a=>[a.hx,a])),n=[];l.forEach(o=>{o.seen=Date.now();trlAdd(o.hx,o.lat,o.lon,o.alt,400);const a=m.get(o.hx);if(a){Object.assign(a,o);n.push(a)}else n.push({k:'trf',...o})});if(sel&&sel.k=='trf'&&!n.includes(sel))n.push(sel);T.length=0;n.forEach(a=>T.push(a));WT.n=T.length;trlGC()}
+function wtMerge(l){const m=new Map(T.map(a=>[a.hx,a])),n=[];l.forEach(o=>{o.seen=Date.now();trlAdd(o.hx||o.id,o.lat,o.lon,o.alt,400);const a=m.get(o.hx);if(a){Object.assign(a,o);n.push(a)}else n.push({k:'trf',...o})});if(sel&&sel.k=='trf'&&!n.includes(sel))n.push(sel);T.length=0;n.forEach(a=>T.push(a));WT.n=T.length;trlGC();trafficPost()}
 async function wtPoll(){if(TRS!='adsb'||WT.busy||document.hidden||liveOk())return;WT.busy=1;const la=+V.lat.toFixed(3),lo=+V.lon.toFixed(3),r=Math.min(250,Math.max(25,Math.ceil(Math.hypot(W,H)/2*40075016*Math.cos(la*R)/(SZ*2**V.z)/1852)));let l=null;
 const via=await wtUseProxy();
 for(const sr of WSRC){try{const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),8000),u=sr.u(la,lo,r),x=await fetch(via?wtApi(u):u,{signal:ac.signal});clearTimeout(tm);if(!x.ok)continue;l=sr.p(await x.json());if(l){WT.src=sr.n;break}}catch(_){}}
@@ -1409,18 +1583,68 @@ $('#olCount').textContent=count;
 $('#online').title=n?(n+' live aircraft in view'+(WT.src?' via '+WT.src:'')):wtTxt()}
 
 /* ===== Stratos additions: trails, tracking panel, built-in charts, in-app PDF viewer ===== */
-function trlAdd(k,lat,lon,alt,mx){if(RP.trail<=0)return;const cap=Math.min(mx||400,RP.trail);let a=TRL.get(k);if(!a){a=[];TRL.set(k,a)}const l=a[a.length-1];if(!l||Math.abs(l[0]-lat)+Math.abs(l[1]-lon)>1e-4){a.push([lat,lon,alt||0,Date.now()]);if(a.length>cap)a.shift()}}
+function trlAdd(k,lat,lon,alt,mx,agl){if(RP.trail<=0)return;const cap=Math.min(mx||400,RP.trail);let a=TRL.get(k);if(!a){a=[];TRL.set(k,a)}const l=a[a.length-1];if(!l||Math.abs(l[0]-lat)+Math.abs(l[1]-lon)>1e-4){a.push([lat,lon,alt||0,Date.now(),Number.isFinite(agl)?agl:null]);if(a.length>cap)a.shift()}}
+/* The bridge records the flight from the moment it starts, so a page opened
+   halfway through can draw the real path instead of a contrail from the moment
+   it was opened. The seed is that recorded track, once per flight; the live
+   frames then continue it. A new flight id replaces the trail, so two flights
+   are never joined by a line. */
+let trailFlightId='',trailSeeded='';
+function seedTrail(flight){
+  if(!flight)return;
+  const id=String(flight.id||'');
+  if(id!==trailFlightId){trailFlightId=id;trailSeeded='';TRL.delete('own')}
+  if(!Array.isArray(flight.track)||flight.track.length<2)return;
+  /* The bridge's recording is the authority on the flown path: it starts at the
+     first movement and is re-sampled to the whole flight on every snapshot. It
+     replaces the local trail when it grows, so the departure end cannot be eaten
+     away by the live points appended between snapshots. */
+  const last=flight.track[flight.track.length-1];
+  const stamp=id+':'+flight.track.length+':'+((last&&last[3])||'');
+  if(trailSeeded===stamp)return;
+  const seeded=flight.track.filter(p=>Array.isArray(p)&&Number.isFinite(p[0])&&Number.isFinite(p[1]))
+    .map(p=>[p[0],p[1],Number(p[2])||0,Number(p[3])||0,Number.isFinite(p[4])?p[4]:null]);
+  if(seeded.length<2)return;
+  const cap=Math.min(8000,Math.max(400,RP.trail||8000));
+  TRL.set('own',seeded.slice(-cap));
+  trailSeeded=stamp
+}
 function trlGC(){const now=Date.now();TRL.forEach((a,k)=>{if(k!='own'&&now-a[a.length-1][3]>1200000)TRL.delete(k)})}
 function trailCol(){if(DKM())return '#ffffff';if(TILED())return '#1e293b';return document.documentElement.dataset.theme=='day'?'#1e293b':'#ffffff'}
-function drawTrail(a,cur,col,wmax){const n=a.length,st=Math.max(1,Math.ceil(n/700)),pts=[];for(let i=0;i<n;i+=st)pts.push(sc(a[i][1],a[i][0]));if(cur)pts.push(sc(cur.lon,cur.lat));const m=pts.length;if(m<2)return;const g=Math.min(28,m-1);
-cx.lineCap='round';cx.lineJoin='round';cx.strokeStyle=col;
-for(let s=0;s<g;s++){const i0=Math.floor(s*(m-1)/g),i1=Math.min(m-1,Math.floor((s+1)*(m-1)/g)+1),f=(s+1)/g;cx.beginPath();for(let i=i0;i<=i1;i++){const q=pts[i];i==i0?cx.moveTo(q[0],q[1]):cx.lineTo(q[0],q[1])}
-cx.globalAlpha=.1+.2*f;cx.lineWidth=wmax*1.9*f+2;cx.stroke();cx.globalAlpha=.15+.8*f*f;cx.lineWidth=Math.max(1,wmax*f);cx.stroke()}
-cx.globalAlpha=1;cx.lineCap='butt'}
+/* The flown trajectory, drawn the way a tracking app draws it: one continuous
+   line from the recorded first position to the aircraft now, coloured by how
+   high the aircraft was — white on the ground, then a ramp through the climb
+   to magenta at the flight levels. Height above ground is used when the recorder
+   stored it, so a taxiway at a high-altitude airport still reads as ground;
+   otherwise the height above the lowest recorded point stands in. A dark casing
+   keeps the line legible on a light chart, a night chart and imagery alike. It
+   is the recorded path, never the planned route, which keeps its own violet. */
+const TRAIL_EDGE='rgba(6,18,10,.55)';
+/* The ramp itself lives in the shared module so the phone's map and this one
+   cannot drift apart; this wrapper is only the page-scope name it is used by. */
+function trailInk(h){return window.TRAILC?window.TRAILC.trailInk(h):'#ffffff'}
+function drawTrail(a,cur,own){const n=a.length,st=Math.max(1,Math.ceil(n/700)),pts=[],hs=[];
+let floor=Infinity;
+for(let i=0;i<n;i+=st){const alt=Number(a[i][2]);if(Number.isFinite(alt)&&alt<floor)floor=alt}
+if(!Number.isFinite(floor))floor=0;
+const height=(p,alt)=>{const agl=Number(p&&p[4]);if(p&&p[4]!=null&&Number.isFinite(agl))return Math.max(0,agl);const v=Number(alt);return Math.max(0,(Number.isFinite(v)?v:0)-(own?floor:0))};
+for(let i=0;i<n;i+=st){const p=a[i];pts.push(sc(p[1],p[0]));hs.push(height(p,p[2]))}
+if(cur){pts.push(sc(cur.lon,cur.lat));hs.push(height([null,null,null,null,(own&&live.d&&live.d.agl!=null)?live.d.agl:null],cur.alt))}
+const m=pts.length;if(m<2)return;
+cx.lineCap='round';cx.lineJoin='round';cx.globalAlpha=1;
+cx.beginPath();cx.moveTo(pts[0][0],pts[0][1]);for(let i=1;i<m;i++)cx.lineTo(pts[i][0],pts[i][1]);
+cx.strokeStyle=TRAIL_EDGE;cx.lineWidth=7;cx.stroke();
+/* One stroke per run of points that share a colour: a climb changes colour in
+   small steps instead of one stroke per segment, so the cost stays flat. */
+const inks=hs.map(trailInk);let start=0,ink=inks[0];
+const run=(from,to)=>{cx.beginPath();cx.moveTo(pts[from][0],pts[from][1]);for(let i=from+1;i<=to;i++)cx.lineTo(pts[i][0],pts[i][1]);cx.strokeStyle=ink;cx.lineWidth=4;cx.stroke()};
+for(let i=1;i<m;i++){if(inks[i]!==ink){run(start,i);start=i;ink=inks[i]}}
+run(start,m-1);
+cx.lineCap='butt'}
 function trails(){if(CH.on||RP.trail<=0)return;const col=trailCol();
 if(L.trl){cx.strokeStyle=col;cx.lineWidth=1.2;cx.globalAlpha=.35;TRL.forEach((a,k)=>{if(k=='own'||a.length<3)return;cx.beginPath();a.slice(-60).forEach((p,i)=>{const q=sc(p[1],p[0]);i?cx.lineTo(q[0],q[1]):cx.moveTo(q[0],q[1])});cx.stroke()});cx.globalAlpha=1}
-if(sel&&sel.k=='trf'){const a=TRL.get(sel.hx||sel.id);if(a)drawTrail(a,sel,col,5)}
-if(liveOk()){const a=TRL.get('own');if(a)drawTrail(a,own,C.own,5)}}
+if(sel&&sel.k=='trf'){const a=TRL.get(sel.hx||sel.id);if(a)drawTrail(a,sel,false)}
+if(liveOk()){const a=TRL.get('own');if(a)drawTrail(a,own,true)}}
 function trCenter(){if(!sel)return;setFol(false);const q=sel.k=='own'?own:sel;V.lon=q.lon;V.lat=q.lat;V.in=null}
 function trClear(){if(!sel)return;TRL.delete(sel.k=='own'?'own':(sel.hx||sel.id));fCard()}
 function spark(tr){if(tr.length<3)return '<div class="m">The altitude profile appears as the trail builds.</div>';const W2=300,H2=56,al=tr.map(p=>p[2]||0),mn=Math.min(...al),mx=Math.max(...al),r=Math.max(mx-mn,500),pts=al.map((v,i)=>(i/(al.length-1)*W2).toFixed(1)+','+(H2-4-(v-mn)/r*(H2-8)).toFixed(1)).join(' ');
@@ -1433,7 +1657,10 @@ return '<svg class="spark" viewBox="0 0 '+W2+' '+H2+'" preserveAspectRatio="none
    snapshot, the traffic feed or the planned route; a field a source does not
    provide says so rather than showing a plausible number. */
 const PHOTOS=new Map();
-let fExp=(()=>{try{return localStorage.getItem('stratos.cardExpanded')=='1'}catch(_){return false}})();
+/* Expanded is the default; a minimized card is the user's choice, remembered
+   on this device. Minimized keeps the callsign, the live numbers and the
+   planned SID/STAR with their runways, and hides the photo and the long list. */
+let fExp=(()=>{try{const saved=localStorage.getItem('stratos.cardExpanded');return saved==null?true:saved=='1'}catch(_){return true}})();
 function fCard(){fcS='';fcRender(liveOk())}
 function fcTog(){fExp=!fExp;try{localStorage.setItem('stratos.cardExpanded',fExp?'1':'0')}catch(_){}fCard()}
 const IDENT=new Map();
@@ -1534,6 +1761,54 @@ function fcPhotoHtml(o){
   const cap=p.photo.link?'<a href="'+esc(p.photo.link)+'" target="_blank" rel="noopener">'+credit+'</a>':credit;
   return '<figure class="fcph"><img src="'+esc(p.photo.src)+'" alt="'+esc(label)+' '+esc(reg)+'" loading="lazy" referrerpolicy="no-referrer"><figcaption class="fcph-c">'+cap+'</figcaption></figure>';
 }
+/* The named procedures belong to the plan being flown. Only the stored
+   SimBrief OFP carries a SID, a STAR or a planned runway; a live target's feed
+   never does, so the card says what it does not have rather than inferring a
+   procedure from where the aircraft happens to be. */
+let fcPlanRaw=null,fcPlanCache=null;
+function fcPlanInfo(){
+  try{
+    // The card redraws at telemetry rate; parse the stored plan only when the
+    // stored text changes, not on every frame.
+    const raw=localStorage.getItem('stratos.ofp');
+    if(raw===fcPlanRaw)return fcPlanCache;
+    fcPlanRaw=raw;
+    const stored=window.FP&&window.FP.loadOfp(localStorage);
+    fcPlanCache=stored&&stored.ofp?stored.ofp:null;
+    return fcPlanCache
+  }catch(_){return null}
+}
+function fcProcedures(o){
+  // A stored SimBrief plan describes your own flight only. A tracked target
+  // gets the airports its own feed reports; the PC's flight is never used for
+  // it, and no procedure is claimed without a plan that states one.
+  const own=o.k=='own',ofp=own?fcPlanInfo():null,cf=own?((live.d&&live.d.currentFlight)||{}):{};
+  const origin=(ofp&&ofp.origin)||{},dest=(ofp&&ofp.destination)||{};
+  return {
+    plan:Boolean(ofp),
+    source:ofp?'SimBrief plan':(own&&cf.id?'recorded flight':'no filed plan'),
+    dep:origin.icao||cf.depAirport||(!own?String(o.dep||''):'')||'',
+    arr:dest.icao||cf.arrAirport||(!own?String(o.arr||''):'')||'',
+    sid:origin.sid||'',sidTrans:origin.sidTrans||'',star:dest.star||'',starTrans:dest.starTrans||'',
+    depRwy:origin.rwy||'',arrRwy:dest.rwy||dest.approachRwy||'',
+    cruise:Number((ofp&&ofp.flight&&ofp.flight.cruiseFt)||0)||Number(o&&o.cruiseFt)||null,
+    filed:!own&&o&&o.route?String(o.route):'',
+  };
+}
+/* SID above its departure runway, STAR above its arrival runway: the summary
+   stays on the card while the rest of it is minimized. */
+function fcProcHtml(o){
+  const p=fcProcedures(o);
+  const block=(label,name,trans,rwy,planned,missing)=>'<div class="fcp"><span class="fcp-k">'+label+'</span><b>'+esc(name||'—')+(trans?'<small>.'+esc(trans)+'</small>':'')+'</b><span class="fcp-r">'+(planned?'RWY '+esc(rwy):esc(missing))+'</span></div>';
+  return '<div class="fcproc">'
+    +block('SID',p.sid,p.sidTrans,p.depRwy,Boolean(p.sid&&p.depRwy),p.plan?'runway not in plan':'not in the plan')
+    +block('STAR',p.star,p.starTrans,p.arrRwy,Boolean(p.star&&p.arrRwy),p.plan?'runway not in plan':'not in the plan')
+    +'</div>'
+    +'<div class="fcp-hint">'+esc((p.plan?'SID and STAR from the SimBrief plan':(p.dep||p.arr?('No SimBrief plan for '+p.dep+' → '+p.arr):'No SimBrief plan loaded, so no SID or STAR is claimed'))+(o.k=='own'&&PROCG.notes.length?' · '+PROCG.notes.join(' · '):''))+'</div>';
+}
+function fcToggleHtml(){
+  return '<button type="button" class="fci" data-fc-toggle aria-expanded="'+(fExp?'true':'false')+'" title="'+(fExp?'Minimize the card, keeping SID and STAR':'Show the full aircraft card')+'">'+(fExp?'&#9662;':'&#9652;')+'</button>';
+}
 function fcAircraftHtml(o){
   const io=o.k=='own',d=live.d||{};
   const lat=io?own.lat:o.lat,lon=io?own.lon:o.lon;
@@ -1549,24 +1824,42 @@ function fcAircraftHtml(o){
   const mins=trail.length>1?Math.round((trail[trail.length-1][3]-trail[0][3])/60000):0;
   const away=!io&&liveOk()?Math.round(dist(own,o)):null;
   const level=alt>=18000?'FL'+String(Math.round(alt/100)).padStart(3,'0'):alt.toLocaleString();
-  const rows=[['Registration',reg?esc(reg)+(detected?' · detected':''):'Not reported'],['Type',type?esc(type):'Not reported'],['Source',esc(fcSource(o))],['Position',Number(lat).toFixed(3)+', '+Number(lon).toFixed(3)]];
-  if(away!=null)rows.push(['From you',away+' nm']);
-  rows.push(['Trail',trail.length>1?nm.toFixed(0)+' nm in '+mins+' min':'Not recorded yet']);
-  const more='<div class="fcm">'+rows.map(r=>'<div><span>'+r[0]+'</span><b>'+r[1]+'</b></div>').join('')+'</div>'
-    +(fExp&&trail.length>2?spark(trail):'')
-    +'<div class="fca">'
+  const phase=io?String(d.flightPhase||'').replace(/_/g,' '):'';
+  const proc=fcProcedures(o);
+  const header='<div class="fh" data-fc-drag><span class="dot'+(lost?' lost':'')+'"></span><b>'+esc(id)+'</b><span class="sp"></span><i>'+esc(type||'AIRCRAFT')+'</i><em>'+(lost?'SIGNAL LOST':tk?'TRACKED':'SELECTED')+'</em>'
+    +fcToggleHtml()
+    +'<button type="button" class="fci" data-fc-act="close" title="Close">&#10005;</button></div>'
+    +'<div class="fcd">'+esc(reg||'registration not reported')+(detected?' (detected)':'')+' · '+esc(fcSource(o))+'</div>';
+  const compact='<div class="fcs">'
+    +'<span><b>'+level+'</b> '+(level.startsWith('FL')?'level':'ft')+'</span>'
+    +'<span><b>'+gs+'</b> kt</span>'
+    +'<span><b>'+hdg+'&deg;</b> hdg</span>'
+    +(away!=null?'<span><b>'+away+'</b> nm</span>':'')
+    +'</div>';
+  const actions='<div class="fca">'
     +(io?'':'<button type="button" class="'+(tk?'on':'')+'" data-fc-act="track">'+(tk?'Stop tracking':'Track')+'</button>')
     +'<button type="button" data-fc-act="center">Center</button>'
     +'<button type="button" data-fc-act="clear">Clear trail</button>'
     +'</div>';
-  return '<div class="fh" data-fc-drag><span class="dot'+(lost?' lost':'')+'"></span><b>'+esc(id)+'</b><span class="sp"></span><i>'+esc(type||'AIRCRAFT')+'</i><em>'+(lost?'SIGNAL LOST':tk?'TRACKED':'SELECTED')+'</em>'
-    +'<button type="button" class="fci" data-fc-toggle aria-expanded="'+(fExp?'true':'false')+'" title="'+(fExp?'Less information':'More information')+'">'+(fExp?'&#9652;':'&#9662;')+'</button>'
-    +'<button type="button" class="fci" data-fc-act="close" title="Close">&#10005;</button></div>'
-    +'<div class="fcd">'+esc(reg||'registration not reported')+(detected?' (detected)':'')+' · '+esc(fcSource(o))+'</div>'
+  if(!fExp){
+    return header+compact+fcProcHtml(o)+actions;
+  }
+  const rows=[['Registration',reg?esc(reg)+(detected?' · detected':''):'Not reported'],['Type',type?esc(type):'Not reported'],['Source',esc(fcSource(o))],['Position',Number(lat).toFixed(3)+', '+Number(lon).toFixed(3)]];
+  if(away!=null)rows.push(['From you',away+' nm']);
+  if(phase)rows.push(['Flight phase',esc(phase)]);
+  if(proc.dep||proc.arr)rows.push(['Route',esc((proc.dep||'—')+' → '+(proc.arr||'—'))]);
+  if(proc.filed)rows.push(['Filed route',esc(proc.filed.length>58?proc.filed.slice(0,58)+'…':proc.filed)]);
+  if(proc.cruise)rows.push(['Planned cruise',esc(window.PROFILE?window.PROFILE.altitudeLabel(proc.cruise,'plan'):Math.round(proc.cruise)+' ft')]);
+  if(proc.plan){rows.push(['Departure runway',proc.depRwy?esc(proc.depRwy):'Not in the plan']);rows.push(['Arrival runway',proc.arrRwy?esc(proc.arrRwy):'Not in the plan'])}
+  rows.push(['Trail',trail.length>1?nm.toFixed(0)+' nm in '+mins+' min':'Not recorded yet']);
+  return header
     +'<div class="fg">'+fcField(level,level.startsWith('FL')?'LEVEL':'ALT FT')
     +fcField(gs,'GS KT')+fcField(hdg+'&deg;','HDG')
     +fcField((vs>0?'+':'')+vs,'VS FPM')+fcField(away==null?'–':away,'FROM YOU')+'</div>'
-    +(fExp?more:'');
+    +fcProcHtml(o)
+    +'<div class="fcm">'+rows.map(r=>'<div><span>'+r[0]+'</span><b>'+r[1]+'</b></div>').join('')+'</div>'
+    +(trail.length>2?spark(trail):'')
+    +actions;
 }
 /* Keep the card on screen after a drag or a content change. */
 function clampCard(){
@@ -1606,6 +1899,7 @@ function clampCard(){
     if(t.hasAttribute('data-fc-toggle')){fcTog();return}
     const act=t.dataset.fcAct;
     if(act=='track'){tk=!tk;if(tk)setFol(false);fCard()}
+    else if(act=='expand'){fExp=true;try{localStorage.setItem('stratos.cardExpanded','1')}catch(_){}fCard()}
     else if(act=='center'){trCenter();fCard()}
     else if(act=='clear'){trClear()}
     else if(act=='close'){sel=null;tk=false;render();fCard()}
@@ -1625,18 +1919,40 @@ function fcRender(ok){
     fcDetect(sel);
     const reg=fcReg(sel);
     if(reg)fcPhoto(reg);
-    s=fcPhotoHtml(sel)+fcAircraftHtml(sel);
+    /* A minimized card drops the photograph and the long list; the callsign,
+       the live numbers and the SID/STAR summary stay on the map. */
+    s=(fExp?fcPhotoHtml(sel):'')+fcAircraftHtml(sel);
   }else{
     const d=live.d||{},cf=d.currentFlight||{},rt=route.length>1,tot=rt?total():0,pr=rt?routeProg():0,pct=tot?Math.min(100,pr/tot*100):0;
+    /* Your own airframe gets the same treatment as a selected one: read the
+       registration the simulator reports (or the title names), then one photo. */
+    fcDetect({k:'own'});
+    const ownReg=fcReg({k:'own'});
+    if(fExp&&ownReg)fcPhoto(ownReg);
     const org=cf.depAirport||(rt?route[0].id:''),dst=cf.arrAirport||(rt?route[route.length-1].id:'');
     const sub=[d.aircraft,d.src?'Live from '+d.src:'Live from the simulator'].filter(Boolean).join(' · ');
-    s='<div class="fh"><span class="dot"></span><b>'+esc(d.callsign||d.registration||'Your aircraft')+'</b><span class="sp"></span><i>'+esc(d.src||'SIM')+'</i><em>Live</em></div>'
-     +'<div class="fcd">'+esc(sub)+(d.registration&&d.callsign?' · '+esc(d.registration):'')+'</div>'
-     +(org||dst?'<div class="fr"><span>'+esc(org||'—')+'</span><span class="arw"></span><span>'+esc(dst||'—')+'</span></div>'
-       +'<div class="ft"><span>off <b>'+zTime(cf.takeoffTime||cf.startTime)+'</b></span><span>eta <b>'+etaZ(g('tEt'))+'</b></span></div>':'')
-     +(rt?'<div class="fbm"><div class="pb"><u style="width:'+pct.toFixed(1)+'%"></u><s style="left:'+pct.toFixed(1)+'%">&#9992;</s></div><span class="fm">'+Math.round(Math.max(0,tot-pr))+' nm remaining</span></div>':'')
-     +'<div class="fg">'+fcField(g('tAL'),'ALT FT')+fcField(g('tGS'),'GS KT')+fcField(g('tHD')+'°','HDG')+fcField(g('tVS'),'VS FPM')
-     +fcField(isFinite(parseFloat(g('tDS')))?g('tDS'):'–','DEST NM')+'</div>';
+    const left=rt?Math.round(Math.max(0,tot-pr)):(isFinite(parseFloat(g('tDS')))?Math.round(parseFloat(g('tDS'))):null);
+    const header='<div class="fh" data-fc-drag><span class="dot"></span><b>'+esc(d.callsign||d.registration||'Your aircraft')+'</b><span class="sp"></span><i>'+esc(d.src||'SIM')+'</i><em>Live</em>'+fcToggleHtml()+'</div>'
+      +'<div class="fcd">'+esc(sub)+(d.registration&&d.callsign?' · '+esc(d.registration):'')+'</div>';
+    const routeLine=(org||dst)?'<div class="fr"><span>'+esc(org||'—')+'</span><span class="arw"></span><span>'+esc(dst||'—')+'</span></div>'
+      +'<div class="ft"><span>off <b>'+zTime(cf.takeoffTime||cf.startTime)+'</b></span><span>eta <b>'+etaZ(g('tEt'))+'</b></span></div>':'';
+    const compact='<div class="fcs"><span><b>'+g('tAL')+'</b> ft</span><span><b>'+g('tGS')+'</b> kt</span><span><b>'+g('tHD')+'&deg;</b> hdg</span>'+(left!=null?'<span><b>'+left+'</b> nm left</span>':'')+'</div>';
+    if(!fExp){
+      s=header+routeLine+compact+fcProcHtml({k:'own'})
+        +(rt?'<div class="fbm"><div class="pb"><u style="width:'+pct.toFixed(1)+'%"></u><s style="left:'+pct.toFixed(1)+'%">&#9992;</s></div></div>':'')
+        +'<div class="fca"><button type="button" data-fc-act="expand">Show details</button></div>';
+    }else{
+      const proc=fcProcedures({k:'own'});
+      const rows=[['Registration',ownReg?esc(ownReg):'Not reported'],['Aircraft',d.aircraft?esc(d.aircraft):'Not reported'],['Flight phase',d.flightPhase?esc(String(d.flightPhase).replace(/_/g,' ')):'Not reported'],['Transponder source',esc(d.src||'Simulator')]];
+      if(proc.cruise)rows.push(['Planned cruise',esc(window.PROFILE?window.PROFILE.altitudeLabel(proc.cruise,'plan'):Math.round(proc.cruise)+' ft')]);
+      if(proc.plan){rows.push(['Departure runway',proc.depRwy?esc(proc.depRwy):'Not in the plan']);rows.push(['Arrival runway',proc.arrRwy?esc(proc.arrRwy):'Not in the plan'])}
+      s=fcPhotoHtml({k:'own'})+header+routeLine
+        +(rt?'<div class="fbm"><div class="pb"><u style="width:'+pct.toFixed(1)+'%"></u><s style="left:'+pct.toFixed(1)+'%">&#9992;</s></div><span class="fm">'+Math.round(Math.max(0,tot-pr))+' nm remaining</span></div>':'')
+        +'<div class="fg">'+fcField(g('tAL'),'ALT FT')+fcField(g('tGS'),'GS KT')+fcField(g('tHD')+'°','HDG')+fcField(g('tVS'),'VS FPM')
+        +fcField(left==null?'–':left,'DEST NM')+'</div>'
+        +fcProcHtml({k:'own'})
+        +'<div class="fcm">'+rows.map(r=>'<div><span>'+r[0]+'</span><b>'+r[1]+'</b></div>').join('')+'</div>';
+    }
   }
   if(s!==fcS){fcS=s;e.innerHTML=s;e.style.display='block';clampCard()}}
 /* The native Charts workspace owns chart viewing now. */
@@ -1680,6 +1996,12 @@ try{if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').t
   import * as AC from './js/lib/aircraft.js';
   import * as PHOTO from './js/lib/aircraftphoto.js';
   import * as REG from './js/lib/aircraftreg.js';
+  import * as PROFILE from './js/lib/profile.js';
+  import * as PROC from './js/lib/procedures.js';
+  import * as TRAILC from './js/lib/trailcolor.js';
+  window.PROFILE = PROFILE;
+  window.PROC = PROC;
+  window.TRAILC = TRAILC;
   window.VATSIM = VATSIM;
   window.AC = AC;
   window.FP = FP;

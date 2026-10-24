@@ -1,3 +1,5 @@
+import { parseOfp } from './flightsummary.js';
+
 const SIMBRIEF_URL = 'https://www.simbrief.com/api/xml.fetcher.php';
 
 // The Username / Pilot ID is saved once, so the planner and the Flight Deck
@@ -88,5 +90,9 @@ export async function fetchSimbriefPlan(entered) {
     destination: data.destination?.icao_code || null,
     general: data.general || {},
     fixes,
+    // The stored plan is what names the SID, the STAR and the planned runways.
+    // Keeping it as the same normalised record the Flight Deck uses means the
+    // tracking card shows the procedures the pilot actually filed, not a guess.
+    ofp: parseOfp(data),
   };
 }

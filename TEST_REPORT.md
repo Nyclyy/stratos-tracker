@@ -2,6 +2,161 @@
 
 Date: 2026-10-19. Environment: Linux x64 cloud VM, Node v24.21.0, Python 3 (FreeStyle build), Chromium 156 via Playwright (headless, software rasterisation, private library prefix). No simulator, iPhone, Windows host or Vercel account was available.
 
+## 2026-10-23 — hosted phone: the desktop's traffic through the relay (Windows 11 x64)
+
+Environment: Windows 11 x64, the real bridge on 8765, `relay/server.mjs` 1.1.0 on loopback 8787, the dev server on 8123 standing in for `https://www.stratos-tracker.com/app/` (same app, relay-paired phone, no bridge reachable), the local test feed and the live VATSIM feed.
+
+| Check | Method | Result |
+| --- | --- | --- |
+| The relay takes the list and new samples | `POST /api/traffic` with the desktop token: one valid list entry, a `(0,0)` entry, a non-numeric entry, two identical samples and one sample older than the window | pass — `{"ok":true,"added":2}`: the repeat, the stale sample and the unusable list entries refused |
+| The phone reads it with its own token | `GET /api/traffic`, `GET /api/traffic?hex=swr219` with the read token | pass — the list held only `SWR219` with its altitude, and the path came back oldest-first as `[12000,16000]` under the normalised key |
+| Roles cannot be swapped | read token on `POST`, desktop token on `GET` | pass — both 401 |
+| A bad post cannot empty a good list | `POST` with non-array fields | pass — `added: 0`, the previous list still served |
+| The bridge sends only what is new | bridge unit test: build a batch, advance the cursor, rebuild | pass — the second batch is empty until a new position is recorded, then contains just that sample |
+| The bridge's real push arrives | bridge paired to the local relay, 20 s later | pass — the relay held 47 aircraft with altitudes, speeds and headings from the bridge's ADS-B loop, `at` 12 s old |
+| The hosted-style phone uses it | page on 8123, paired through the relay, tapped QXE2128 | pass — the card showed ADS-B / 12,680 ft / 335 kt / 007° / 8 nm and “4 recorded positions in its trail **from the relay**”; the oldest point was 63 s old on a 51 s-old page, so it predates the page |
+| Network cost | relay requests observed during the test | pass — one `OPTIONS` + one `GET /api/traffic` per 15 s, one `GET /api/traffic?hex=` on a tap; no errors |
+| Suites | `npm test`, `python -m unittest tests.test_bridge` | 286 JavaScript and 56 bridge tests pass |
+
+Limitations: the relay's traffic lives in its memory, so a relay restart keeps pairings but clears the trails; a phone on the relay cannot write positions, so it sees what the desktop recorded, not its own observations; and nothing is invented for the part of a flight nobody observed.
+
+## 2026-10-23 — nearby traffic on the phone's live map, with the bridge's trails (Windows 11 x64)
+
+Environment: Windows 11 x64, the real bridge on port 8765 serving the phone page on a 390×844 viewport, Chromium, the live VATSIM feed and the bridge's own ADS-B polling. The request: show nearby traffic on the phone's small live map, and give a tapped target the same bridge-backed trail the desktop uses.
+
+| Check | Method | Result |
+| --- | --- | --- |
+| Nearby traffic is drawn | phone page at `http://127.0.0.1:8765/live.html`, map inspected after the first poll | pass — 25 targets within 180 nm (24 from the bridge's ADS-B feed, 1 VATSIM), each a heading glyph; own aircraft drawn on top |
+| Both sources share one list | keys inspected after a poll | pass — 25 targets, 25 distinct keys (24 ADS-B, 1 VATSIM); the merge is keyed by callsign, and VATSIM wins when both feeds report the same aircraft because it carries the filed route and level |
+| Tapping a target selects it | click at the projected position of ASA1385 (FL310, 505 kt, 179°, 36 nm) | pass — `map.trafficSelected` became `ASA1385`, the card showed **ADS-B**, altitude FL310, 505 kt, 179°, 36 nm and “4 recorded positions in its trail”, with no invented type, route, runway or procedure |
+| The trail is the bridge's, not the page's | `GET /traffic/trail?hex=ASA1385` after the tap, compared with the page's own age | pass — the store held 3 points for that aircraft, the oldest **270 s** old, while the page had been open 40 s: the line spans before the page load |
+| It survives a reload | reload, re-select CES998 (and later FDX1223 after the bridge was restarted on a fresh data directory) | pass — 9 points with the first **142 s** old; on the fresh store, a 7-second-old page got 5 points whose oldest was **57 s** old, i.e. recorded before the reload and served back from `traffic_trails.json` |
+| A hidden layer costs nothing | press **Traffic** off, wait 35 s, read the network log | pass — no feed request, no trail request, no position post; toggling it back on polled within 3 s and refreshed the selected target's trail |
+| Aircraft are picked before the route under them | unit test with a fix and an aircraft at the same position | pass — `{ kind: 'traffic', index: 0 }`; with the layer hidden the same point hit-tests as the waypoint |
+| A stale selection cannot outlive its aircraft | unit test: `setTraffic()` without the selected key | pass — selection and its trail are cleared instead of leaving a path with no target |
+| No page errors | console and network logs for the whole session | pass — every request 200, `GET /traffic/trail` and `POST /traffic/track` included; the only console entries were two aborted connections during a reload, and 20 s of polling afterwards produced none |
+| Suites | `npm test`, `python -m unittest tests.test_bridge tests.test_cifp` | 285 JavaScript and 66 Python tests pass |
+
+Limitations confirmed: the phone reads the VATSIM feed directly, so it needs internet for that source; the bridge's ADS-B list is used exactly as the bridge last published it (the desktop shows the same last-known positions), and a hosted page served through the relay receives no ADS-B list, so there it shows VATSIM only. A trail still starts when Stratos first observes the aircraft — no history is invented — and a phone paired through the relay has no bridge store, so its trails live only as long as the page.
+
+## 2026-10-23 — traffic trails kept by the bridge, across reloads (Windows 11 x64)
+
+Environment: Windows 11 x64, the real bridge on port 8765, Chromium, the live VATSIM feed. The request: keep the observed traffic trails so a clicked aircraft's path survives a reload rather than starting from the moment the page opened.
+
+| Check | Method | Result |
+| --- | --- | --- |
+| The bridge records posted positions | `POST /traffic/track` with three points, two of them real samples and one at `0,0` | pass — `{"ok":true,"added":1}`: the duplicate and the `0,0` sentinel were refused, the real sample stored |
+| A path reads back oldest first | `GET /traffic/trail?hex=4ca1b2` | pass — `{"ok":true,"hex":"4CA1B2","points":[[47.1,-122.3,12000.0,…]],"retentionSeconds":2700}`, the key normalised from lower case |
+| A bad request says so | `GET /traffic/trail?hex=` | pass — 400 with “A hex address or callsign is required.” |
+| The store survives a restart | stop the bridge, start it again, read the same trail | pass — the point written before the restart is served afterwards from `traffic_trails.json` |
+| The page reports what it sees | live VATSIM feed, 35 s of polling | pass — fourteen aircraft recorded in the file (SWR219, GFA020, THA27LP, FDX4900, RYR2PW, THY1759, …), two samples each |
+| A reload keeps the path | reload the page, click SWR219 | pass — the page had two live samples; after the backfill its trail held **five** points, the first **118 s** old, i.e. from before the reload, with the newest one current |
+| Order is never rewound | bridge unit test with a stale sample posted after a fresh one | pass — the stale point is dropped instead of being appended at the end |
+| Write cost | debounced save | 8 s between writes (`STRATOS_TRAFFIC_SAVE`, fixed), 360 samples and 45 minutes per aircraft, 400 aircraft overall |
+| Suites | `npm test`, `python -m unittest tests.test_bridge` | 283 JavaScript and 53 bridge tests pass |
+
+Limitations confirmed: the phone's live page did not show other traffic at that point (superseded by the phone-traffic entry above). The trail still begins when Stratos first observes an aircraft — VATSIM and the public ADS-B feeds publish only a current position. A hosted deployment without the bridge has no store, so trails there last as long as the page does.
+
+## 2026-10-23 — a clicked aircraft's own path, for both traffic sources (Windows 11 x64)
+
+Environment: Windows 11 x64, the real bridge on port 8765, Chromium, the live VATSIM feed (2–18 pilots in view depending on the area).
+
+| Check | Method | Result |
+| --- | --- | --- |
+| The cause | reading the traffic path in the page | **failed, fixed** — ADS-B polling recorded trails, but the VATSIM refresh removed every VATSIM entry and pushed brand-new objects without recording a position, so no VATSIM aircraft ever had a trail and a selection could not survive a refresh |
+| VATSIM pilots are recorded | live feed, 35 s of refreshes, `TRL` inspected | pass — eleven pilots each held a two-point trail after two refreshes (SWR219, THA671, THA27LP, FDX4900, RYR2PW, THY1759, DLH766, TVS1082, …), where the map previously held none |
+| A click draws that aircraft's path | `sel = SWR219`, `fCard()`, canvas pixels read along its recorded points | pass — the line is stroked in the same altitude ramp: `rgb(240,104,144)` at FL362, alpha 255, with the card reporting “Trail 9 nm in 1 min” |
+| The open card and selection survive a refresh | objects updated in place via `known.get(id)` | pass — the same object is mutated rather than replaced, and a selected pilot that leaves the view is kept until cleared |
+| Both sources use one path | ADS-B `wtMerge` and VATSIM `vatsimTraffic` | pass — both call `trlAdd` with `hx||id`, and `trlGC` expires silent trails on the same cycle |
+| Suites | `npm test` | 282 JavaScript tests pass |
+
+Limitations confirmed: VATSIM and the public ADS-B feeds publish only a current position, so a target's trail begins when Stratos first observes it — there is no history to fetch and none is invented, and the card states how much has been recorded. The screenshot used to show this was taken from the live feed, not from stored data.
+
+## 2026-10-23 — flown path drawn as an altitude-coloured trajectory (Windows 11 x64)
+
+Environment: Windows 11 x64, Node v26.8.1, Python 3.15.0, Chromium through the app's own bridge on port 8765. The request was for the aircraft's path to look like a tracking app's trajectory — one continuous line, not a fading contrail — and to change colour with height, white on the ground.
+
+| Check | Method | Result |
+| --- | --- | --- |
+| The path is one solid line, not a contrail | code path `drawTrail` | pass — a 6 px dark casing under a 3 px line, opaque (`globalAlpha` = 1); the old per-segment width/alpha taper and its colour constant are gone |
+| The colour follows height above ground | `trailInk()` evaluated in the page | pass — `trailInk(0)` = `rgb(255,255,255)`, `trailInk(12000)` = `rgb(160,232,56)`, `trailInk(42000)` = `rgb(216,72,240)`, interpolated in 8-value steps between stops |
+| The rendered pixels change with the climb | a 60-point synthetic track drawn on the live canvas, then `getImageData` at six points | pass — 0 ft `rgb(255,255,255)` white, 12,203 ft `rgb(168,232,56)`, 20,339 ft `rgb(255,201,65)`, 27,797 ft `rgb(248,137,71)`, 35,932 ft `rgb(240,104,144)`, every sample alpha 255 |
+| A taxiway at a high-altitude airport still reads as ground | recorded samples carry AGL; `seedTrail` keeps it | pass — a track of `[430 ft MSL, AGL 0]`, `[12,000 ft, AGL 11,570]`, `[36,000 ft, AGL 35,570]` seeded into the map keeps its AGL and renders white, lime and rose |
+| The bridge sends AGL with the recorded track | `stream_track` and `tests/test_bridge.py` | pass — a fifth value per point, `null` when the simulator gave none; the stream cache key now includes the first sample as well, because two flights can share a sample count and end time and would otherwise receive each other's points |
+| The recording is not eroded | `seedTrail` refreshes from the bridge's whole-flight sample on every snapshot that grows | pass — a page opened mid-flight keeps the departure end instead of losing one point per telemetry frame |
+| Suites | `npm test`, `python -m unittest discover -s tests -p 'test_*.py'` | 278 JavaScript and 60 Python tests pass |
+
+The phone's small map now uses the same ramp from the shared module `app/js/lib/trailcolor.js`: rendered there, a 30-point track returned white at AGL 0, `rgb(136,224,80)` at 10,800 ft, `rgb(248,152,64)` at 25,200 ft and `rgb(224,80,200)` at 39,600 ft, while a preview without altitudes still drew the accent colour `#4d9fe8` exactly.
+
+Limitations confirmed: a flight recorded by a bridge older than this change has no AGL per sample, so its trail is coloured by height above its lowest recorded altitude, which is the departure elevation for a flight recorded from the gate. The end-of-track marker dot still sits on top of the line in its own colour.
+
+## 2026-10-23 — shipped SID/STAR dataset, and procedures with no runway leg (Windows 11 x64)
+
+Environment: Windows 11 x64, Node v26.8.1, Python 3.15.0, X-Plane 12 (Steam, Navigraph Custom Data, AIRAC 2610), Chromium through the app's own bridge on port 8765. The dataset was built from the FAA's `CIFP_261029.zip` (cycle 2611, effective 2026-10-29) and OurAirports `runways.csv`; both are public domain / CC0 and only the converted JSON is committed.
+
+| Check | Method | Result |
+| --- | --- | --- |
+| The dataset builds from the published source | `python scripts/build-navdata.py` | pass — 739 files, 738 airports with procedures, 2,124 SIDs, 1,946 STARs, 19,384 transitions, 8.3 MB; `index.json` carries cycle, effective date, coverage and the airport list |
+| The simulator's data still wins | `GET /health`, `GET /procedures.json?airport=KSEA&kind=sid&id=SUMMA2` | pass — `/health` reports `navdata {source: 'Custom Data', cycle: '2610'}` **and** `navdata.dataset {cycle: '2611', airports: 738}`; SUMMA2 answers `source: X-Plane 12 CIFP (Custom Data)` |
+| The dataset answers when the simulator's cycle lacks a procedure | real FAACIFP18 rows for `06FA` `VUUDU3` (absent from the installed 2610 data, present in 2611) | pass — `GET /procedures.json?airport=06FA&kind=star&id=VUUDU3` answers `source: FAA CIFP (FAACIFP18, United States)`, cycle 2611, with its ten en-route transitions and every fix resolved |
+| Real legs, side by side with the simulator | `tests/procedures.test.mjs` against `navdata/cifp/KSEA.json` and `KPDX.json` | pass — KSEA `BANGR9`/16L is `RW16L → CAVOB → RENBE → RICHR → TOMRE → BANGR` from the 16L threshold `47.463794, -122.30775`; KPDX `HELNS6`/10L runs `BTG → … → RW10L`, i.e. it ends on the runway, not at the airport centre |
+| **Procedures with no runway leg are no longer dropped** | 65.7% of the dataset's 4,070 procedures publish no runway transition (measured over the whole dataset); KLAX `ANJLL4` and `CHATY5` are real examples | **failed, fixed** — these previously produced “has no runway transition”, so nothing was drawn. The verified geometry is now returned instead: `ANJLL4`/24R with a KLAX plan gives `HAKMN → SHTNR → SMASH → SALYY → GLESN → ANJLL → CAANN → BOYEL → CRCUS` (`transition: HAKMN+ALL`, `runwayConnector: false`), `CHATY5` gives `CHATY → JOSUL → CASTA → GMN`, and the runway is **not** joined to either by a straight line. A trunk of one fix still refuses, because one point is not a path |
+| The page follows the same path live | Chromium at `http://127.0.0.1:8765` with a stored KSEA→KLAX plan (SUMMA2/16L, ANJLL4/24R) | pass — `PROCG.star` holds `ANJLL, CAANN, BOYEL, CRCUS`, `PROCG.sid` holds `RW16L, NEVJO, SUMMA`, and the card note reads “ANJLL4 ALL legs from AIRAC 2610 · the source publishes no runway leg, so the runway is not joined”. No console errors, and the request count stayed at one per airport/kind/procedure |
+| The plan's own legs are untouched | `tests/ui.test.mjs` (byte-for-byte route-line test) and the procedure block's “never edits the route” assertion | pass — the procedure layer still only reads `route`; the 12 px waypoint line is unchanged and the procedure path is painted beneath it |
+| Packaging | `electron-builder.config.cjs` extraResources, PyInstaller steps in `.github/workflows/release.yml` | pass (static) — the app ships `bridge/navdata`, and each one-file bridge build passes `--add-data navdata/cifp`, which is where `stratos_cifp.find_dataset_dir()` looks (`here/navdata/cifp`, `sys._MEIPASS/navdata/cifp`, beside the frozen executable). Not exercised by an actual installer build here |
+| Suites | `npm test`, `python -m unittest discover -s tests -p 'test_*.py'` | 277 JavaScript and 59 Python tests pass |
+
+Limitations confirmed: the dataset covers United States airports only, so a European procedure needs a simulator that has it installed; approach procedures are returned by the bridge but not drawn by the map; arcs, turn radii, holds and leg terminators are reported, not synthesised; and a procedure with no published runway leg is drawn without a runway connection and says so rather than being completed by a straight line. An installer was not built here, so the packaged copies of `navdata` are verified by reading the configuration, not by running the artifact.
+
+## 2026-10-23 — terminal procedure geometry from the simulator's own CIFP data (Windows 11 x64)
+
+Environment: Windows 11 with X-Plane 12 installed through Steam (`C:\Program Files (x86)\Steam\steamapps\common\X-Plane 12`, Navigraph Custom Data, AIRAC 2610), the real bridge on port 8765 and Chromium. This round adds a navigation-data source, so every claim below was checked against the installed files, not only against fixtures.
+
+| Check | Method | Result |
+| --- | --- | --- |
+| The bridge finds the simulator's data | `stratos_cifp.find_xplane_dir()` on this PC, and `/health` | pass — found the Steam install from `x-plane_install_12.txt`; `/health` reports `navdata: {available: true, cycle: '2610', source: 'Custom Data'}` |
+| Real SID geometry | `GET /procedures.json?airport=KSEA&kind=sid&id=SUMMA2` | pass — `SUMMA2` returns the RW16L transition `NEVJO → SUMMA`, the RW16C/RW16R/34L/34R transitions and the BKE/LKV en-route transitions, each fix with real coordinates, plus the 16L threshold `47.463794, -122.30775` from the `RWY:` record |
+| Real STAR geometry | `GET /procedures.json?airport=KPDX&kind=star&id=HELNS6` | pass — runway transitions RW03, RW10B, RW21 and RW28B, each `BTG → KPDX` and complete; the 28R threshold comes from the file |
+| A fix the data cannot place is not invented | synthetic fixture with an unknown fix | pass — the transition lists the verified fixes, `skipped: 1`, `complete: false`, and the unknown name is absent (`tests/test_cifp.py`) |
+| VOR/DME duplicates do not make a name ambiguous | real `BTG` (VOR record 3 and DME record 12, a few hundred metres apart) | **failed, fixed** — the two records were treated as two different places and BTG was dropped. Same ident in the same region within 0.02° is now one station; BTG resolves and HELNS6 is complete |
+| Runway thresholds parse correctly | DMS `N47255222,W122182894` | pass — 47.431172, -122.30775 etc. A 9-digit longitude (previously rejected) is now read |
+| The app draws only the runway connection the plan lacks | KSEA→KPDX plan with SUMMA2/16L and HELNS6/28R in Chromium | pass — the SID path is RW16L → NEVJO → SUMMA (stops at the first plan fix), the STAR path is BTG → RW28R, and the airport point is replaced by the threshold instead of drawing into the field and back out |
+| The path is on the map and under the route line | canvas pixel sampling after fitting the route | pass — 36 cyan pixels on the SID threshold leg and 64 on the STAR leg; `drawProcedurePaths()` runs before the unchanged route-line statement, which still passes its byte-for-byte test |
+| A missing transition is reported, not fabricated | plan with HELNS6/28R before the resolver fix, and a runway with no published transition | pass — card note reads “HELNS6 has no runway transition for 28R in this data”, and no path is drawn; after the fix it reads “HELNS6 28R transition from AIRAC 2610 · combined runway transition” |
+| The AIRAC cycle is shown | card hint and payload | pass — `AIRAC 2610`, read from `cycle_info.txt`/`cycle.json` |
+| Cost | first request per airport, then cached | ~1 s for the first airport (one pass over the 15 MB fix file and the 2.6 MB navaid file), then served from memory; the fetch is asynchronous and never blocks the map |
+| Suites | `npm test`, `python -m unittest tests.test_bridge tests.test_cifp` | 275 JavaScript and 53 Python tests pass |
+
+Limitations confirmed: this reads X-Plane 12's data on the PC running the bridge. A hosted page on another machine, or MSFS (proprietary navdata), gets no procedure geometry and says so. Only the runway transition is painted: the plan's own fixes still come from the plan, and arcs, turns and leg terminators are reported but not synthesised. No licensed navigation file is committed to the repository; the tests use a synthetic fixture in the same format.
+
+## 2026-10-23 — phone reconnect, TOC/TOD cache, plan hand-off and traffic card (Windows 11 x64)
+
+Environment: Windows 11 10.0.26300, Node v26.8.1, Python 3.15.0, the real bridge running from a temporary data directory on port 8765, Chromium previews at 1048x879, and X-Plane-style `DATA3` UDP rows fed from a test harness (`artifacts/simfeed.mjs`, test-only). No real X-Plane or MSFS session and no iPhone were available. Totals: **265 JavaScript tests** and **46 Python bridge tests**, all passing.
+
+| Check | Method | Result |
+| --- | --- | --- |
+| Phone pairing without a code, QR or typed URL | real bridge; `curl` from the LAN address and from loopback | pass — `GET /pair/connect` from `192.168.50.157` answers 303 to `/live.html` and sets only the HttpOnly `stratos_phone` cookie; `/health` and `/stream` are 401 from the LAN without it and 200 with it; loopback is trusted and returns 303 without a cookie |
+| Phone dashboard receives live telemetry | Chromium on `http://127.0.0.1:8765/live.html` with the UDP feed | pass — “Simulator live”, altitude/groundspeed/heading/vertical speed, aircraft position on the mini map, flight time advancing |
+| Phone recovers after the bridge restarts | kill the bridge, watch the page, start it again | pass — status went `Simulator live` → `Connecting…` → `Simulator live` with telemetry flowing again, no reload and no user action |
+| Desktop page recovers on its own | same restart, Flight Deck tab | pass — the EventSource reopened, `liveOk()` true, header returned to “Live from X-Plane” |
+| TOC/TOD appear at all with a plan | Flight Deck with a 5-point KSEA→KPDX plan carrying plan altitudes | **failed, fixed** — `planTocTod()` cached an empty result from the first frame, before the deferred profile module loaded, so the markers never appeared. The cache key now includes whether `window.PROFILE` exists; re-checked: cruise 35,000 ft, TOC at 62 nm (SUMMA→BLUIT), TOD at 82 nm (BLUIT→CHINS), both from the plan's own altitudes |
+| TOC/TOD follow the route, not a great circle | same route, markers read back from `planTocTod()` | pass — both are interpolated inside their own leg (`legIndex` 1 and 2), never beyond the segment, and a plan with no room returns `ok:false` instead of two stacked markers (`tests/profile.test.mjs`) |
+| Airport symbols survive the planner→map hand-off | route from `stratos.activeRoute` with the planner's `airport`/`navaid` names | **failed, fixed** — the map only knew `apt`/`nav`, so a planned airport drew as an ordinary waypoint. `routeKindName()` normalises on load and `sendToMap` translates both directions; re-checked: kinds `apt, sid, air, wp, apt` |
+| SID/STAR tags and the stored plan survive a Route Planner import | source + unit tests | **failed, fixed** — the planner dropped `is_sid_star`, `via_airway` and the SimBrief plan, so a plan imported there reached the map with every fix as an ordinary waypoint and a card with no procedures. It now keeps both tags, stores the normalised OFP and sends the same plan the Flight Deck import does (`tests/simbrief.test.mjs`, `tests/ui.test.mjs`) |
+| Waypoint selection with a mouse | pointer events on the map canvas at BLUIT | pass — the point was selected, the route card opened with identifier, coordinates, planned altitude, distance from departure/previous/next, type and both connected legs |
+| Selection is purple and does not touch the route line | canvas pixel comparison at a leg midpoint, before/during/after selection | pass — 471 purple pixels at the selected marker; the sampled route pixels were identical (`494110`) in all three states; the line statement itself is unchanged (locked by `tests/ui.test.mjs`) |
+| Marker types stay distinct | `routeKind()` on a SID fix, an airway fix, an ordinary fix and both airports | pass — `sid`, `air`, `wp`, `apt` |
+| Traffic card shows the target's own flight, not the PC's | synthetic VATSIM entry rendered through `fcAircraftHtml` | **failed, fixed** — `fcProcedures` fell back to the live PC flight's airports for every target. A target now uses its own filed `dep`/`arr`, and shows its filed route and planned cruise when the feed carries them; the synthetic ASA123 card reads KSEA → KPDX, “SUMMA2 SUMMA J523 BLUIT HRMNS3”, FL360, with SID/STAR honestly “not in the plan” |
+| VATSIM filed route and cruise level | `parsePilots` unit test | pass — `cruiseFt` 36000 and the route text are kept; a pilot with no flight plan gets nulls |
+| Tracking card minimizes to SID/STAR and runways | `fcProcHtml` with a stored plan | pass — SID SUMMA2 with `RWY 16L` under it, STAR HRMNS3 with `RWY 28R`; the same block is in both the expanded and minimized branches, and the expanded/minimized choice is remembered in `stratos.cardExpanded` |
+| Flight trail is recorded, not decorative | `TRL.get('own')` after a fed flight | pass — 206 timestamped points from the first recorded position to the last (35,500 ft → 355 ft), each with lat/lon/alt/time; a new flight id clears the old trail, and the phone seeds from the same bridge track |
+| Map cost per frame | 30 consecutive `draw()` calls with a 5-point route and a 206-point trail | 4.61 ms per frame at the normal profile (60 fps budget 16.7 ms); no route rebuild on telemetry, and the card only replaces its HTML when the rendered string changes |
+| Aircraft photo through the bridge | `GET /api/photo?reg=N8312C` on the running bridge, then the app's own card | **added** — the bridge now proxies the Planespotters lookup for the pages it serves. The endpoint answered 200 with a published photo, 400 for `12345`, and the cached second request in 0.117 s; the card showed the real photo with “Planespotters © Mingfei S” and the registration, type, SID and STAR. Before this the bridge-served page had no photo route (404) |
+| Watching a dead stream | restart the bridge with the Flight Deck tab open, then check the page | pass — the tab reopened the stream on its own (fresh payload within seconds) and now also reopens after twelve seconds of silence, which covers the half-open socket a restart can leave behind (`tests/ui.test.mjs`) |
+| Whole suites | `npm test`, `python -m unittest tests.test_bridge` | 265/265 and 46/46 pass |
+
+Limitations confirmed in this round: procedure geometry is limited to the fixes the imported plan lists — there is no CIFP/ARINC dataset here, so runway transitions and leg terminators are not synthesised and a plan that starts at the airport draws its SID from that node. No real simulator or iPhone was connected, so the UDP/SimConnect identity reads and Safari behaviour remain source-tested only.
+
 ## 2026-10-21 — route on the main Flight Deck map (2.1.16)
 
 The planner writes `stratos.activeRoute` on every edit and the Flight Deck map reads it, so the route draws there without pressing a button. On load the map fits the route into view and keeps it updated when the planner changes it in another page. A Layers toggle (Route) hides and shows it. Checks: `npm test` 172/172 pass; `npm run test:py` passes. Chromium 1440x900 on a local static server, with a stored KSFO→KLAX route: the map fitted both airports, drew the dashed route with labels, and the screenshot is saved as `artifacts/route-main-map-2116.png`. The Windows installer was not rebuilt in this session.

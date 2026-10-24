@@ -45,7 +45,9 @@ GitHub Pages also works if you deploy the repository root (Settings → Pages �
 3. Share → **Add to Home Screen** → Add.
 4. Open the installed app. For live simulator data, pair it.
 
-   **On the same Wi-Fi (no relay):** on the PC open **Pilot → Settings → Phone access → Show pairing QR**, then scan the code with the iPhone camera. The QR opens `http://<PC-IP>:8765/pair?t=…` on the phone, which exchanges the single-use code for its own HttpOnly cookie and redirects to Checklists. The PC lists each paired phone and can forget one or all; forgetting closes an already-open telemetry stream within about five seconds.
+   **On the same Wi-Fi (no relay):** open Stratos on the phone and tap **Connect to Simulator**. The bridge answers multicast DNS for `stratos.local`, so the phone opens `http://stratos.local:8765/pair/connect`, receives its own HttpOnly secret and is redirected to the live dashboard — nothing to scan and nothing to type. Opening the same page again reconnects with the stored cookie. The PC lists each paired phone and can forget one or all; forgetting closes an already-open telemetry stream within about five seconds.
+
+   **Fallback (multicast blocked, or an unusual network):** use **Pilot → Settings → Phone access → Show pairing code** and enter the six-digit code, or open the LAN address shown in Settings (`http://<PC-IP>:8765`). The QR code encodes the single-use token instead of the code. Either route issues the same per-phone cookie.
 
    **From outside the LAN:** enter the relay URL on the PC and generate a code, then use **Live → Relay URL + pairing code → Connect** on the phone. The relay is the only path that works over HTTPS from another network.
 
@@ -179,7 +181,12 @@ If the port is changed with `STRATOS_HTTP_PORT`, the desktop UI does not know th
 
 - **X-Plane 11/12:** Settings → Data Output, enable rows 3 (speeds), 17 (heading) and 20 (position/altitude), send to UDP port 49003 on the PC running the bridge. Start a flight.
 - **MSFS 2020/2024:** the optional SimConnect Python package (`pip install SimConnect`) is needed for the MSFS connector. Start a flight. If it is unavailable, the app reports “not installed (optional)” and MSFS telemetry is not claimed.
-- The bridge HTTP server binds to **0.0.0.0** by default so the QR code can be opened by a phone on the same trusted network. Every non-loopback request needs the bridge token or a phone pairing cookie; the PC is trusted by loopback. Set `STRATOS_HOST=127.0.0.1` to disable LAN access entirely (and use the relay for phones). Never forward port 8765 from a router.
+- The bridge HTTP server binds to **0.0.0.0** by default so a phone on the same trusted network can reach it. Every non-loopback request needs the bridge token or a phone pairing cookie; the PC is trusted by loopback. Set `STRATOS_HOST=127.0.0.1` to disable LAN access entirely (and use the relay for phones). Never forward port 8765 from a router.
+- **Terminal procedures:** `GET /procedures.json?airport=KSEA[&kind=sid&id=BANGR9]` returns the published SID, STAR and approach legs for one airport, each fix resolved to a coordinate, each runway threshold supplied where the source has one. Two providers, in order: the PC's X-Plane 12 installation (`Custom Data/CIFP` first, then `Resources/default data/CIFP`; `STRATOS_XPLANE_DIR` points the bridge at an install it cannot find), then the dataset Stratos ships in `navdata/cifp` — the FAA's public-domain Coded Instrument Flight Procedures, one JSON file per United States airport, rebuilt with `python scripts/build-navdata.py`. The dataset is what gives MSFS users, and PCs without X-Plane, real SID/STAR geometry from the runway transition to the terminal fix; outside the United States only a simulator that has the procedure installed can supply it. `/health` reports `navdata` (simulator source and cycle) and `navdata.dataset` (cycle, effective date, airport count). A fix the source cannot place is counted as `skipped` and the transition is marked incomplete rather than guessed. Many procedures publish no runway-specific legs at all (a common `ALL` trunk plus en-route transitions); the page then draws those verified legs and does not join the runway to them, because the source states no such leg. The first request for a simulator airport reads its fix and navaid files once (about a second) and is then cached for the life of the bridge; the dataset answers immediately. A procedure the simulator's older cycle lacks is looked up in the dataset before the answer is `not-found`.
+- **Observed traffic trails:** `POST /traffic/track` with `{"points":[[hex,lat,lon,alt,tMs],…]}` records the positions a page has seen (at most 2000 per request, batched by the page to one post every 15 s); `GET /traffic/trail?hex=<hex or callsign>` returns that aircraft's path as `[[lat,lon,alt,tMs],…]`, oldest first. The store keeps 45 minutes (`STRATOS_TRAFFIC_RETENTION`) and 360 samples per aircraft, drops `0,0` positions, repeated samples and anything older than the newest one, and writes to `traffic_trails.json` in the data folder at most every 8 s, so a trail survives a page reload and a bridge restart. Nothing is fetched from a historical source: a trail begins at the first observation.
+- **Aircraft photos:** `GET /api/photo?reg=<registration>` proxies the Planespotters lookup for pages the bridge serves (the API refuses a browser User-Agent). A found photo is cached in memory for 24 h and a miss for 1 h, so a card that redraws at telemetry rate asks the service once; an unknown registration answers `{"photos":[]}`, an unreachable source a 502.
+- **One-tap pairing:** the bridge answers multicast DNS on `224.0.0.251:5353` for `stratos.local` (best effort; if the port is held by the OS the bridge still serves and Settings says discovery is unavailable). `GET /pair/connect` enrolls a phone that arrives from a private address and redirects it to `/live.html`; `POST /pair/auto` does the same for the app. Both are rate limited per address and are disabled by `STRATOS_AUTO_PAIR=0`, which leaves the code/QR path. Enrollment still issues an authenticated per-phone cookie: telemetry is never unauthenticated.
+- **X-Plane identity:** the bridge subscribes over UDP to `sim/aircraft/view/acf_tailnum`, `acf_ICAO` and `acf_descrip` one character at a time (RREF) so the registration and type appear without a plugin or hand-typed values. A value saved in Settings still wins. `STRATOS_XPLANE_HOST` points the requests at a simulator on another machine.
 - On Windows the bridge binds the HTTP port exclusively, so a second copy exits with `Could not start the bridge on port 8765` instead of competing with the first. The desktop app also probes `/health` before spawning.
 - UDP telemetry listens on `0.0.0.0:49003` so a simulator on another machine can send data. Set `STRATOS_UDP_HOST` to restrict it.
 
@@ -188,7 +195,11 @@ Useful variables:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `STRATOS_HTTP_PORT` | `8765` | Bridge HTTP port |
-| `STRATOS_HOST` | `0.0.0.0` | HTTP bind address; set `127.0.0.1` to disable LAN/QR pairing |
+| `STRATOS_HOST` | `0.0.0.0` | HTTP bind address; set `127.0.0.1` to disable LAN pairing |
+| `STRATOS_AUTO_PAIR` | `1` | Set `0` to require the six-digit code for every new phone |
+| `STRATOS_MDNS_HOST` | `stratos.local` | The name the bridge answers over multicast DNS |
+| `STRATOS_XPLANE_HOST` | `127.0.0.1` | Where UDP dataref requests for aircraft identity are sent |
+| `STRATOS_XPLANE_UDP_PORT` | `49000` | X-Plane's UDP dataref port |
 | `STRATOS_UDP_PORT` | `49003` | X-Plane data output port |
 | `STRATOS_UDP_HOST` | `0.0.0.0` | UDP bind address |
 | `STRATOS_DATA_DIR` | script folder | Logbook, token, replay data, caches |
@@ -216,10 +227,13 @@ Put it behind HTTPS (Render, Fly.io, a VPS with Caddy, etc.). The bridge refuses
 | `STALE_SECONDS` | `15` | When a snapshot is shown as stale |
 | `TRUST_PROXY` | off | Trust `X-Forwarded-For` (only behind a known proxy) |
 | `RELAY_PERSIST` | on | Set `0` for memory-only |
+| `TRAFFIC_RETENTION_SECONDS` | `2700` | How long a relayed traffic trail is kept |
 
 Set `ALLOWED_ORIGINS` to your real PWA origin in production. `*` still requires a bearer token, but narrowing it limits abuse. The relay stores only SHA-256 hashes of tokens. Sessions are written with mode 0600 when persistence is enabled. Pairing codes expire after five minutes; claim and pair endpoints are rate-limited.
 
 The relay only accepts data from the desktop. There is no route that sends a command, keypress or file to the PC.
+
+A paired phone that is not on the PC's network still gets the desktop's traffic. The bridge posts the aircraft it has polled and the new samples of each recorded trail to `POST /api/traffic` every 15 s (desktop token, list capped at 60 aircraft, only samples the relay has not seen). The phone reads `GET /api/traffic` for the list and `GET /api/traffic?hex=KEY` for one aircraft's path (read token). Traffic lives in relay memory with the same 45-minute retention, per-aircraft cap (360) and duplicate/rewind rules as the bridge store, so a relay restart clears the trails but leaves sessions and pairing intact. There is no route by which a phone can write traffic.
 
 ## 5. API
 
@@ -253,7 +267,7 @@ The bundled pdf.js 6 build calls JavaScript helpers newer than Chromium 138 (Ele
 ```bash
 npm ci
 npm test                     # data, chart, module, DOM/UI, Discovery, relay and route-weather suites
-npm run test:py              # 31 bridge lifecycle, landing, checklist and pairing tests
+npm run test:py              # bridge lifecycle, landing, checklist, discovery and identity tests
 npm run test:integration     # real bridge + relay + SSE + pairing (about 10 s)
 node scripts/benchmark.mjs   # data-path benchmark
 ```
@@ -279,10 +293,11 @@ Browser automation was available for the charts check on Windows (Playwright + C
 ## 8. Remaining limitations
 
 - No real simulator, iPhone, or Windows machine was available here. Simulator compatibility is implemented from the documented UDP/SimConnect interfaces but is **not** verified against a live sim in this environment.
+- SID/STAR geometry follows verified procedure legs, never an invented straight line: the bundled dataset is FAA CIFP data, so procedures outside the United States come only from a simulator that has them installed, and a leg whose fix the source cannot place is reported as skipped rather than drawn. Arcs, turn radii and holding patterns are not drawn, and the plan's own waypoint-to-waypoint lines are untouched — only the procedure's runway connection is added beneath them.
 - Landing runway matching depends on the bridge's airport/runway data. It is labelled an estimate when the runway is inferred from position.
 - NOTAMs are not implemented. No legitimate free NOTAM API is wired in, so the briefing says so instead of inventing them.
-- Automatic local-network discovery (mDNS/DNS-SD) is not used: browsers do not expose it to a web page, and iOS restricts local-network probing. Pairing therefore stores the reachable bridge origin on the phone and reconnects to it; if the PC's DHCP address changes, scan a new QR code. A small-screen phone cannot be paired through an HTTPS page to an HTTP LAN bridge (mixed content), so open the QR's HTTP address directly.
-- Push notifications are not implemented. Pairing uses a QR code or a short code.
+- A web page cannot scan the local network, and an HTTPS page cannot call an HTTP LAN bridge (mixed content). One-tap pairing therefore uses the one mechanism that works: the bridge answers multicast DNS for a fixed name, and the phone follows a **top-level navigation** to `http://stratos.local:8765/pair/connect`. Networks that block multicast, or client isolation on guest Wi-Fi, will not resolve the name; the code/QR fallback and the LAN address in Settings remain. The phone's stored bridge origin is tried first after that, so an unchanged DHCP lease reconnects instantly.
+- Push notifications are not implemented. A new phone can connect with one tap, or with a QR code or short code when multicast is unavailable.
 - Replay is available only for flights recorded after track logging was enabled. Older flights without a track show an explicit explanation.
 - The relay keeps sessions in memory by default; a restart invalidates pairings unless `RELAY_PERSIST` and a persistent disk are used.
 - The public ADS-B providers and NOAA can rate-limit or block a network. The UI reports the failure; it does not substitute demo aircraft.
@@ -290,6 +305,6 @@ Browser automation was available for the charts check on Windows (Playwright + C
 
 ## 9. Attribution
 
-Map data © OpenStreetMap contributors (ODbL). Airport data from OurAirports (CC0). Weather from NOAA Aviation Weather Center (public domain). FAA terminal procedures are fetched from the official site and shown in the in-app viewer; Stratos does not redistribute a chart library. See `SOURCES_AND_LICENSING.md`.
+Map data © OpenStreetMap contributors (ODbL). Airport data from OurAirports (CC0). Weather from NOAA Aviation Weather Center (public domain). The bundled SID/STAR dataset is the FAA's Coded Instrument Flight Procedures (public domain) with runway thresholds from OurAirports (CC0). FAA terminal procedures are fetched from the official site and shown in the in-app viewer; Stratos does not redistribute a chart library. See `SOURCES_AND_LICENSING.md`.
 
 Stratos is not for real-world navigation.

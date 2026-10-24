@@ -1,0 +1,1 @@
+{"ok":true,"airport":"PAPE","source":"FAA CIFP (FAACIFP18, United States)","cycle":"2611","runways":{"02":{"lat":55.903,"lon":-159.164993},"20":{"lat":55.9104,"lon":-159.156006}},"procedures":{"sid":[{"id":"CILAC3","transitions":[{"id":"RW20","runway":"20","combined":false,"points":[{"id":"CILAC","lat":55.666667,"lon":-159.5,"terminator":"DF"}],"skipped":0,"complete":true}]}]}}

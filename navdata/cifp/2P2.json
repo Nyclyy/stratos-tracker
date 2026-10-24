@@ -1,0 +1,1 @@
+{"ok":true,"airport":"2P2","source":"FAA CIFP (FAACIFP18, United States)","cycle":"2611","runways":{},"procedures":{"sid":[{"id":"WINEP1","transitions":[{"id":"ALL","runway":"","combined":false,"points":[{"id":"OCEKA","lat":45.415878,"lon":-86.9048,"terminator":"IF"},{"id":"WINEP","lat":45.537861,"lon":-86.980664,"terminator":"TF"}],"skipped":0,"complete":true}]}]}}

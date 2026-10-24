@@ -1,0 +1,1 @@
+{"ok":true,"airport":"1L7","source":"FAA CIFP (FAACIFP18, United States)","cycle":"2611","runways":{},"procedures":{"sid":[{"id":"HASSL2","transitions":[{"id":"RW13","runway":"13","combined":false,"points":[{"id":"UVCEH","lat":37.586425,"lon":-111.397681,"terminator":"DF"},{"id":"HASSL","lat":37.570022,"lon":-110.883508,"terminator":"TF"}],"skipped":0,"complete":true}]}]}}

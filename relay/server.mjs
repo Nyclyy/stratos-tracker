@@ -40,12 +40,23 @@ const CODE_TTL_MS = 5 * 60 * 1000;
 const READ_TTL_MS = Number(process.env.READ_TOKEN_DAYS || 30) * 24 * 60 * 60 * 1000;
 const MAX_BODY = 256 * 1024;
 const STALE_MS = Number(process.env.STALE_SECONDS || 15) * 1000;
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
+// Traffic the bridge has observed. A traffic feed publishes only a current
+// position, so this is what the bridge actually saw, kept briefly for a paired
+// phone. It is deliberately in memory only: it expires in minutes and is not
+// worth writing to the session file.
+const TRAFFIC_RETENTION_MS = Number(process.env.TRAFFIC_RETENTION_SECONDS || 2700) * 1000;
+const TRAFFIC_MAX_POINTS = 360;
+const TRAFFIC_MAX_AIRCRAFT = 400;
+const TRAFFIC_LIST_MAX = 60;
+const TRAFFIC_BODY_MAX = 128 * 1024;
 
 /** @type {Map<string, {id:string, name:string, createdAt:number, codeHash:string, codeExpiresAt:number, desktopHash:string, reads:Map<string,{hash:string,createdAt:number,expiresAt:number,label:string}>, snapshot:object|null, updatedAt:number}>} */
 const sessions = new Map();
 const tokenIndex = new Map(); // sha256(token) -> {sessionId, role, readHash?}
 const attempts = new Map();   // ip -> number[] timestamps
+/** sessionId -> { at, list, trails: Map<key, point[]> } — ephemeral, never persisted. */
+const trafficBySession = new Map();
 
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -165,6 +176,93 @@ function requireToken(req, role) {
   return { session, token, entry };
 }
 
+/** An aircraft key: a hex address or a callsign, reduced to a safe token. */
+function trafficKey(value) {
+  return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+}
+
+function trafficStore(sessionId) {
+  let store = trafficBySession.get(sessionId);
+  if (!store) {
+    store = { at: 0, list: [], trails: new Map() };
+    trafficBySession.set(sessionId, store);
+  }
+  return store;
+}
+
+function pruneTrails(store, now) {
+  const cutoff = now - TRAFFIC_RETENTION_MS;
+  for (const [key, trail] of store.trails) {
+    const kept = trail.filter(point => point[3] >= cutoff);
+    if (kept.length) store.trails.set(key, kept.slice(-TRAFFIC_MAX_POINTS));
+    else store.trails.delete(key);
+  }
+  if (store.trails.size > TRAFFIC_MAX_AIRCRAFT) {
+    const keep = [...store.trails.entries()]
+      .sort((a, b) => b[1][b[1].length - 1][3] - a[1][a[1].length - 1][3])
+      .slice(0, TRAFFIC_MAX_AIRCRAFT);
+    store.trails = new Map(keep);
+  }
+}
+
+/**
+ * Merge one bridge post: a current list and any new trail samples.
+ * Points are [[key, lat, lon, altFt, tMs], …], oldest first per aircraft. A
+ * position that repeats the last one, a (0, 0) "no position" sentinel, a clock
+ * ahead of ours and a sample that would rewind a trail are all refused, with the
+ * same rules the bridge applies to what it stores locally.
+ */
+function storeTraffic(store, body, now) {
+  let added = 0;
+  const list = Array.isArray(body.list) ? body.list : [];
+  const cleanList = [];
+  for (const entry of list.slice(0, TRAFFIC_LIST_MAX)) {
+    if (!entry || typeof entry !== 'object') continue;
+    const id = String(entry.id || '').trim().toUpperCase().slice(0, 12);
+    const lat = Number(entry.lat);
+    const lon = Number(entry.lon);
+    if (!id || !Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    if (Math.abs(lat) > 90 || Math.abs(lon) > 180) continue;
+    if (Math.abs(lat) < 1e-6 && Math.abs(lon) < 1e-6) continue;
+    const num = value => (Number.isFinite(Number(value)) ? Math.round(Number(value) * 100) / 100 : null);
+    cleanList.push({ id, lat, lon, alt: num(entry.alt), gs: num(entry.gs), hdg: num(entry.hdg) });
+  }
+  if (cleanList.length) {
+    store.list = cleanList;
+    store.at = now;
+  }
+  const points = Array.isArray(body.points) ? body.points : [];
+  for (const raw of points) {
+    if (!Array.isArray(raw) || raw.length < 4) continue;
+    const key = trafficKey(raw[0]);
+    if (!key) continue;
+    const lat = Number(raw[1]);
+    const lon = Number(raw[2]);
+    const alt = Number(raw[3] || 0);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(alt)) continue;
+    if (Math.abs(lat) > 90 || Math.abs(lon) > 180) continue;
+    if (Math.abs(lat) < 1e-6 && Math.abs(lon) < 1e-6) continue;
+    let stamp = Number(raw[4]);
+    if (!Number.isFinite(stamp) || stamp <= 0) stamp = now;
+    stamp = Math.min(stamp, now);
+    // A sample that is already outside the window would be dropped on the next
+    // prune; refusing it keeps "added" honest.
+    if (stamp < now - TRAFFIC_RETENTION_MS) continue;
+    const trail = store.trails.get(key) || [];
+    const last = trail[trail.length - 1];
+    if (last) {
+      if (Math.abs(last[0] - lat) < 1e-5 && Math.abs(last[1] - lon) < 1e-5) continue;
+      if (stamp < last[3]) continue;
+      if (stamp === last[3]) stamp = last[3] + 1;
+    }
+    trail.push([Math.round(lat * 1e6) / 1e6, Math.round(lon * 1e6) / 1e6, Math.round(alt * 10) / 10, Math.round(stamp)]);
+    store.trails.set(key, trail);
+    added++;
+  }
+  pruneTrails(store, now);
+  return added;
+}
+
 function validateSnapshot(payload) {
   if (typeof payload.ts !== 'number' || !Number.isFinite(payload.ts)) {
     throw new HttpError(400, 'Snapshot needs a numeric ts');
@@ -227,7 +325,13 @@ function cleanup() {
     if (!session.reads.size && now - session.createdAt > READ_TTL_MS * 2) {
       sessions.delete(id);
       tokenIndex.delete(session.desktopHash);
+      trafficBySession.delete(id);
       changed = true;
+    }
+    const store = trafficBySession.get(id);
+    if (store) {
+      pruneTrails(store, now);
+      if (!store.trails.size && !store.list.length) trafficBySession.delete(id);
     }
     if (changed) persist();
   }
@@ -328,6 +432,37 @@ const routes = {
     send(res, 200, state.snapshot ? state : { ...state, snapshot: null, waiting: true });
   },
 
+  'POST /api/traffic': async (req, res) => {
+    rateLimit(clientIp(req), 'traffic', 120);
+    const { session } = requireToken(req, 'desktop');
+    const body = await readBody(req, TRAFFIC_BODY_MAX);
+    const store = trafficStore(session.id);
+    const added = storeTraffic(store, body, Date.now());
+    send(res, 200, {
+      ok: true, added, at: store.at,
+      aircraft: store.trails.size, retentionSeconds: Math.round(TRAFFIC_RETENTION_MS / 1000),
+    });
+  },
+
+  'GET /api/traffic': async (req, res) => {
+    rateLimit(clientIp(req), 'state', 240);
+    const { session } = requireToken(req, 'read');
+    const store = trafficBySession.get(session.id) || { at: 0, list: [], trails: new Map() };
+    const url = new URL(req.url || '/', 'http://relay');
+    const key = trafficKey(url.searchParams.get('hex') || '');
+    if (key) {
+      send(res, 200, {
+        ok: true, hex: key, points: store.trails.get(key) || [],
+        retentionSeconds: Math.round(TRAFFIC_RETENTION_MS / 1000),
+      });
+      return;
+    }
+    send(res, 200, {
+      ok: true, at: store.at, stale: !store.at || Date.now() - store.at > STALE_MS * 4,
+      list: store.list, retentionSeconds: Math.round(TRAFFIC_RETENTION_MS / 1000),
+    });
+  },
+
   'GET /api/devices': async (req, res) => {
     rateLimit(clientIp(req), 'state', 240);
     // Read tokens see their own session; the desktop token manages devices.
@@ -378,6 +513,7 @@ const routes = {
     for (const [readHash] of session.reads) tokenIndex.delete(readHash);
     tokenIndex.delete(session.desktopHash);
     sessions.delete(session.id);
+    trafficBySession.delete(session.id);
     persist();
     send(res, 200, { ok: true });
   },
@@ -425,4 +561,4 @@ server.listen(PORT, HOST, () => {
 loadPersisted();
 setInterval(cleanup, 60 * 1000).unref();
 
-export { server, sessions };
+export { server, sessions, trafficBySession };

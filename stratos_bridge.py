@@ -24,6 +24,7 @@ import datetime
 import hashlib
 import hmac
 import io
+import ipaddress
 import json
 import math
 import os
@@ -41,6 +42,8 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+import stratos_cifp as nav_cifp
 
 from bridge_logbook_addon import (
     VERSION,
@@ -63,6 +66,10 @@ HTTP_PORT = int(os.environ.get("STRATOS_HTTP_PORT", "8765"))
 # the only unauthenticated route and it only accepts a short-lived token.
 HOST = os.environ.get("STRATOS_HOST", "0.0.0.0")
 UDP_HOST = os.environ.get("STRATOS_UDP_HOST", "0.0.0.0")
+# X-Plane answers UDP dataref requests on its own port; the bridge only reads
+# the data-output port, so identity requests go to the simulator directly.
+XPLANE_HOST = os.environ.get("STRATOS_XPLANE_HOST", "127.0.0.1")
+XPLANE_UDP_PORT = int(os.environ.get("STRATOS_XPLANE_UDP_PORT", "49000"))
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get("STRATOS_DATA_DIR", HERE)
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -79,6 +86,40 @@ state = {}
 state_lock = threading.Lock()
 METARS = {}
 METARS_LOCK = threading.Lock()
+# Aircraft photos by registration: (fetched at, payload, ttl seconds). A found
+# photo is kept for a day, a registration the source does not know for an hour,
+# so a card that redraws at telemetry rate asks the service once.
+# Terminal procedure geometry, from the simulator's CIFP data or the dataset
+# Stratos ships. Built once: locating the install and reading the cycle is
+# cheap, but each airport's first build scans the fix and navaid files, so the
+# answers are cached.
+NAV_DATA = None
+NAV_DATA_LOCK = threading.Lock()
+
+
+def nav_data():
+    global NAV_DATA
+    with NAV_DATA_LOCK:
+        if NAV_DATA is None:
+            NAV_DATA = nav_cifp.NavData(os.environ.get("STRATOS_XPLANE_DIR", "").strip())
+        return NAV_DATA
+
+
+PHOTOS = {}
+PHOTO_LOCK = threading.Lock()
+PHOTO_TTL = 24 * 60 * 60
+PHOTO_MISS_TTL = 60 * 60
+PHOTO_ENDPOINT = "https://api.planespotters.net/pub/photos/reg/"
+
+
+def photo_registration(value):
+    """A plausible registration, or an empty string. Never a callsign or a type."""
+    reg = str(value or "").strip().upper()
+    if not re.match(r"^[A-Z0-9][A-Z0-9-]{1,9}$", reg):
+        return ""
+    if re.match(r"^\d+$", reg) or re.match(r"^[A-Z]{1,4}\d{1,4}$", reg):
+        return ""
+    return reg
 FAA = {}
 FAA_LOCK = threading.Lock()
 # Cycle, publication window and check time for the catalogue currently in FAA.
@@ -92,6 +133,13 @@ navaids = []
 airports_loaded_at = 0
 msfs_status = {"available": False, "connected": False, "error": ""}
 udp_status = {"ready": False, "error": ""}
+xplane_identity_status = {"available": False, "registration": "", "type": "", "error": "", "at": 0}
+MDNS_GROUP = "224.0.0.251"
+MDNS_PORT = 5353
+MDNS_HOST = os.environ.get("STRATOS_MDNS_HOST", "stratos.local").strip().rstrip(".") or "stratos.local"
+MDNS_SERVICE = "_stratos._tcp.local"
+MDNS_INSTANCE = "Stratos Bridge." + MDNS_SERVICE
+mdns_status = {"running": False, "name": MDNS_HOST, "address": "", "error": "", "answers": 0}
 relay_status = {"configured": False, "url": "", "code": "", "expiresAt": 0,
                 "lastPushAt": 0, "lastError": "", "pairedAt": 0}
 relay_lock = threading.Lock()
@@ -308,6 +356,10 @@ def create_pair_session():
         "url": "http://%s:%d/pair?t=%s" % (host, HTTP_PORT, token),
         "lanIp": host,
         "lanEnabled": HOST not in ("127.0.0.1", "localhost"),
+        # The no-code route: the phone opens this and is enrolled on arrival.
+        "connectUrl": "http://%s:%d/pair/connect" % (MDNS_HOST, HTTP_PORT),
+        "hostName": MDNS_HOST,
+        "autoPair": AUTO_PAIR_ENABLED and HOST not in ("127.0.0.1", "localhost"),
     }
 
 
@@ -333,6 +385,82 @@ def claim_pair(value):
         return True
 
 
+# ── One-tap phone connection ───────────────────────────────────────
+# A browser cannot scan the local network, so the phone reaches the bridge by
+# its multicast-DNS name (http://stratos.local:8765) and enrolls itself there.
+# Enrollment is accepted only from private network addresses, is rate limited
+# per address, and still yields a credential: the phone keeps its own secret in
+# an HttpOnly cookie and every data route keeps requiring it. Turn it off with
+# STRATOS_AUTO_PAIR=0; the six-digit code keeps working either way.
+AUTO_PAIR_ENABLED = os.environ.get("STRATOS_AUTO_PAIR", "1").strip().lower() not in ("0", "false", "off", "no")
+AUTO_PAIR_WINDOW = 60
+AUTO_PAIR_LIMIT = 5
+AUTO_PAIR_ATTEMPTS = {}
+
+
+LAN_NETWORKS = tuple(ipaddress.ip_network(cidr) for cidr in (
+    "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+    "169.254.0.0/16", "fc00::/7", "fe80::/10",
+))
+
+
+def is_lan_address(address):
+    """A private-network address a phone on the same network would use."""
+    try:
+        ip = ipaddress.ip_address(str(address or "").split("%")[0])
+    except ValueError:
+        return False
+    if ip.is_loopback:
+        return True
+    return any(ip in network for network in LAN_NETWORKS if network.version == ip.version)
+
+
+def auto_pair_gate(address):
+    """Why one-tap pairing cannot run for this request, or an empty string."""
+    if not AUTO_PAIR_ENABLED:
+        return "One-tap pairing is turned off on this PC (STRATOS_AUTO_PAIR=0). Show the code instead."
+    if HOST in ("127.0.0.1", "localhost"):
+        return "The bridge is reachable only on this PC. Start it on the network to pair a phone."
+    if not is_lan_address(address):
+        return "A phone can pair from the same local network only."
+    return ""
+
+
+def auto_pair_rate_limited(address):
+    now = time.time()
+    with PAIR_LOCK:
+        attempts = [stamp for stamp in AUTO_PAIR_ATTEMPTS.get(address, []) if now - stamp < AUTO_PAIR_WINDOW]
+        if len(attempts) >= AUTO_PAIR_LIMIT:
+            AUTO_PAIR_ATTEMPTS[address] = attempts
+            return True
+        attempts.append(now)
+        AUTO_PAIR_ATTEMPTS[address] = attempts
+    return False
+
+
+def auto_pair(address):
+    """Enroll a LAN phone without a code. Returns (secret, record) or (None, reason)."""
+    reason = auto_pair_gate(address)
+    if reason:
+        return None, reason
+    if auto_pair_rate_limited(address):
+        return None, "Too many connection attempts from this phone. Wait a minute and try again."
+    secret, record = pair_client(address)
+    log("Paired a phone from %s without a code (one-tap connection)" % (address or "?"))
+    return secret, record
+
+
+def phone_cookie(secret, max_age=2592000):
+    cookie = SimpleCookie()
+    cookie["stratos_phone"] = secret
+    morsel = cookie["stratos_phone"]
+    morsel["path"] = "/"
+    morsel["httponly"] = True
+    morsel["samesite"] = "Lax"
+    morsel["max-age"] = max_age
+    return cookie.output(header="").strip()
+
+
 def pair_status():
     pair_clean()
     with PAIR_LOCK:
@@ -345,6 +473,11 @@ def pair_status():
             "activeCodes": len(active),
             "claimedAt": PAIR_LAST["claimedAt"],
             "clients": len(PAIR_CLIENTS),
+            "autoPair": AUTO_PAIR_ENABLED and HOST not in ("127.0.0.1", "localhost"),
+            "hostName": MDNS_HOST,
+            "connectUrl": "http://%s:%d/pair/connect" % (MDNS_HOST, HTTP_PORT),
+            "localUrl": "http://%s:%d/pair/connect" % (lan_ip(), HTTP_PORT),
+            "discovery": dict(mdns_status),
             # Addresses and timestamps only: never a secret or its hash.
             "devices": devices,
         }
@@ -430,6 +563,183 @@ def save_aircraft_identity(data):
             json.dump(data, f)
     except OSError:
         pass
+
+
+# ── Traffic trails ─────────────────────────────────────────────────
+# The public traffic feeds publish one position per aircraft, so a trail is what
+# this bridge has observed. The page posts the positions it sees; they are kept
+# per hex, written to disk and served back, so a clicked aircraft's path survives
+# a page reload and a bridge restart, and is the same on the PC and on a paired
+# phone. Nothing here is fetched from a source that does not exist: a trail
+# starts at the first observation.
+TRAFFIC_FILE = os.path.join(DATA_DIR, "traffic_trails.json")
+TRAFFIC_RETENTION_S = int(os.environ.get("STRATOS_TRAFFIC_RETENTION", "2700"))
+TRAFFIC_MAX_POINTS = 360
+TRAFFIC_MAX_AIRCRAFT = 400
+TRAFFIC_SAVE_EVERY_S = 8.0
+TRAFFIC = {}
+TRAFFIC_LOCK = threading.Lock()
+TRAFFIC_SAVE = {"at": 0.0, "dirty": False}
+
+
+def traffic_key(value):
+    """An aircraft key: a hex address or a callsign, reduced to a safe token."""
+    return re.sub(r"[^A-Z0-9]", "", str(value or "").upper())[:12]
+
+
+def load_traffic_trails():
+    try:
+        with open(TRAFFIC_FILE, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError):
+        return
+    trails = data.get("trails") if isinstance(data, dict) else None
+    if not isinstance(trails, dict):
+        return
+    with TRAFFIC_LOCK:
+        for key, points in trails.items():
+            if not isinstance(points, list):
+                continue
+            clean = []
+            for point in points:
+                if not isinstance(point, list) or len(point) < 4:
+                    continue
+                try:
+                    clean.append([float(point[0]), float(point[1]), float(point[2]), int(point[3])])
+                except (TypeError, ValueError):
+                    continue
+            if clean:
+                TRAFFIC[traffic_key(key)] = clean
+        _prune_traffic(time.time() * 1000, save=False)
+
+
+def _prune_traffic(now_ms, save=True):
+    """Drop samples past the retention window and keep the per-aircraft cap."""
+    cutoff = now_ms - TRAFFIC_RETENTION_S * 1000
+    removed = False
+    for key in list(TRAFFIC):
+        trail = [point for point in TRAFFIC[key] if point[3] >= cutoff]
+        if len(trail) > TRAFFIC_MAX_POINTS:
+            trail = trail[-TRAFFIC_MAX_POINTS:]
+        if trail:
+            TRAFFIC[key] = trail
+        else:
+            TRAFFIC.pop(key, None)
+            removed = True
+    if len(TRAFFIC) > TRAFFIC_MAX_AIRCRAFT:
+        keep = sorted(TRAFFIC.items(), key=lambda item: item[1][-1][3], reverse=True)[:TRAFFIC_MAX_AIRCRAFT]
+        TRAFFIC.clear()
+        TRAFFIC.update(dict(keep))
+        removed = True
+    if save and removed:
+        TRAFFIC_SAVE["dirty"] = True
+    return removed
+
+
+def record_traffic(points):
+    """Merge posted positions: [[key, lat, lon, alt, t_ms], ...]. Returns the count added."""
+    now_ms = time.time() * 1000
+    added = 0
+    with TRAFFIC_LOCK:
+        for raw in points if isinstance(points, list) else []:
+            if not isinstance(raw, (list, tuple)) or len(raw) < 4:
+                continue
+            key = traffic_key(raw[0])
+            if not key:
+                continue
+            try:
+                lat, lon = float(raw[1]), float(raw[2])
+                alt = float(raw[3] or 0)
+            except (TypeError, ValueError):
+                continue
+            if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+                continue
+            # (0, 0) is what a feed sends when it has no position at all.
+            if abs(lat) < 1e-6 and abs(lon) < 1e-6:
+                continue
+            try:
+                stamp = float(raw[4]) if len(raw) > 4 and raw[4] else now_ms
+            except (TypeError, ValueError):
+                stamp = now_ms
+            # A clock ahead of ours would push later samples out of order.
+            stamp = min(stamp, now_ms)
+            trail = TRAFFIC.setdefault(key, [])
+            if trail:
+                last = trail[-1]
+                if abs(last[0] - lat) < 1e-5 and abs(last[1] - lon) < 1e-5:
+                    continue
+                # A sample older than the last one would draw a path that runs
+                # backwards; the trail stays chronological.
+                if stamp < last[3]:
+                    continue
+                if stamp <= last[3]:
+                    stamp = last[3] + 1
+            trail.append([round(lat, 6), round(lon, 6), round(alt, 1), int(stamp)])
+            added += 1
+        _prune_traffic(now_ms)
+        if added:
+            TRAFFIC_SAVE["dirty"] = True
+    save_traffic_trails()
+    return added
+
+
+def traffic_trail(key, since=0):
+    with TRAFFIC_LOCK:
+        trail = list(TRAFFIC.get(traffic_key(key), []))
+    return [point for point in trail if point[3] >= since]
+
+
+def save_traffic_trails(force=False):
+    """Write at most every few seconds: traffic arrives faster than a disk needs it."""
+    now = time.time()
+    with TRAFFIC_LOCK:
+        if not TRAFFIC_SAVE["dirty"] or (not force and now - TRAFFIC_SAVE["at"] < TRAFFIC_SAVE_EVERY_S):
+            return False
+        payload = json.dumps({"trails": TRAFFIC}, separators=(",", ":")).encode("utf-8")
+        TRAFFIC_SAVE["at"] = now
+        TRAFFIC_SAVE["dirty"] = False
+    temporary = TRAFFIC_FILE + ".tmp"
+    try:
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(payload)
+        os.replace(temporary, TRAFFIC_FILE)
+        return True
+    except OSError as exc:
+        log("Could not persist traffic trails: %s" % exc)
+        return False
+
+
+load_traffic_trails()
+
+
+def _handle_traffic_track(handler):
+    """The page reports the positions it has seen; the bridge remembers them."""
+    data, error = handler.read_json(512 * 1024)
+    if error:
+        handler.send_json({"ok": False, "error": error}, 400)
+        return
+    points = data.get("points") if isinstance(data, dict) else None
+    if not isinstance(points, list) or len(points) > 2000:
+        handler.send_json({"ok": False, "error": "Expected a points list of at most 2000 entries"}, 400)
+        return
+    handler.send_json({"ok": True, "added": record_traffic(points)})
+
+
+def _handle_traffic_trail(handler, parsed):
+    """One aircraft's recorded path, oldest first, for the map to draw."""
+    query = urllib.parse.parse_qs(parsed.query)
+    key = traffic_key((query.get("hex") or [""])[0])
+    if not key:
+        handler.send_json({"ok": False, "error": "A hex address or callsign is required."}, 400)
+        return
+    try:
+        since = int(float((query.get("since") or ["0"])[0]))
+    except (TypeError, ValueError):
+        since = 0
+    points = traffic_trail(key, since)
+    handler.send_json({"ok": True, "hex": key, "points": points,
+                       "retentionSeconds": TRAFFIC_RETENTION_S})
 
 
 # ── Relay configuration ────────────────────────────────────────────
@@ -522,9 +832,68 @@ def relay_snapshot():
     }
 
 
+# Traffic pushed to the relay for a paired phone that is not on this network.
+# Only the list and the samples the relay has not seen yet are sent, so a push
+# costs one position per aircraft rather than the whole trail.
+TRAFFIC_RELAY_EVERY_S = 15.0
+TRAFFIC_RELAY_MAX_POINTS = 400
+TRAFFIC_RELAY_MAX_AIRCRAFT = 25
+TRAFFIC_RELAY_FRESH_PER_KEY = 6
+
+
+def relay_traffic_batch(cursor):
+    """The current list and the samples newer than ``cursor`` (key -> last ms).
+
+    The list is the bridge's own ADS-B traffic; the samples are the trails it has
+    recorded, most recently updated first, so a relayed phone gets the same paths
+    the PC has without shipping the whole store every 15 seconds.
+    """
+    with state_lock:
+        raw = list(state.get("tr") or [])
+    listed = []
+    for item in raw[:60]:
+        try:
+            entry = {"id": str(item.get("id") or "")[:12],
+                     "lat": float(item.get("lat")),
+                     "lon": float(item.get("lon"))}
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if not entry["id"]:
+            continue
+        for field in ("alt", "gs", "hdg"):
+            value = item.get(field)
+            try:
+                entry[field] = round(float(value), 1) if value is not None else None
+            except (TypeError, ValueError):
+                entry[field] = None
+        listed.append(entry)
+    points = []
+    with TRAFFIC_LOCK:
+        recent = sorted(TRAFFIC, key=lambda name: TRAFFIC[name][-1][3], reverse=True)
+        for key in recent[:TRAFFIC_RELAY_MAX_AIRCRAFT]:
+            since = cursor.get(key, 0)
+            fresh = [point for point in TRAFFIC[key] if point[3] > since]
+            for point in fresh[-TRAFFIC_RELAY_FRESH_PER_KEY:]:
+                points.append([key, point[0], point[1], point[2], point[3]])
+    return {"list": listed, "points": points[-TRAFFIC_RELAY_MAX_POINTS:]}
+
+
+def relay_post_json(url, token, path, payload, timeout=10):
+    body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    request = urllib.request.Request(
+        url + path, data=body, method="POST",
+        headers={"Content-Type": "application/json",
+                 "Authorization": "Bearer " + token,
+                 "User-Agent": "Stratos-Bridge/%s" % VERSION})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        response.read(256)
+
+
 def relay_loop():
     last_config_read = 0.0
     cached = None
+    traffic_cursor = {}
+    last_traffic_push = 0.0
     while True:
         now = time.time()
         if now - last_config_read > 5:
@@ -536,18 +905,11 @@ def relay_loop():
         if not cached:
             time.sleep(3)
             continue
-        body = json.dumps(relay_snapshot(), separators=(",", ":")).encode("utf-8")
-        request = urllib.request.Request(
-            cached["url"] + "/api/ingest", data=body, method="POST",
-            headers={"Content-Type": "application/json",
-                     "Authorization": "Bearer " + cached["token"],
-                     "User-Agent": "Stratos-Bridge/%s" % VERSION})
         telemetry_age = 999
         with state_lock:
             telemetry_age = time.time() - state.get("t", 0) if state.get("t") else 999
         try:
-            with urllib.request.urlopen(request, timeout=10) as response:
-                response.read(256)
+            relay_post_json(cached["url"], cached["token"], "/api/ingest", relay_snapshot())
             with relay_lock:
                 relay_status.update(lastPushAt=int(time.time() * 1000), lastError="")
         except urllib.error.HTTPError as exc:
@@ -570,6 +932,25 @@ def relay_loop():
         except Exception as exc:
             with relay_lock:
                 relay_status["lastError"] = str(exc)[:200]
+        # The traffic list and its new trail samples go on their own, slower
+        # cadence: the phone polls them every 15 s, so nothing is gained by
+        # sending them with every telemetry snapshot.
+        if cached and telemetry_age < 60 and time.time() - last_traffic_push >= TRAFFIC_RELAY_EVERY_S:
+            last_traffic_push = time.time()
+            try:
+                batch = relay_traffic_batch(traffic_cursor)
+                if batch["list"] or batch["points"]:
+                    relay_post_json(cached["url"], cached["token"], "/api/traffic", batch)
+                    for key, _lat, _lon, _alt, stamp in batch["points"]:
+                        traffic_cursor[key] = max(traffic_cursor.get(key, 0), stamp)
+                    cutoff = time.time() * 1000 - 600 * 1000
+                    for key in [k for k, stamp in traffic_cursor.items() if stamp < cutoff]:
+                        traffic_cursor.pop(key, None)
+            except Exception as exc:
+                # A relay that cannot take traffic still gets telemetry; the
+                # cursor is unchanged, so the next push includes these samples.
+                with relay_lock:
+                    relay_status["lastError"] = ("Traffic relay: %s" % str(exc))[:200]
         time.sleep(2 if telemetry_age < 5 else 5)
 
 
@@ -629,6 +1010,164 @@ def udp_loop():
                 process_telemetry_for_logbook(snapshot, airports)
             except Exception as exc:
                 log("Logbook processing error: %s" % exc)
+
+
+# ── X-Plane aircraft identity ──────────────────────────────────────
+# The data-output rows carry position and speed, not the airframe.
+# X-Plane's standard UDP dataref interface can be asked for its string
+# datarefs one element at a time, so the registration, ICAO type and
+# description are read without a plugin. Values only fill fields the user has
+# not set by hand, so a deliberate identity in Settings always wins.
+XPLANE_STRING_DATAREFS = (
+    ("tail", "sim/aircraft/view/acf_tailnum", 10),
+    ("icao", "sim/aircraft/view/acf_ICAO", 8),
+    ("desc", "sim/aircraft/view/acf_descrip", 48),
+)
+RREF_INDEX_BASE = 9000
+RREF_SLOTS = {}
+RREF_REQUESTS = []
+_XPLANE_CHARS = {"tail": {}, "icao": {}, "desc": {}}
+
+
+def build_rref_requests():
+    """One subscription per character, each with its own response index."""
+    RREF_SLOTS.clear()
+    RREF_REQUESTS.clear()
+    index = RREF_INDEX_BASE
+    for key, path, length in XPLANE_STRING_DATAREFS:
+        for position in range(length):
+            RREF_SLOTS[index] = (key, position)
+            RREF_REQUESTS.append((index, "%s[%d]" % (path, position)))
+            index += 1
+
+
+def rref_request(index, dataref, freq=1):
+    """One RREF subscription: header, rate in Hz, response index, 400-byte path."""
+    return struct.pack("<4sxii400s", b"RREF", int(freq), int(index),
+                       str(dataref).encode("utf-8")[:399])
+
+
+def rref_values(packet):
+    """(index, value) pairs from an RREF packet; several may share a datagram."""
+    if packet[:4] != b"RREF":
+        return []
+    values = []
+    body = packet[5:]
+    for offset in range(0, len(body) - 7, 8):
+        try:
+            index, value = struct.unpack("<if", body[offset:offset + 8])
+        except struct.error:
+            break
+        values.append((int(index), float(value)))
+    return values
+
+
+def rref_text(chars):
+    """Assemble per-character values into text, stopping at the first NUL or gap."""
+    data = bytearray()
+    for position in range(len(chars)):
+        if position not in chars:
+            break
+        value = chars[position]
+        if not math.isfinite(value) or value <= 0:
+            break
+        data.append(int(value) & 0xFF)
+    return data.decode("utf-8", "replace").strip()
+
+
+# Multi-letter prefixes that begin a type designator rather than a country mark
+# (MD-82, CRJ-900). A single letter is a country mark, as in B-1234.
+TYPE_PREFIXES = {"MD", "CRJ", "ERJ", "AT", "DH", "PA", "BAE"}
+TYPE_CODE = re.compile(r"^[A-Z][A-Z0-9]?\d[A-Z0-9]{0,2}$")
+
+
+def plausible_registration(text):
+    """A tail number, not a placeholder, a callsign or a type code."""
+    value = str(text or "").strip().upper()
+    if not re.fullmatch(r"[A-Z0-9][A-Z0-9-]{1,9}", value):
+        return ""
+    if value in ("NONE", "N/A", "NA", "NULL", "DEFAULT", "UNKNOWN"):
+        return ""
+    if not re.search(r"\d", value) and "-" not in value:
+        return ""                     # a callsign or a name, not a tail number
+    # Type designators such as B738, A320 or E190 sit in the same field when a
+    # livery leaves the tail empty; they are not registrations.
+    if "-" not in value and TYPE_CODE.match(value):
+        return ""
+    if "-" in value:
+        prefix, suffix = value.split("-", 1)
+        if prefix in TYPE_PREFIXES or (len(prefix) > 1 and suffix.isdigit()):
+            return ""
+    return value
+
+
+def apply_xplane_identity():
+    """Publish what X-Plane reported, without overwriting a chosen identity."""
+    tail = plausible_registration(rref_text(_XPLANE_CHARS["tail"]))
+    icao = rref_text(_XPLANE_CHARS["icao"])[:12].strip().upper()
+    desc = rref_text(_XPLANE_CHARS["desc"])[:48].strip()
+    if not (tail or icao or desc):
+        return
+    xplane_identity_status.update(available=True, registration=tail, type=icao,
+                                  error="", at=int(time.time() * 1000))
+    identity = load_aircraft_identity()
+    with state_lock:
+        if desc and not identity.get("aircraft") and not state.get("aircraft"):
+            state["aircraft"] = desc
+        if icao and not state.get("aircraftType"):
+            state["aircraftType"] = icao
+        if tail and not identity.get("registration") and not state.get("registration"):
+            state["registration"] = tail
+
+
+def xplane_identity_loop():
+    """Ask X-Plane for the loaded airframe's names, gently: 1 Hz, no polling loop."""
+    if not RREF_REQUESTS:
+        return
+    target = (XPLANE_HOST, XPLANE_UDP_PORT)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.bind(("", 0))
+        sock.settimeout(1.0)
+    except OSError as exc:
+        xplane_identity_status["error"] = str(exc)
+        try:
+            sock.close()
+        except OSError:
+            pass
+        return
+    sent_at = 0.0
+    while True:
+        now = time.time()
+        # Re-subscribing is harmless and recovers after X-Plane restarts.
+        if now - sent_at > 10:
+            sent_at = now
+            for index, dataref in RREF_REQUESTS:
+                try:
+                    sock.sendto(rref_request(index, dataref, 1), target)
+                except OSError as exc:
+                    xplane_identity_status["error"] = str(exc)
+                    break
+        try:
+            data, _source = sock.recvfrom(4096)
+        except socket.timeout:
+            continue
+        except OSError:
+            return
+        changed = False
+        for index, value in rref_values(data):
+            slot = RREF_SLOTS.get(index)
+            if not slot:
+                continue
+            chars = _XPLANE_CHARS[slot[0]]
+            if chars.get(slot[1]) != value:
+                chars[slot[1]] = value
+                changed = True
+        if changed:
+            apply_xplane_identity()
+
+
+build_rref_requests()
 
 
 # ── OurAirports / FAA / OpenStreetMap ───────────────────────────────
@@ -1122,6 +1661,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/unlock":
             self.handle_unlock()
             return
+        # A phone has no credential yet; this is how it earns one. It is the
+        # only unauthenticated POST besides unlocking, and it is LAN-only.
+        if path == "/pair/auto":
+            self.handle_pair_auto()
+            return
         if not self.authorized():
             self.send_json({"ok": False, "error": "Unauthorized"}, 401)
             return
@@ -1150,6 +1694,9 @@ class Handler(BaseHTTPRequestHandler):
                     if value:
                         state[key] = value
             self.send_json({"ok": True, "identity": identity})
+            return
+        if path == "/traffic/track":
+            _handle_traffic_track(self)
             return
         if path == "/checklist":
             data, error = self.read_json(64 * 1024)
@@ -1226,6 +1773,58 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"ok": True})
             return
         self.send_json({"ok": False, "error": "Not found"}, 404)
+
+    def handle_pair_auto(self):
+        if not self.same_origin():
+            self.send_json({"ok": False, "error": "Cross-origin request refused"}, 403)
+            return
+        if self.authorized():
+            self.send_json({"ok": True, "paired": True, "already": True})
+            return
+        address = self.client_address[0] if self.client_address else "?"
+        secret, detail = auto_pair(address)
+        if not secret:
+            self.send_json({"ok": False, "error": detail}, 403)
+            return
+        body = json.dumps({"ok": True, "paired": True, "auto": True}, separators=(",", ":")).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Set-Cookie", phone_cookie(secret))
+        # A phone must never keep the shared token from an earlier unlock.
+        self.send_header("Set-Cookie", "stratos_token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def handle_pair_connect(self):
+        address = self.client_address[0] if self.client_address else "?"
+        if self.authorized():
+            self.send_response(303)
+            self.send_header("Location", "/live.html")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        secret, detail = auto_pair(address)
+        if secret:
+            self.send_response(303)
+            self.send_header("Location", "/live.html")
+            self.send_header("Set-Cookie", phone_cookie(secret))
+            self.send_header("Set-Cookie", "stratos_token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        body = PAIR_HTML.replace("{{ERROR}}", '<p class="err">%s</p>' % detail if detail else "").encode("utf-8")
+        self.send_response(403)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def handle_unlock(self):
         if self.rate_limited():
@@ -1392,6 +1991,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/pair":
             self.handle_pair_page(parsed)
             return
+        # Top-level navigation from the phone: enroll if allowed, then go to
+        # the live dashboard. No code, no URL typing, no QR.
+        if path == "/pair/connect":
+            self.handle_pair_connect()
+            return
         if not self.authorized():
             self.unlock_denied()
             return
@@ -1412,6 +2016,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/logbook.json":
             _handle_logbook(self)
+            return
+        if path == "/traffic/trail":
+            _handle_traffic_trail(self, parsed)
             return
         if path == "/descent.json":
             _handle_descent(self)
@@ -1455,6 +2062,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/metar":
             self.handle_metar(parsed)
             return
+        if path == "/api/photo":
+            self.handle_photo(parsed)
+            return
+        if path == "/procedures.json":
+            self.handle_procedures(parsed)
+            return
         if path == "/weather":
             self.handle_weather(parsed)
             return
@@ -1488,6 +2101,10 @@ class Handler(BaseHTTPRequestHandler):
             "relay": {key: value for key, value in relay_status.items() if key != "token"},
             "pairing": pair_status(),
             "lanIp": lan_ip(),
+            "lanAddress": "http://%s:%d" % (lan_ip(), HTTP_PORT),
+            "discovery": dict(mdns_status),
+            "xplaneIdentity": dict(xplane_identity_status),
+            "navdata": nav_data().summary(),
             "auth": {"remoteTokenRequired": True},
             "identity": load_aircraft_identity(),
             "dataDir": DATA_DIR,
@@ -1739,6 +2356,74 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def handle_procedures(self, parsed):
+        """Published SID, STAR and approach legs from real navigation data.
+
+        Read-only: first the PC's own X-Plane CIFP files, then the dataset
+        Stratos ships in ``navdata/cifp`` (FAA CIFP, United States). No procedure
+        is invented and nothing is downloaded at request time. Without either
+        source the answer says so, and the map draws the plan's own fixes as
+        before.
+        """
+        query = urllib.parse.parse_qs(parsed.query)
+        airport = (query.get("airport", [""])[0] or "").strip()
+        kind = (query.get("kind", [""])[0] or "").strip().lower()
+        ident = (query.get("id", [""])[0] or "").strip().upper()
+        try:
+            payload = nav_data().procedures(airport, kind, ident)
+        except Exception as exc:
+            self.send_json({"ok": False, "reason": "read-error",
+                            "error": "Could not read the simulator's procedures: %s" % exc}, 502)
+            return
+        status = 200
+        if not payload.get("ok"):
+            status = 503 if payload.get("reason") == "no-navdata" else 404
+        self.send_json(payload, status)
+
+    def handle_photo(self, parsed):
+        """One aircraft photo by registration, for a page the bridge serves.
+
+        The Planespotters API refuses a browser User-Agent, so the lookup runs
+        here with the app's own. Results are cached per registration: a photo
+        for a day, a miss for an hour. An unknown registration is an empty list,
+        not an error; an unreachable source is a 502 the card reports as such.
+        """
+        reg = photo_registration(urllib.parse.parse_qs(parsed.query).get("reg", [""])[0])
+        if not reg:
+            self.send_json({"error": "Unsupported registration"}, 400)
+            return
+        now = time.time()
+        with PHOTO_LOCK:
+            cached = PHOTOS.get(reg)
+        if cached and now - cached[0] < cached[2]:
+            self.send_json(cached[1])
+            return
+        request = urllib.request.Request(
+            PHOTO_ENDPOINT + urllib.parse.quote(reg),
+            headers={"Accept": "application/json",
+                     "User-Agent": "Stratos/2 (+https://github.com/Nyclyy/stratos-tracker)"})
+        try:
+            with urllib.request.urlopen(request, timeout=8) as response:
+                payload = json.loads(response.read().decode("utf-8") or "{}")
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                payload = {"photos": []}
+                with PHOTO_LOCK:
+                    PHOTOS[reg] = (now, payload, PHOTO_MISS_TTL)
+                self.send_json(payload)
+                return
+            self.send_json({"error": "Photo source returned %d" % exc.code}, 502)
+            return
+        except Exception:
+            self.send_json({"error": "Photo source is temporarily unreachable"}, 502)
+            return
+        if not isinstance(payload, dict):
+            self.send_json({"error": "The photo source returned an unexpected response"}, 502)
+            return
+        with PHOTO_LOCK:
+            PHOTOS[reg] = (now, payload, PHOTO_TTL)
+        self.send_json(payload)
+
     def serve_static(self, path):
         if path in ("/", "/index.html"):
             relative = "index.html"
@@ -1807,6 +2492,173 @@ def lan_ip():
                 pass
 
 
+# ── Multicast DNS ──────────────────────────────────────────────────
+# "http://stratos.local:8765" is the phone's way in with nothing to type. The
+# bridge answers the one name it owns and advertises the live page as a
+# service; iOS and Android both resolve .local names through the system
+# responder, so no app is needed. Best effort: if port 5353 is unavailable the
+# bridge keeps running and Settings shows the LAN address instead.
+
+
+def dns_encode_name(name):
+    out = bytearray()
+    for label in str(name).strip(".").split("."):
+        data = label.encode("utf-8")[:63]
+        out.append(len(data))
+        out += data
+    out.append(0)
+    return bytes(out)
+
+
+def dns_read_name(packet, offset):
+    """Decode a possibly compressed DNS name. Returns (name, next offset)."""
+    labels, jumped, end, hops = [], False, offset, 0
+    while 0 <= offset < len(packet):
+        length = packet[offset]
+        if length == 0:
+            offset += 1
+            break
+        if length & 0xC0 == 0xC0:
+            if offset + 1 >= len(packet):
+                break
+            pointer = ((length & 0x3F) << 8) | packet[offset + 1]
+            if not jumped:
+                end = offset + 2
+                jumped = True
+            offset = pointer
+            hops += 1
+            if hops > 8:
+                break
+            continue
+        offset += 1
+        labels.append(packet[offset:offset + length].decode("utf-8", "replace"))
+        offset += length
+    return ".".join(labels), (end if jumped else offset)
+
+
+def dns_questions(packet):
+    """(name, qtype) for each question in a DNS query."""
+    if len(packet) < 12:
+        return []
+    count = struct.unpack(">H", packet[4:6])[0]
+    offset, questions = 12, []
+    for _ in range(min(int(count), 16)):
+        name, offset = dns_read_name(packet, offset)
+        if offset + 4 > len(packet):
+            break
+        qtype, _qclass = struct.unpack(">HH", packet[offset:offset + 4])
+        offset += 4
+        if name:
+            questions.append((name.lower(), qtype))
+    return questions
+
+
+def dns_record(name, rtype, ttl, rdata):
+    # 0x8001: class IN with the cache-flush bit set, as mDNS requires.
+    return dns_encode_name(name) + struct.pack(">HHIH", rtype, 0x8001, ttl, len(rdata)) + rdata
+
+
+def mdns_txt():
+    """TXT keys name the page a phone lands on; no secret is ever advertised."""
+    fields = [b"path=/live", b"version=" + VERSION.encode("ascii", "replace")]
+    return b"".join(bytes([min(255, len(field))]) + field for field in fields)
+
+
+def mdns_answers(address):
+    """Every record this bridge owns: the host name and the service instance."""
+    ip = socket.inet_aton(address)
+    host = MDNS_HOST
+    srv = struct.pack(">HHH", 0, 0, HTTP_PORT) + dns_encode_name(host)
+    return [
+        dns_record(host, 1, 120, ip),
+        dns_record(MDNS_SERVICE, 12, 4500, dns_encode_name(MDNS_INSTANCE)),
+        dns_record(MDNS_INSTANCE, 33, 120, srv),
+        dns_record(MDNS_INSTANCE, 16, 4500, mdns_txt()),
+    ]
+
+
+def mdns_response(packet, address):
+    """An answer packet for the questions we own, or None when nothing matches."""
+    if len(packet) < 12 or packet[2] & 0x80:
+        return None
+    answers = []
+    for name, qtype in dns_questions(packet):
+        if name == MDNS_HOST and qtype in (1, 255):
+            answers.append(dns_record(MDNS_HOST, 1, 120, socket.inet_aton(address)))
+        elif name == MDNS_SERVICE and qtype in (12, 255):
+            answers.append(dns_record(MDNS_SERVICE, 12, 4500, dns_encode_name(MDNS_INSTANCE)))
+        elif name == MDNS_INSTANCE and qtype in (33, 16, 255):
+            srv = struct.pack(">HHH", 0, 0, HTTP_PORT) + dns_encode_name(MDNS_HOST)
+            answers.append(dns_record(MDNS_INSTANCE, 33, 120, srv))
+            answers.append(dns_record(MDNS_INSTANCE, 16, 4500, mdns_txt()))
+    if not answers:
+        return None
+    header = struct.pack(">HHHHHH", 0, 0x8400, 0, len(answers), 0, 0)
+    return header + b"".join(answers)
+
+
+def mdns_loop():
+    address = lan_ip()
+    if HOST in ("127.0.0.1", "localhost") or address == "127.0.0.1":
+        mdns_status.update(error="The bridge is reachable only on this PC", address=address)
+        return
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        except (AttributeError, OSError):
+            pass
+        sock.bind(("", MDNS_PORT))
+        group = socket.inet_aton(MDNS_GROUP)
+        try:
+            sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP,
+                            group + socket.inet_aton(address))
+        except OSError:
+            sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP,
+                            group + socket.inet_aton("0.0.0.0"))
+        sock.settimeout(1.0)
+    except OSError as exc:
+        mdns_status.update(error=str(exc), address=address)
+        log("mDNS discovery unavailable (%s). The phone can still use http://%s:%d."
+            % (exc, address, HTTP_PORT))
+        try:
+            sock.close()
+        except OSError:
+            pass
+        return
+    mdns_status.update(running=True, address=address, error="")
+    log("Answering %s on %s (http://%s:%d)" % (MDNS_HOST, address, MDNS_HOST, HTTP_PORT))
+    announced = 0.0
+    while True:
+        now = time.time()
+        if now - announced > 60:
+            announced = now
+            try:
+                records = b"".join(mdns_answers(address))
+                sock.sendto(struct.pack(">HHHHHH", 0, 0x8400, 0, 4, 0, 0) + records,
+                            (MDNS_GROUP, MDNS_PORT))
+            except OSError:
+                pass
+        try:
+            data, source = sock.recvfrom(4096)
+        except socket.timeout:
+            continue
+        except OSError:
+            return
+        # Our own multicast announcement comes back when the interface loops it.
+        if source[0] == address:
+            continue
+        reply = mdns_response(data, address)
+        if not reply:
+            continue
+        try:
+            sock.sendto(reply, (MDNS_GROUP, MDNS_PORT))
+            mdns_status["answers"] += 1
+        except OSError:
+            pass
+
+
 def startup_recovery():
     try:
         recover_inprogress()
@@ -1846,6 +2698,8 @@ def main():
     threading.Thread(target=load_airports, daemon=True).start()
     threading.Thread(target=load_faa, daemon=True).start()
     threading.Thread(target=udp_loop, daemon=True).start()
+    threading.Thread(target=xplane_identity_loop, daemon=True).start()
+    threading.Thread(target=mdns_loop, daemon=True).start()
     threading.Thread(target=msfs_loop, daemon=True).start()
     threading.Thread(target=traffic_loop, daemon=True).start()
     threading.Thread(target=relay_loop, daemon=True).start()
@@ -1860,7 +2714,8 @@ def main():
     print("  Stratos bridge is running")
     print("  On this PC:   http://127.0.0.1:%d" % HTTP_PORT)
     print("  On your LAN:  http://%s:%d  (token required; pair a phone from Stratos Settings)" % (lan_ip(), HTTP_PORT))
-    print("  Phone QR:     Stratos > Settings > Phone access > Show pairing QR")
+    print("  Phone:        http://%s:%d on the phone, or Stratos > Settings > Phone access"
+          % (MDNS_HOST, HTTP_PORT))
     print("  Access token: %s" % TOKEN)
     print("  X-Plane: Settings > Data Output, enable rows 3, 17 and 20 to UDP %s:%d" % (lan_ip(), UDP_PORT))
     print("  MSFS: start a flight (install the connector once with  pip install SimConnect )")

@@ -1,0 +1,1 @@
+{"ok":true,"airport":"L35","source":"FAA CIFP (FAACIFP18, United States)","cycle":"2611","runways":{},"procedures":{"sid":[{"id":"OKACO1","transitions":[{"id":"RW08","runway":"08","combined":false,"points":[{"id":"OKACO","lat":34.264569,"lon":-116.584222,"terminator":"DF"}],"skipped":0,"complete":true}]}]}}

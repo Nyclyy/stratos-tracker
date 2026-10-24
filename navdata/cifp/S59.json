@@ -1,0 +1,1 @@
+{"ok":true,"airport":"S59","source":"FAA CIFP (FAACIFP18, United States)","cycle":"2611","runways":{},"procedures":{"sid":[{"id":"EYESE2","transitions":[{"id":"RW15","runway":"15","combined":false,"points":[{"id":"EYESE","lat":48.001342,"lon":-115.379339,"terminator":"DF"}],"skipped":0,"complete":true}]}]}}

@@ -6,10 +6,15 @@
 
 import { initTheme, esc, fmtDate, fmtTime, num, setTheme, toast, tag } from './ui.js';
 import { defaultBridgeBase, claimRelay, RelayClient, TelemetryClient, bridgeHealth, forgetThisPhone } from './bridge.js';
+import {
+  BRIDGE_STORAGE_KEY, blocksLocalBridge, bridgeCandidates, connectionHelp,
+  connectStatus, findBridge, phoneConnectUrl,
+} from './lib/connect.js';
 import { mergeFlights, getFlights } from './lib/store.js';
 import { detectResourceMode, formatAltitude, parseTelemetry } from './lib/telemetry.js';
 import { findAirport } from './data/airports.js';
 import { distanceNm } from './lib/geo.js';
+import { VATSIM_FEED_URL, parsePilots } from './lib/vatsim.js';
 import { MiniMap } from './minimap.js';
 
 initTheme();
@@ -38,6 +43,244 @@ let lastPosition = null;
 let lastFlightKey = '';
 let busy = false;
 
+/* Other aircraft near this flight, from the VATSIM feed this phone can read
+   itself and from the traffic the bridge already holds (its ADS-B feed).
+   Tapping one shows its recorded path: the bridge's own store where the page is
+   served by the bridge, so it matches what the PC shows, plus what this phone
+   has observed. Nothing is invented for the part nobody recorded. */
+const TRAFFIC_RADIUS_NM = 180;
+const TRAFFIC_MAX = 25;
+let traffic = [];
+let trafficAt = 0;
+let trafficBusy = false;
+let trafficSelected = null;
+let trafficTrailCount = 0;
+let trafficPostAt = 0;
+const trafficSeen = new Map();
+/* A phone paired through the relay has no bridge, so the relay carries the
+   desktop's traffic list and the trail samples it has recorded. */
+let relayTrafficList = [];
+let relayTrafficAt = 0;
+
+function trafficKeyOf(target) {
+  return String((target && (target.key || target.id)) || '').toUpperCase();
+}
+
+/**
+ * The traffic the bridge already polled (its ADS-B feed), shaped like the
+ * VATSIM entries. The bridge is the authority on how fresh that list is — the
+ * desktop map shows its last known positions too — so no second age gate is
+ * applied here; a snapshot without a traffic timestamp carries no list.
+ */
+function bridgeTrafficList(raw) {
+  const list = Array.isArray(raw && raw.tr) ? raw.tr : [];
+  if (!Number(raw && raw.trt)) return [];
+  const out = [];
+  for (const item of list) {
+    if (!item || !Number.isFinite(Number(item.lat)) || !Number.isFinite(Number(item.lon))) continue;
+    const id = String(item.id || '').trim().toUpperCase();
+    if (!id) continue;
+    out.push({
+      id, key: id, source: 'adsb',
+      lat: Number(item.lat), lon: Number(item.lon),
+      alt: Number.isFinite(Number(item.alt)) ? Number(item.alt) : null,
+      gs: Number.isFinite(Number(item.gs)) ? Number(item.gs) : null,
+      hdg: Number.isFinite(Number(item.hdg)) ? Number(item.hdg) : 0,
+      aircraft: null, dep: null, arr: null,
+    });
+  }
+  return out;
+}
+
+/** A position this phone saw, kept per aircraft for the duration of the trail. */
+function recordTrafficPoint(target, when) {
+  const key = trafficKeyOf(target);
+  if (!key) return;
+  const list = trafficSeen.get(key) || [];
+  const last = list[list.length - 1];
+  if (!last || Math.abs(last[0] - target.lat) + Math.abs(last[1] - target.lon) > 1e-4) {
+    list.push([target.lat, target.lon, Number(target.alt) || 0, when]);
+    if (list.length > 240) list.shift();
+    trafficSeen.set(key, list);
+  }
+}
+
+/**
+ * The desktop's traffic list, carried through the relay for a paired phone.
+ * Fetched at the same 15 s cadence as the feed; a failure keeps the last list.
+ */
+async function fetchRelayTraffic() {
+  if (bridgeSource || !relayConfig) return;
+  const now = Date.now();
+  if (now - relayTrafficAt < 15000) return;
+  relayTrafficAt = now;
+  try {
+    const response = await fetch(`${relayConfig.url}/api/traffic`, {
+      headers: { Authorization: `Bearer ${relayConfig.token}` }, cache: 'no-store',
+    });
+    if (!response.ok) return;
+    const payload = await response.json();
+    if (payload && Array.isArray(payload.list)) relayTrafficList = payload.list;
+  } catch (_) { /* keep the last list; the page still shows VATSIM traffic */ }
+}
+
+/** The bridge's record plus what this phone saw, oldest first, one point per time. */
+async function trafficHistory(key) {
+  const byTime = new Map();
+  (trafficSeen.get(key) || []).forEach(point => byTime.set(point[3], { lat: point[0], lon: point[1], alt: point[2], t: point[3] }));
+  if (!bridgeSource && relayConfig) {
+    try {
+      const response = await fetch(`${relayConfig.url}/api/traffic?hex=${encodeURIComponent(key)}`, {
+        headers: { Authorization: `Bearer ${relayConfig.token}` }, cache: 'no-store',
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        (payload && payload.points || []).forEach(point => {
+          if (!Array.isArray(point) || !Number.isFinite(point[0]) || !Number.isFinite(point[1])) return;
+          byTime.set(point[3], { lat: point[0], lon: point[1], alt: Number(point[2]) || 0, t: point[3] });
+        });
+      }
+    } catch (_) { /* the phone's own record stands */ }
+  }
+  if (bridgeSource || location.port === '8765') {
+    try {
+      const response = await fetch(`${location.origin}/traffic/trail?hex=${encodeURIComponent(key)}`, { cache: 'no-store', credentials: 'include' });
+      if (response.ok) {
+        const payload = await response.json();
+        (payload && payload.points || []).forEach(point => {
+          if (!Array.isArray(point) || !Number.isFinite(point[0]) || !Number.isFinite(point[1])) return;
+          byTime.set(point[3], { lat: point[0], lon: point[1], alt: Number(point[2]) || 0, t: point[3] });
+        });
+      }
+    } catch (_) { /* a hosted page has no bridge; the phone's own record stands */ }
+  }
+  return [...byTime.values()].sort((a, b) => a.t - b.t);
+}
+
+/** What is actually known about a target, without placeholder values. */
+function trafficSummary(target) {
+  const parts = [];
+  if (target.aircraft) parts.push(target.aircraft);
+  if (target.dep && target.arr) parts.push(`${target.dep} → ${target.arr}`);
+  parts.push(target.source === 'adsb' ? 'ADS-B' : 'VATSIM');
+  return parts.join(' · ');
+}
+
+function clearTrafficSelection() {
+  trafficSelected = null;
+  trafficTrailCount = 0;
+  map?.selectTraffic('');
+  render();
+}
+
+async function selectTrafficIndex(index) {
+  const target = traffic[index];
+  if (!target) return;
+  trafficSelected = target;
+  map?.selectTraffic(trafficKeyOf(target));
+  map?.setTrafficTrail([]);
+  trafficTrailCount = 0;
+  render();
+  const points = await trafficHistory(trafficKeyOf(target));
+  if (!trafficSelected || trafficKeyOf(trafficSelected) !== trafficKeyOf(target)) return;
+  trafficTrailCount = points.length;
+  map?.setTrafficTrail(points);
+  render();
+}
+
+/**
+ * One tap: aircraft are picked before the route, on the same map instance. The
+ * index belongs to the map's own filtered array, so the aircraft is resolved by
+ * its key before it is looked up in this page's list.
+ */
+function handleMapSelect(hit) {
+  if (hit && hit.kind === 'traffic') {
+    const target = map?.traffic?.[hit.index];
+    const key = trafficKeyOf(target || traffic[hit.index]);
+    const index = traffic.findIndex(item => trafficKeyOf(item) === key);
+    if (index >= 0) selectTrafficIndex(index);
+  } else if (trafficSelected) clearTrafficSelection();
+}
+
+/** Report what this phone sees, so the trail is shared with the desktop. */
+function postTraffic() {
+  if (!(bridgeSource || location.port === '8765')) return;
+  const now = Date.now();
+  if (now - trafficPostAt < 15000) return;
+  trafficPostAt = now;
+  const points = traffic.map(target => [trafficKeyOf(target), target.lat, target.lon, Number(target.alt) || 0, now]);
+  if (!points.length) return;
+  fetch(`${location.origin}/traffic/track`, {
+    method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ points }),
+  }).catch(() => {});
+}
+
+async function pollTraffic(telemetry) {
+  if (!telemetry || trafficBusy || document.hidden) return;
+  // A hidden traffic layer costs nothing: no feed request, no redraw.
+  if (map && map.layers.traffic === false) return;
+  const now = Date.now();
+  if (now - trafficAt < 15000) return;
+  trafficAt = now;
+  trafficBusy = true;
+  try {
+    let pilots = [];
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      const response = await fetch(VATSIM_FEED_URL, { signal: controller.signal, cache: 'no-store' });
+      clearTimeout(timer);
+      if (response.ok) pilots = parsePilots(await response.json());
+    } catch (_) { /* the bridge's own traffic can still fill the map */ }
+    const here = { lat: telemetry.lat, lon: telemetry.lon };
+    const byKey = new Map();
+    const add = target => {
+      const key = trafficKeyOf(target);
+      if (!key || byKey.has(key)) return;
+      const fromYouNm = distanceNm(here, target);
+      if (!Number.isFinite(fromYouNm) || fromYouNm > TRAFFIC_RADIUS_NM) return;
+      byKey.set(key, { ...target, key, fromYouNm });
+    };
+    // VATSIM first: it carries the filed route and level, which the ADS-B feed
+    // does not. An aircraft seen by both keeps the richer entry.
+    pilots.forEach(pilot => add({ ...pilot, key: pilot.id }));
+    if (bridgeSource) bridgeTrafficList(lastState?.snapshot?.telemetry).forEach(add);
+    else {
+      await fetchRelayTraffic();
+      relayTrafficList.forEach(target => add({ ...target, key: target.id, source: 'adsb' }));
+    }
+    const near = [...byKey.values()]
+      .sort((a, b) => a.fromYouNm - b.fromYouNm)
+      .slice(0, TRAFFIC_MAX);
+    near.forEach(target => recordTrafficPoint(target, now));
+    traffic = near;
+    // Forget aircraft that have not been seen for a while so a long session does
+    // not accumulate every flight it ever met.
+    const cutoff = now - 45 * 60 * 1000;
+    for (const [key, points] of trafficSeen) {
+      if (!points.length || points[points.length - 1][3] < cutoff) trafficSeen.delete(key);
+    }
+    map?.setTraffic(near);
+    if (trafficSelected) {
+      const fresh = near.find(target => trafficKeyOf(target) === trafficKeyOf(trafficSelected));
+      if (fresh) {
+        trafficSelected = fresh;
+        const points = await trafficHistory(trafficKeyOf(fresh));
+        trafficTrailCount = points.length;
+        map?.setTrafficTrail(points);
+      } else {
+        trafficSelected = null;
+        trafficTrailCount = 0;
+        map?.selectTraffic('');
+      }
+    }
+    if (near.length) postTraffic();
+  } finally {
+    trafficBusy = false;
+  }
+}
+
 function readRelay() {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
@@ -47,31 +290,95 @@ function readRelay() {
 }
 
 function setStatus(state, text) {
-  statusEl.innerHTML = `<i class="dot dot-${esc(state)}"></i><span>${esc(text)}</span>`;
+  const label = connectStatus(state);
+  statusEl.innerHTML = `<i class="dot dot-${esc(label.dot)}"></i><span>${esc(text || label.text)}</span>`;
 }
 
-function pairingScreen(message = '') {
+async function servedByBridge() {
+  try {
+    const response = await fetch(`${location.origin}/health`, { cache: 'no-store', credentials: 'include' });
+    if (!response.ok) return false;
+    return /^StratosBridge\//.test(response.headers.get('server') || '');
+  } catch (_) { return false; }
+}
+
+function readBridgeBase() {
+  try { return localStorage.getItem(BRIDGE_STORAGE_KEY) || ''; } catch (_) { return ''; }
+}
+
+function rememberBridge(base) {
+  try { if (base) localStorage.setItem(BRIDGE_STORAGE_KEY, base); } catch (_) {}
+}
+
+/* One button, no code, no URL. On a page served over HTTPS the browser will
+   not let us call an HTTP bridge, so the button opens the bridge's own page;
+   the bridge enrolls this phone on arrival. On an HTTP page we probe the known
+   addresses first, so the phone lands on the one that actually answered. */
+function pairingScreen(message = '', hint = '') {
   const query = new URLSearchParams(location.search);
   const suggestedUrl = query.get('relay') || (relayConfig && relayConfig.url) || 'https://';
   const suggestedCode = query.get('code') || '';
-  const hosted = location.protocol === 'https:';
+  const saved = readBridgeBase();
+  const hosted = blocksLocalBridge(location);
+  const candidates = bridgeCandidates({ protocol: location.protocol, hostname: location.hostname, port: location.port, saved });
   view.innerHTML = `
     <div class="card pair-card">
-      <div class="card-head"><h1 style="font-size:22px">Connect to your PC</h1></div>
-      <p class="muted small" style="margin-bottom:14px">Stratos shows live telemetry from the simulator running on your PC. Pair once with a short code generated in <b>Pilot → Settings → Phone access</b>.</p>
+      <div class="card-head"><h1 style="font-size:22px">Connect to your simulator</h1></div>
+      <p class="muted small" style="margin-bottom:14px">Open Stratos on the PC, keep the simulator running, then tap the button. This phone finds the PC on your network and pairs itself — no code, no URL, no QR.</p>
       ${message ? `<div class="notice bad" style="margin-bottom:12px">${esc(message)}</div>` : ''}
-      <div class="field"><label for="pair-url">Relay URL</label>
-        <input class="input" id="pair-url" value="${esc(suggestedUrl)}" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://your-relay.example.com"></div>
-      <div class="field" style="margin-top:10px"><label for="pair-code">Pairing code</label>
-        <input class="input" id="pair-code" value="${esc(suggestedCode)}" inputmode="text" autocapitalize="characters" spellcheck="false" maxlength="12" placeholder="8-character code" style="font-family:var(--mono);letter-spacing:.16em;font-size:20px"></div>
-      <button class="btn primary" id="pair-connect" style="width:100%;margin-top:14px;min-height:46px">Connect</button>
-      <p class="help" style="margin-top:12px">The relay only receives telemetry pushed by your PC. It cannot send commands to your PC. Tokens are stored on this phone only; use “Disconnect” to revoke this phone.</p>
-      ${hosted ? `<div class="notice" style="margin-top:12px"><div><strong>On the same Wi-Fi?</strong><br>You can also open the bridge address directly (<code>http://PC-IP:8765</code>) and enter the bridge token once. That keeps telemetry on your local network.</div>
-        <a class="btn small" href="${esc(defaultBridgeBase())}">Open local bridge</a></div>` : ''}
+      <button class="btn primary" id="pair-connect" style="width:100%;min-height:48px">Connect to Simulator</button>
+      <p class="help" id="pair-progress" style="margin-top:10px">${esc(hint || (hosted ? 'Opens the page your PC serves, and pairs on arrival.' : `Looking for Stratos near ${candidates[0] || 'this network'}.`))}</p>
+      <div class="notice" style="margin-top:12px"><div><strong>If it cannot find the PC</strong><br>Both devices must be on the same Wi-Fi — guest networks and VPNs keep them apart. Allow Stratos through the firewall on private networks. The bridge listens on port 8765.</div></div>
+      ${saved ? `<div class="row" style="margin-top:10px"><span class="muted small">Last connected to <code>${esc(saved)}</code></span><span class="spacer"></span><button class="btn small ghost" id="pair-forget">Forget</button></div>` : ''}
+      <details style="margin-top:14px"><summary class="small muted">Not on the same network? Use the relay</summary>
+        <p class="help" style="margin-top:10px">The relay receives snapshots pushed by your PC and serves them here with a read-only token. It never accepts commands for your PC.</p>
+        <div class="field"><label for="pair-url">Relay URL</label>
+          <input class="input" id="pair-url" value="${esc(suggestedUrl)}" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://your-relay.example.com"></div>
+        <div class="field" style="margin-top:10px"><label for="pair-code">Pairing code</label>
+          <input class="input" id="pair-code" value="${esc(suggestedCode)}" inputmode="text" autocapitalize="characters" spellcheck="false" maxlength="12" placeholder="8-character code" style="font-family:var(--mono);letter-spacing:.16em;font-size:20px"></div>
+        <button class="btn" id="pair-code-connect" style="width:100%;margin-top:12px;min-height:44px">Connect through the relay</button>
+      </details>
     </div>`;
-  document.getElementById('pair-connect').addEventListener('click', connectWithCode);
+  document.getElementById('pair-connect').addEventListener('click', connectLocal);
+  document.getElementById('pair-code-connect')?.addEventListener('click', connectWithCode);
+  document.getElementById('pair-forget')?.addEventListener('click', () => {
+    try { localStorage.removeItem(BRIDGE_STORAGE_KEY); } catch (_) {}
+    pairingScreen('', 'The saved address was forgotten. Tap Connect to find this PC again.');
+  });
   setStatus('disconnected', 'Not connected');
   document.title = 'Live · Stratos';
+}
+
+async function connectLocal() {
+  if (busy) return;
+  busy = true;
+  const button = document.getElementById('pair-connect');
+  const progress = document.getElementById('pair-progress');
+  const say = text => { if (progress) progress.textContent = text; };
+  if (button) { button.disabled = true; button.textContent = 'Looking for your PC…'; }
+  setStatus('connecting', 'Looking for your PC…');
+  try {
+    if (blocksLocalBridge(location)) {
+      say('Opening the page your PC serves…');
+      location.href = phoneConnectUrl();
+      return;
+    }
+    const candidates = bridgeCandidates({
+      protocol: location.protocol, hostname: location.hostname,
+      port: location.port, saved: readBridgeBase(),
+    });
+    const found = await findBridge(candidates);
+    if (found.ok || found.reason === 'unauthorized') {
+      rememberBridge(found.base);
+      say(`Found ${found.base}. Pairing this phone…`);
+      location.href = `${found.base}/pair/connect`;
+      return;
+    }
+    const tried = found.tried.map(entry => entry.base).filter(Boolean).join(', ');
+    pairingScreen(connectionHelp(found.reason), tried ? `Tried ${tried}.` : '');
+  } finally {
+    busy = false;
+  }
 }
 
 async function connectWithCode() {
@@ -127,11 +434,12 @@ function startRelay() {
       const labels = {
         connecting: ['connecting', 'Connecting…'],
         connected: ['connected', 'Live'],
+        reconnecting: ['connecting', 'Reconnecting…'],
         waiting: ['waiting', 'Waiting for telemetry'],
         stale: ['stale', 'Desktop idle'],
         unpaired: ['unpaired', 'Pairing revoked'],
         offline: ['offline', 'No network'],
-        error: ['error', 'Connection problem'],
+        error: ['reconnecting', 'Reconnecting…'],
       };
       const [dot, text] = labels[status.state] || ['disconnected', 'Not connected'];
       setStatus(dot, text);
@@ -149,19 +457,19 @@ function startRelay() {
   render();
 }
 
-async function startBridge() {
+async function startBridge(base = defaultBridgeBase()) {
   relayClient?.stop();
   relayClient = null;
   bridgeSource = true;
-  const base = defaultBridgeBase();
   try {
     const health = await bridgeHealth(base);
     if (health.simulator && health.simulator.connected) setStatus('connected', 'Simulator live');
     else setStatus('waiting', 'Bridge connected');
+    rememberBridge(base);
   } catch (error) {
     pairingScreen(error.name === 'BridgeAuthError'
-      ? 'The bridge needs its access token. Open the bridge address in this browser and unlock it, then return here.'
-      : `Bridge not reachable at ${base}. ${error.message}`);
+      ? connectionHelp('unauthorized')
+      : connectionHelp('bridge-offline'), `The bridge at ${base} did not answer.`);
     return;
   }
   telemetryClient = new TelemetryClient({
@@ -246,7 +554,7 @@ function ensureMap() {
   if (!map) {
     const canvas = document.createElement('canvas');
     canvas.setAttribute('aria-label', 'Aircraft position');
-    map = new MiniMap(canvas, { padding: 22 });
+    map = new MiniMap(canvas, { padding: 22, onSelect: handleMapSelect });
     map.setTrack(mapTrack.length ? mapTrack : [{ lat: 0, lon: 0 }]);
   }
   map.attach(host);
@@ -296,7 +604,17 @@ function render() {
   const routeKey = `${flight?.id || ''}:${flight?.depAirport || ''}:${flight?.arrAirport || ''}`;
   if (routeKey !== lastFlightKey) {
     lastFlightKey = routeKey;
-    mapTrack = [];
+    // The bridge keeps the flight's recorded path, so a phone opened halfway
+    // through starts from the real first point instead of an empty trail.
+    mapTrack = Array.isArray(flight?.track)
+      ? flight.track
+        .filter(point => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]))
+        .map(point => ({
+          lat: point[0], lon: point[1], alt: Number(point[2]) || 0, t: Number(point[3]) || 0,
+          // The fifth value is height above ground, which the map colours by.
+          agl: Number.isFinite(point[4]) ? point[4] : null,
+        }))
+      : [];
     flownNm = 0;
     lastPosition = null;
     flightStartedAt = flight && flight.takeoffTime ? flight.takeoffTime : null;
@@ -304,7 +622,9 @@ function render() {
   if (telemetry) {
     if (lastPosition) flownNm += distanceNm(lastPosition, telemetry);
     lastPosition = { lat: telemetry.lat, lon: telemetry.lon };
-    mapTrack.push({ lat: telemetry.lat, lon: telemetry.lon, alt: telemetry.alt, t: Date.now() });
+    const lastPoint = mapTrack[mapTrack.length - 1];
+    const moved = !lastPoint || Math.abs(lastPoint.lat - telemetry.lat) + Math.abs(lastPoint.lon - telemetry.lon) > 1e-5;
+    if (moved) mapTrack.push({ lat: telemetry.lat, lon: telemetry.lon, alt: telemetry.alt, t: Date.now(), agl: Number.isFinite(telemetry.agl) ? telemetry.agl : null });
     if (mapTrack.length > 900) mapTrack.splice(0, mapTrack.length - 900);
   }
   ingestFlights(recent);
@@ -343,6 +663,21 @@ function render() {
       <button type="button" class="btn small" data-map-action="fit">Fit route</button>
       <button type="button" class="btn small" data-map-action="route" aria-pressed="${map?.layers?.route !== false ? 'true' : 'false'}">Route</button>
       <button type="button" class="btn small" data-map-action="track" aria-pressed="${map?.layers?.track !== false ? 'true' : 'false'}">Track</button>
+      <button type="button" class="btn small" data-map-action="traffic" aria-pressed="${map?.layers?.traffic !== false ? 'true' : 'false'}">Traffic</button>
+    </div>
+
+    <div class="card" id="live-traffic" style="margin-top:12px">
+      <div class="card-head"><h2>${trafficSelected ? esc(trafficKeyOf(trafficSelected)) : 'Nearby traffic'}</h2><span class="spacer"></span>${trafficSelected ? '<button type="button" class="btn small ghost" id="traffic-clear">Clear</button>' : `<span class="muted small">${traffic.length} within ${TRAFFIC_RADIUS_NM} nm</span>`}</div>
+      ${trafficSelected ? `
+      <div class="muted small">${esc(trafficSummary(trafficSelected))}</div>
+      <div class="telemetry" style="margin-top:10px">
+        <div class="stat"><span class="stat-label">Altitude</span><b class="stat-value">${Number.isFinite(Number(trafficSelected.alt)) ? esc(formatAltitude(trafficSelected.alt)) : '—'}</b></div>
+        <div class="stat"><span class="stat-label">Ground speed</span><b class="stat-value">${Number.isFinite(Number(trafficSelected.gs)) ? Math.round(Number(trafficSelected.gs)) : '—'}<small class="muted" style="font-size:12px"> kt</small></b></div>
+        <div class="stat"><span class="stat-label">Heading</span><b class="stat-value">${Number.isFinite(Number(trafficSelected.hdg)) ? `${String(Math.round(Number(trafficSelected.hdg)) % 360).padStart(3, '0')}°` : '—'}</b></div>
+        <div class="stat"><span class="stat-label">From you</span><b class="stat-value">${Math.round(Number(trafficSelected.fromYouNm) || 0)}<small class="muted" style="font-size:12px"> nm</small></b></div>
+      </div>
+      <p class="help" style="margin-top:8px">${trafficTrailCount > 1 ? `${trafficTrailCount} recorded positions in its trail${bridgeSource ? '' : (relayConfig ? ' from the relay' : ' on this phone')}.` : 'Trail recording starts now — the line grows as positions arrive.'}</p>
+      ` : `<p class="help">${traffic.length ? 'Tap an aircraft on the map to see its track and details.' : 'No traffic within range yet. Aircraft appear as they are seen by the bridge or on VATSIM.'}</p>`}
     </div>
 
     <div class="card" style="margin-top:12px">
@@ -379,6 +714,7 @@ function render() {
   document.getElementById('live-disconnect')?.addEventListener('click', () => {
     if (confirm('Disconnect this phone? It will lose access until paired again.')) disconnect(true);
   });
+  document.getElementById('traffic-clear')?.addEventListener('click', clearTrafficSelection);
   document.getElementById('live-forget')?.addEventListener('click', async () => {
     if (!confirm('Forget this PC on this phone? You will need to scan a new QR code to reconnect.')) return;
     try { await forgetThisPhone(defaultBridgeBase()); } catch (_) { /* already unpaired */ }
@@ -398,6 +734,7 @@ function render() {
       liveMap.setPosition({ lat: telemetry.lat, lon: telemetry.lon }, telemetry.hdg);
     }
   }
+  pollTraffic(telemetry);
   document.title = flight?.arrAirport ? `Live · ${flight.depAirport || '????'} → ${flight.arrAirport}` : 'Live · Stratos';
 }
 
@@ -412,6 +749,12 @@ view.addEventListener('click', event => {
     case 'fit': map.setFollow(false); map.resetZoom(); break;
     case 'route': map.setLayers({ route: !map.layers.route }); break;
     case 'track': map.setLayers({ track: !map.layers.track }); break;
+    case 'traffic':
+      map.setLayers({ traffic: !map.layers.traffic });
+      // Switching the layer back on fetches at the next telemetry frame instead
+      // of waiting out the poll interval.
+      if (map.layers.traffic) trafficAt = 0;
+      break;
     default: return;
   }
   render();
@@ -431,6 +774,18 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+// A Wi-Fi change or a tunnel is the common way a phone drops the stream. Retry
+// at once when the network returns instead of waiting out the backoff.
+window.addEventListener('online', () => {
+  if (bridgeSource && telemetryClient) {
+    telemetryClient.open();
+  } else if (relayConfig) {
+    if (!relayClient) startRelay();
+    else if (relayClient.closed) relayClient.start();
+  }
+});
+window.addEventListener('offline', () => setStatus('offline'));
+
 (async function boot() {
   const query = new URLSearchParams(location.search);
   const saved = relayConfig;
@@ -439,6 +794,12 @@ document.addEventListener('visibilitychange', () => {
 
   if (location.port === '8765') {
     await startBridge();
+    return;
+  }
+  // The bridge can be told to listen on another port. The page it serves is
+  // still a bridge page, so ask its own origin before falling back to pairing.
+  if (location.protocol === 'http:' && await servedByBridge()) {
+    await startBridge(location.origin);
     return;
   }
   if (saved) { startRelay(); return; }

@@ -1,0 +1,1 @@
+{"ok":true,"airport":"KDUB","source":"FAA CIFP (FAACIFP18, United States)","cycle":"2611","runways":{},"procedures":{"sid":[{"id":"ROWEY1","transitions":[{"id":"RW11","runway":"11","combined":false,"points":[{"id":"ROWEY","lat":43.320392,"lon":-109.069692,"terminator":"DF"}],"skipped":0,"complete":true}]}]}}

@@ -120,6 +120,71 @@ test('relay: pairing, ingest, read and revocation', async (t) => {
   assert.equal(gone.status, 401);
 });
 
+test('relay: traffic list and trails reach a paired phone', async (t) => {
+  await startRelay();
+  t.after(async () => {
+    if (child && !child.killed) child.kill('SIGTERM');
+    await once(child, 'exit').catch(() => {});
+    fs.rmSync(DATA_DIR, { recursive: true, force: true });
+  });
+
+  const paired = await api('POST', '/api/pair', { body: { name: 'Traffic PC' } });
+  const { code, desktopToken } = paired.json;
+  const claimed = await api('POST', '/api/claim', { body: { code, label: 'Phone' } });
+  const readToken = claimed.json.readToken;
+  const now = Date.now();
+
+  const posted = await api('POST', '/api/traffic', {
+    token: desktopToken,
+    body: {
+      list: [
+        { id: 'SWR219', lat: 46.5, lon: -122.9, alt: 12000, gs: 320, hdg: 180 },
+        { id: 'ZERO', lat: 0, lon: 0 },
+        { id: 'BAD', lat: 'north', lon: 1 },
+      ],
+      points: [
+        ['swr219', 46.5, -122.9, 12000, now - 15000],
+        ['swr219', 46.5, -122.9, 12000, now - 15000], // the same position again
+        ['SWR219', 46.4, -122.8, 16000, now],
+        ['DLH400', 47.0, -121.0, 30000, now - 4000 * 1000], // past the 45 min window
+      ],
+    },
+  });
+  assert.equal(posted.status, 200);
+  assert.equal(posted.json.ok, true);
+  assert.equal(posted.json.added, 2, 'the repeat and the stale sample are refused');
+
+  const list = await api('GET', '/api/traffic', { token: readToken });
+  assert.equal(list.status, 200);
+  assert.deepEqual(list.json.list.map(entry => entry.id), ['SWR219'], 'a (0, 0) or unusable entry is never listed');
+  assert.equal(list.json.list[0].alt, 12000);
+  assert.ok(list.json.at > 0);
+
+  const trail = await api('GET', '/api/traffic?hex=swr219', { token: readToken });
+  assert.equal(trail.status, 200);
+  assert.equal(trail.json.hex, 'SWR219');
+  assert.deepEqual(trail.json.points.map(point => point[2]), [12000, 16000], 'oldest first, duplicate refused');
+  const expired = await api('GET', '/api/traffic?hex=DLH400', { token: readToken });
+  assert.equal(expired.json.points.length, 0, 'a sample past the window is not served');
+  const unknown = await api('GET', '/api/traffic?hex=NOPE', { token: readToken });
+  assert.deepEqual(unknown.json.points, []);
+
+  const readCannotPost = await api('POST', '/api/traffic', { token: readToken, body: { points: [] } });
+  assert.equal(readCannotPost.status, 401);
+  const desktopCannotRead = await api('GET', '/api/traffic', { token: desktopToken });
+  assert.equal(desktopCannotRead.status, 401);
+  const nothingUsable = await api('POST', '/api/traffic', { token: desktopToken, body: { list: 'nope', points: 'nope' } });
+  assert.equal(nothingUsable.status, 200);
+  assert.equal(nothingUsable.json.added, 0);
+  const afterNoise = await api('GET', '/api/traffic', { token: readToken });
+  assert.equal(afterNoise.json.list.length, 1, 'a malformed post does not erase the last good list');
+
+  const removed = await api('DELETE', '/api/session', { token: desktopToken });
+  assert.equal(removed.status, 200);
+  const gone = await api('GET', '/api/traffic', { token: readToken });
+  assert.equal(gone.status, 401);
+});
+
 test('relay: origin and rate limiting', async (t) => {
   await startRelay();
   t.after(async () => {

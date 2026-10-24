@@ -7,6 +7,7 @@ import {
 } from '../lib/planner.js';
 import { BUNDLED_NAVAIDS } from '../data/airports.js';
 import { fetchSimbriefPlan, loadSimbriefId, saveSimbriefId } from '../lib/simbrief.js';
+import { saveOfp } from '../lib/flightsummary.js';
 import { formatLatLon } from '../lib/geo.js';
 import { esc, fmtDate, fmtDateTime, num, tag, toast, downloadText, pickFile, askText } from '../ui.js';
 import { wireSearch } from './common.js';
@@ -768,7 +769,7 @@ export async function mount(root, ctx) {
     try {
       const plan = await fetchSimbriefPlan(entered);
       saveSimbriefId(localStorage, entered);
-      const { origin, destination, fixes, general } = plan;
+      const { origin, destination, fixes, general, ofp } = plan;
       const imported = fixes.map((fix, index) => ({
         id: String(fix.ident || `WP${index + 1}`).toUpperCase(),
         name: fix.name || fix.ident || 'Waypoint',
@@ -776,8 +777,16 @@ export async function mount(root, ctx) {
         lon: Number(fix.pos_long),
         elev: Number(fix.altitude_feet) || 0,
         kind: fix.type === 'apt' ? 'apt' : fix.type === 'vor' || fix.type === 'ndb' ? 'nav' : 'fix',
+        // Kept exactly as the plan states them: the map draws a SID fix and an
+        // arrival fix differently, and an airway fix differently again. Neither
+        // is inferred from the fix's position or its name.
+        ss: fix.is_sid_star == '1' ? (String(fix.stage || '').toUpperCase() === 'DES' ? 'star' : 'sid') : '',
+        aw: fix.via_airway && !/^DCT$/i.test(fix.via_airway) ? String(fix.via_airway).toUpperCase() : '',
       })).filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lon));
       if (imported.length < 2) throw new Error('No usable coordinates in the SimBrief plan.');
+      // The normalised OFP carries the SID, STAR and planned runways, so the
+      // Flight Deck card can show them without a second import there.
+      if (ofp) saveOfp(localStorage, ofp, entered);
       pushUndo();
       points = imported;
       name = `${origin || points[0].id} → ${destination || points[points.length - 1].id} (SimBrief)`;
@@ -800,7 +809,11 @@ export async function mount(root, ctx) {
     if (points.length < 2) { toast('Add at least two waypoints first.', 'bad'); return; }
     const mapRoute = points.map(p => ({
       id: p.id, name: p.name || p.id, lat: p.lat, lon: p.lon,
-      elev: Number(p.elev) || 0, k: p.kind || p.k || 'fix',
+      elev: Number(p.elev) || 0,
+      // The planner names these 'airport' and 'navaid'; the map draws 'apt'
+      // and 'nav'. Translating here keeps the airport ring and navaid symbol
+      // instead of falling back to an ordinary waypoint.
+      k: p.kind === 'airport' ? 'apt' : p.kind === 'navaid' ? 'nav' : (p.kind || p.k || 'fix'),
       // Kept so the map can draw a SID/STAR and an airway fix when the plan said so.
       ss: p.ss || '', aw: p.aw || '',
     }));

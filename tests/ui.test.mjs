@@ -1110,3 +1110,174 @@ test('the map draws waypoint symbols over a route line it never rewrites', async
   const head = execFileSync('git', ['show', 'HEAD:app/index.html'], { encoding: 'utf8' });
   assert.ok(head.includes(line), 'the committed build paints the same line');
 });
+
+test('a selected waypoint turns purple without touching the route line', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  assert.match(page, /const MKSELN='#a855f7',MKSELD='#7c3aed'/, 'the selection palette is the app purple');
+  assert.match(page, /function mkSelHalo\(x,y,r\)/, 'the selection indicator is its own pass');
+  assert.match(page, /function mkDraw\(kind,x,y,r,override\)/, 'a glyph can be redrawn in the selection colour');
+  assert.match(page, /chosen=wpIdx===i,col=chosen\?mkSelColor\(\):null/, 'only the selected marker changes colour');
+  assert.match(page, /if\(chosen\)mkSelHalo\(/, 'the selected marker gets the halo');
+  assert.match(page, /if\(wpIdx!=null&&!route\[wpIdx\]\)wpIdx=null/, 'a stale index is dropped, never drawn on another point');
+  // Selection lives on the map layer; closing the card or pressing Escape clears it.
+  assert.match(page, /if\(act=='close'\)\{wpIdx=null;/, 'closing the card clears the selection');
+  assert.match(page, /if\(e\.key=='Escape'\)\{if\(wpCard\)closeRouteCard\(\);wpIdx=null\}/, 'Escape clears it too');
+  // The same statement that paints the line must still be there.
+  assert.match(page, /cx\.globalAlpha=\.35;cx\.strokeStyle=C\.route;cx\.lineWidth=12/, 'the route line is unchanged');
+});
+
+test('the tracking card minimizes to a SID and STAR summary', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  assert.match(page, /function fcProcHtml\(o\)/, 'procedures are their own block');
+  assert.match(page, /block\('SID',p\.sid/, 'the SID label sits above its runway');
+  assert.match(page, /block\('STAR',p\.star/, 'the STAR label sits above its runway');
+  assert.match(page, /'RWY '\+esc\(rwy\)/, 'the planned runway is written under the procedure');
+  assert.match(page, /runway not in plan/, 'an unplanned runway is named as missing, not invented');
+  assert.match(page, /if\(!fExp\)\{\s*return header\+compact\+fcProcHtml\(o\)\+actions/, 'a minimized card keeps the live strip, the procedures and the actions');
+  assert.match(page, /s=\(fExp\?fcPhotoHtml\(sel\):''\)\+fcAircraftHtml\(sel\)/, 'the photograph is hidden when minimized');
+  assert.match(page, /data-fc-act="expand">Show details/, 'the minimized card says how to reopen it');
+  assert.match(page, /localStorage\.getItem\('stratos\.cardExpanded'\)/, 'the state is remembered');
+  assert.match(page, /from the SimBrief plan/, 'the card says where the procedures came from');
+  // Data the plan does not hold is never displayed as if it did.
+  assert.match(page, /runway not in plan/, 'a missing runway is honest');
+  assert.match(page, /Not in the plan/, 'a missing field says so');
+});
+
+test('the flight trail starts from the track the bridge recorded', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  const live = fs.readFileSync(new URL('../app/js/live.js', import.meta.url), 'utf8');
+  assert.match(page, /function seedTrail\(flight\)/, 'the map seeds the trail from the recorded flight');
+  assert.match(page, /seedTrail\(live\.d\.currentFlight\)/, 'each snapshot offers the recorded track');
+  assert.match(page, /if\(id!==trailFlightId\)\{trailFlightId=id;trailSeeded='';TRL\.delete\('own'\)\}/, 'a new flight never joins the previous trail');
+  assert.match(page, /TRL\.set\('own',seeded\.slice\(-cap\)\)/, 'the recorded points replace an empty trail');
+  assert.match(page, /const stamp=id\+':'\+flight\.track\.length/, 'the seed is refreshed when the recording grows');
+  assert.match(page, /if\(trailSeeded===stamp\)return/, 'an unchanged recording is not re-read every frame');
+  assert.match(page, /trailSeeded=stamp/, 'the refreshed recording is the trail, so its departure end cannot erode');
+  assert.match(live, /mapTrack = Array\.isArray\(flight\?\.track\)/, 'the phone seeds its map from the same track');
+  assert.match(live, /if \(moved\) mapTrack\.push/, 'the live point continues the trail instead of duplicating it');
+});
+
+test('a clicked aircraft shows its own recorded trail, from every traffic source', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  // The selected target's trail is drawn whether or not the all-trails layer is on.
+  assert.match(page, /if\(sel&&sel\.k=='trf'\)\{const a=TRL\.get\(sel\.hx\|\|sel\.id\);if\(a\)drawTrail\(a,sel,false\)\}/, 'a selected aircraft is drawn with its own path');
+  // ADS-B traffic is recorded as it polls.
+  assert.match(page, /trlAdd\(o\.hx\|\|o\.id,o\.lat,o\.lon,o\.alt,400\)/, 'every polled aircraft appends a position');
+  // VATSIM used to replace its objects on each refresh and record nothing.
+  const vatsim = page.slice(page.indexOf('function vatsimTraffic()'), page.indexOf('function vatsimHtml('));
+  assert.match(vatsim, /trlAdd\(p\.id,p\.lat,p\.lon,p\.alt,400\)/, 'every VATSIM pilot appends a position');
+  assert.match(vatsim, /known\.get\(id\)/, 'the existing object is reused, so an open card and its trail survive a refresh');
+  assert.match(vatsim, /sel\.source=='vatsim'&&!out\.includes\(sel\)/, 'a selected pilot stays selectable when it leaves the view');
+  assert.match(vatsim, /trlGC\(\)/, 'expired trails are cleared on the same cycle');
+});
+
+test('observed traffic positions go to the bridge, so a trail outlives the page', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  assert.match(page, /fetch\('\/traffic\/track',\{method:'POST'/, 'the page reports what it has seen');
+  assert.match(page, /if\(now-trfPostAt<15000\)return/, 'batched: at most one post every fifteen seconds');
+  assert.match(page, /fetch\('\/traffic\/trail\?hex='\+encodeURIComponent\(key\)/, 'a clicked aircraft asks the bridge for its path');
+  assert.match(page, /TRL\.set\(key,\[...older,\.\.\.have\]\)/, 'the history is prepended, never drawn out of order');
+  assert.match(page, /if\(best\.k=='trf'\)\{tk=true;setFol\(false\);trafficBackfill\(best\)\}/, 'a tap on an aircraft backfills its trail');
+  assert.match(page, /trafficPost\(\)\}$/m, 'the VATSIM refresh posts the positions it just saw');
+});
+
+test('the flown trail is a continuous line coloured by height above the ground', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  assert.match(page, /import \* as TRAILC from '\.\/js\/lib\/trailcolor\.js'/, 'the map shares one ramp with the phone');
+  assert.match(page, /window\.TRAILC = TRAILC/, 'the classic script can reach it');
+  assert.match(page, /function trailInk\(h\)\{return window\.TRAILC\?window\.TRAILC\.trailInk\(h\)/, 'a height becomes a colour');
+  assert.match(page, /const agl=Number\(p&&p\[4\]\)/, 'height above ground is used when the recording has it');
+  assert.match(page, /own\?floor:0/, 'a recording without it falls back to height above the lowest point');
+  assert.match(page, /for\(let i=1;i<m;i\+\+\)\{if\(inks\[i\]!==ink\)\{run\(start,i\)/, 'a run of one colour is stroked once, not per segment');
+  // The trail is one solid line: no fading contrail, no gradient tail.
+  const draw = page.slice(page.indexOf('function drawTrail(a,cur,own)'), page.indexOf('function trails()'));
+  assert.doesNotMatch(draw, /globalAlpha=\.[0-9]/, 'the drawn path is opaque');
+  assert.doesNotMatch(draw, /f\*f|wmax/, 'there is no tapering width');
+  assert.match(draw, /cx\.lineWidth=7;cx\.stroke\(\)[\s\S]*cx\.lineWidth=4/, 'a dark casing under a 4 px line');
+});
+
+test('TOC and TOD are computed on the route legs by the profile module', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  assert.match(page, /import \* as PROFILE from '\.\/js\/lib\/profile\.js'/, 'the page loads the profile module');
+  assert.match(page, /window\.PROFILE = PROFILE/, 'the classic script can reach it');
+  assert.match(page, /PROFILE\.computeVerticalProfile\(\{/, 'the markers come from the profile');
+  assert.match(page, /descentFtPerNm:DESC_FT_PER_NM/, 'the measured descent rate is used');
+  assert.match(page, /out\.toc=\{lat:profile\.toc\.lat,lon:profile\.toc\.lon/, 'the marker is the interpolated position');
+  assert.match(page, /altitudeLabel\(alt,source\)/, 'an estimate is marked as one');
+  assert.match(page, /key\+='\|'\+Math\.round\(DESC_FT_PER_NM\)/, 'a changed descent rate recomputes the profile');
+  // The profile module loads after the first paint. A cached empty result would
+  // otherwise survive every later frame and the markers would never appear.
+  assert.ok(page.includes("+Math.round(DESC_FT_PER_NM)+'|'+(window.PROFILE?1:0)"), 'the cache knows when the profile module has loaded');
+});
+
+test('a plan keeps its procedures and markers when it moves between pages', async () => {
+  const fs = await import('node:fs');
+  const routes = fs.readFileSync(new URL('../app/js/pilot/routes.js', import.meta.url), 'utf8');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  // The planner used to drop is_sid_star and the airway, so a plan imported
+  // there reached the map with every fix drawn as an ordinary waypoint.
+  assert.match(routes, /ss: fix\.is_sid_star == '1'/, 'the SID/STAR tag survives the import');
+  assert.match(routes, /aw: fix\.via_airway/, 'the airway survives the import');
+  assert.match(routes, /saveOfp\(localStorage, ofp, entered\)/, 'the plan is stored where the tracking card reads it');
+  assert.match(routes, /p\.kind === 'airport' \? 'apt'/, 'an airport keeps its airport symbol on the map');
+  assert.match(routes, /p\.kind === 'navaid' \? 'nav'/, 'a navaid keeps its navaid symbol');
+  assert.match(page, /function routeKindName\(kind\)/, 'the map accepts the planner names too');
+  assert.match(page, /k:routeKindName\(p\.kind\|\|p\.k\)/, 'a stored route is normalised on load');
+});
+
+test('SID and STAR runway paths come from the simulator data, under the route line', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  assert.match(page, /import \* as PROC from '\.\/js\/lib\/procedures\.js'/, 'the page loads the procedure helpers');
+  assert.match(page, /window\.PROC = PROC/, 'the classic script can reach them');
+  assert.match(page, /function procTick\(\)/, 'the plan is checked once per key, not per frame');
+  assert.match(page, /PROC\.procedureEndpoint\(airport,kind,ident\)/, 'one request per airport, kind and procedure');
+  assert.match(page, /PROC\.procedurePath\(payload,\{kind,ident,runway:rwy,routeIds\}\)/, 'the plan runway picks the transition and the plan its en-route branch');
+  assert.match(page, /PROC\.connectorFor\(kind,path\.points,routeIds\)/, 'only the part the plan does not draw is painted');
+  assert.match(page, /function drawProcedurePaths\(\)/, 'the geometry has its own drawing pass');
+  assert.match(page, /cx\.lineWidth=9/, 'it is a step thinner than the 12 px waypoint line');
+  // It is painted before the route line, so the waypoints still read on top and
+  // the line between them is never redrawn or repainted by this layer.
+  assert.ok(page.indexOf('drawProcedurePaths();') < page.indexOf('cx.globalAlpha=.35;cx.strokeStyle=C.route;cx.lineWidth=12'), 'procedure paths sit under the route line');
+  const start = page.indexOf('/* ── Published procedure geometry');
+  const stop = page.indexOf('function mkPlanLabel(');
+  const block = page.slice(start, stop);
+  assert.ok(start > 0 && stop > start, 'the procedure layer exists as its own block');
+  assert.doesNotMatch(block, /route\s*=|route\.(push|splice|sort|unshift)\(/, 'it never edits the route');
+  assert.match(page, /fcProcHtml\(o\)/, 'the card reports the procedure source');
+  assert.match(page, /PROCG\.notes\.join\(' · '\)/, 'and any limitation the source reported');
+});
+
+test('a dead telemetry socket is noticed and reopened', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  // A restarted bridge, or a Wi-Fi change, can leave an EventSource that never
+  // fires onerror. The bridge writes a heartbeat every five seconds, so silence
+  // is the only reliable signal.
+  assert.match(page, /function openStream\(base\)/, 'the stream is opened by its own function');
+  assert.match(page, /es\.onerror=\(\)=>\{if\(live\.es===es\)live\.at=0\}/, 'an errored stream stops counting as live');
+  assert.match(page, /performance\.now\(\)-live\.at>12000/, 'twelve seconds of silence is treated as a dead socket');
+  assert.match(page, /openStream\(live\.base\)/, 'the watchdog reopens it without a reload');
+  assert.match(page, /addEventListener\('online',\(\)=>\{if\(live\.on&&live\.base\)openStream\(live\.base\)\}\)/, 'a returning network reopens at once');
+  assert.match(page, /function disc\(\)\{if\(live\.es\)live\.es\.close\(\);live\.on=false;live\.base=''/, 'a deliberate disconnect stops the watchdog');
+});
+
+test('the phone page reconnects on its own and retries when the network returns', async () => {
+  const fs = await import('node:fs');
+  const live = fs.readFileSync(new URL('../app/js/live.js', import.meta.url), 'utf8');
+  assert.match(live, /async function servedByBridge\(\)/, 'a bridge on another port is still recognised');
+  assert.match(live, /await startBridge\(location\.origin\)/, 'and its own origin is used');
+  assert.match(live, /addEventListener\('online'/, 'a network that returns triggers an immediate retry');
+  assert.match(live, /telemetryClient\.open\(\)/, 'the stream is reopened, not left to the backoff');
+  assert.match(live, /setStatus\('connecting', 'Looking for your PC…'\)/, 'searching is its own state');
+  assert.match(live, /function connectLocal\(\)/, 'one button drives the connection');
+  assert.match(live, /blocksLocalBridge\(location\)/, 'an HTTPS page navigates instead of failing a mixed-content fetch');
+  assert.match(live, /location\.href = phoneConnectUrl\(\)/, 'the bridge page is opened, with nothing to type');
+});

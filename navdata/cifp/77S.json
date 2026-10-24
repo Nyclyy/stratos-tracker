@@ -1,0 +1,1 @@
+{"ok":true,"airport":"77S","source":"FAA CIFP (FAACIFP18, United States)","cycle":"2611","runways":{},"procedures":{"sid":[{"id":"77S2","transitions":[{"id":"RW34","runway":"34","combined":false,"points":[{"id":"EUG","lat":44.120897,"lon":-123.222831,"terminator":"DF"}],"skipped":0,"complete":true}]}]}}

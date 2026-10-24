@@ -1,0 +1,1 @@
+{"ok":true,"airport":"PACJ","source":"FAA CIFP (FAACIFP18, United States)","cycle":"2611","runways":{},"procedures":{"sid":[{"id":"AJOFY1","transitions":[{"id":"RW32","runway":"32","combined":false,"points":[{"id":"UWUHI","lat":61.920539,"lon":-158.187467,"terminator":"DF"},{"id":"AJOFY","lat":62.059581,"lon":-158.375,"terminator":"TF"}],"skipped":0,"complete":true}]}]}}

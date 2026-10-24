@@ -1,0 +1,1 @@
+{"ok":true,"airport":"O46","source":"FAA CIFP (FAACIFP18, United States)","cycle":"2611","runways":{},"procedures":{"sid":[{"id":"FOBRO1","transitions":[{"id":"RW32","runway":"32","combined":false,"points":[{"id":"DIMGE","lat":41.612986,"lon":-122.476958,"terminator":"DF"},{"id":"FOBRO","lat":41.956925,"lon":-122.615931,"terminator":"TF"}],"skipped":0,"complete":true}]}]}}

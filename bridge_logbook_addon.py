@@ -642,6 +642,39 @@ def get_flight_phase():
         return _flight_state["phase"]
 
 
+# The live stream carries the path recorded so far, so a page opened halfway
+# through a flight still draws from the gate instead of starting a contrail at
+# the moment it was opened. The logbook keeps every point; the stream gets an
+# even sample, capped, with the first and last points always included.
+TRACK_STREAM_POINTS = 400
+_TRACK_STREAM_CACHE = {"key": None, "points": []}
+
+
+def stream_track(track):
+    track = track or []
+    if len(track) < 2:
+        return []
+    # A new flight can happen to share the previous one's sample count and end
+    # time, so the cache key includes the first sample too; otherwise its points
+    # would be served for a different flight.
+    key = (len(track), track[0].get("t"), track[-1].get("t"))
+    if _TRACK_STREAM_CACHE["key"] == key:
+        return _TRACK_STREAM_CACHE["points"]
+    step = max(1, int(math.ceil(len(track) / float(TRACK_STREAM_POINTS))))
+    sampled = track[::step]
+    if sampled[-1] is not track[-1]:
+        sampled = sampled + [track[-1]]
+    # The fifth value is height above ground: the map colours the flown path by
+    # how high the aircraft was, and only AGL makes the ground band read as the
+    # ground at an airport that sits well above sea level.
+    points = [[point.get("lat"), point.get("lon"), point.get("alt"), point.get("t"),
+               point.get("agl") if isinstance(point.get("agl"), (int, float)) else None]
+              for point in sampled
+              if isinstance(point.get("lat"), (int, float)) and isinstance(point.get("lon"), (int, float))]
+    _TRACK_STREAM_CACHE.update(key=key, points=points)
+    return points
+
+
 def get_current_flight():
     with _fs_lock:
         flight = _flight_state["flight"]
@@ -659,6 +692,7 @@ def get_current_flight():
             "maxAlt": flight.get("maxAlt"),
             "distanceNm": _track_distance(flight.get("track") or []),
             "trackPoints": len(flight.get("track") or []),
+            "track": stream_track(flight.get("track")),
             "landingVS": flight.get("landingVS"),
             "descent": flight.get("descent"),
         }

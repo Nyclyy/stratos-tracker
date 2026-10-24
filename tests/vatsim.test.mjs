@@ -91,6 +91,20 @@ test('vatsim: pilots need a valid position and a callsign; missing speed or alti
   assert.deepEqual(parsePilots(null), []);
 });
 
+test('vatsim: a pilot\'s filed cruise level and route are kept, and nothing is invented', () => {
+  const [withPlan, withoutPlan] = parsePilots({
+    pilots: [
+      { callsign: 'ASA123', latitude: 47, longitude: -122, altitude: 35000, groundspeed: 400, heading: 180, flight_plan: { aircraft_short: 'B738', departure: 'KSEA', arrival: 'KPDX', altitude: '36000', route: 'SUMMA2 SUMMA J523 BLUIT' } },
+      { callsign: 'N123AB', latitude: 47, longitude: -122, altitude: 4000, groundspeed: 120, heading: 90 },
+    ],
+  });
+  assert.equal(withPlan.cruiseFt, 36000);
+  assert.equal(withPlan.route, 'SUMMA2 SUMMA J523 BLUIT');
+  assert.equal(withoutPlan.cruiseFt, null, 'no flight plan means no cruise level');
+  assert.equal(withoutPlan.route, null);
+  assert.equal(withoutPlan.dep, null);
+});
+
 test('vatsim: summary counts positions by facility', () => {
   const summary = summarize(parseControllers(feed));
   assert.equal(summary.total, 6);

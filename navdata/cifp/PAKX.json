@@ -1,0 +1,1 @@
+{"ok":true,"airport":"PAKX","source":"FAA CIFP (FAACIFP18, United States)","cycle":"2611","runways":{},"procedures":{"sid":[{"id":"MARVN1","transitions":[{"id":"RW24L","runway":"24L","combined":false,"points":[{"id":"GOTFD","lat":60.034192,"lon":-154.826656,"terminator":"DF"},{"id":"MARVN","lat":59.835967,"lon":-154.560478,"terminator":"TF"}],"skipped":0,"complete":true}]}]}}

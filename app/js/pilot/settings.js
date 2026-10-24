@@ -263,7 +263,13 @@ export async function mount(root, ctx) {
             ${pairedPhones().length
               ? tag(`${pairedPhones().length} phone${pairedPhones().length === 1 ? '' : 's'}`, 'good', `Last paired ${new Date(pairingInfo.claimedAt || Math.max(...pairedPhones().map(phone => phone.pairedAt || 0))).toLocaleTimeString()}`)
               : pairingInfo?.claimedAt ? tag(`last paired ${new Date(pairingInfo.claimedAt).toLocaleTimeString()}`, 'muted') : tag('not paired', 'muted')}</div>
-          <p class="help" style="margin-bottom:10px">Scan this code with the phone camera. The code expires in two minutes and works once; the phone keeps a secure cookie so later visits reconnect without typing anything.</p>
+          <p class="help" style="margin-bottom:8px"><b>Nothing to scan.</b> Open Stratos on the phone and tap <b>Connect to Simulator</b>. The phone finds this PC at <code class="mono">${esc(pairingInfo?.hostName ? `http://${pairingInfo.hostName}:${health?.ports?.http || 8765}` : 'http://stratos.local:8765')}</code> and pairs itself; the address is published by the bridge over multicast DNS, so nothing is typed.</p>
+          <div class="row" style="margin-bottom:10px;gap:8px;flex-wrap:wrap">
+            ${pairingInfo?.autoPair ? tag('one-tap pairing on', 'good', 'A phone on this network can enroll itself') : tag('one-tap pairing off', 'muted')}
+            ${pairingInfo?.discovery?.running ? tag('discovery running', 'good', `Answering ${pairingInfo.discovery.name || 'stratos.local'}`) : tag('discovery unavailable', 'muted', pairingInfo?.discovery?.error || 'The LAN address still works')}
+            ${pairingInfo?.lanIp ? tag(`LAN ${pairingInfo.lanIp}`, 'muted') : ''}
+          </div>
+          <p class="help" style="margin-bottom:10px">Fallback only: a six-digit code, valid for two minutes and once, for a phone that cannot use the one-tap route. The phone keeps a secure cookie either way, so later visits reconnect without typing anything.</p>
           ${pairing ? `<div class="pair-grid">
             <div class="pair-qr" id="pair-qr"></div>
             <div class="pair-detail">
@@ -273,7 +279,7 @@ export async function mount(root, ctx) {
               <div class="btn-row"><button class="btn small" id="pair-new">New code</button>
                 <button class="btn small ghost" id="pair-stop">Hide</button></div>
             </div>
-          </div>` : `<div class="btn-row"><button class="btn primary" id="pair-phone" ${health ? '' : 'disabled'}>Show pairing QR</button>
+          </div>` : `<div class="btn-row"><button class="btn primary" id="pair-phone" ${health ? '' : 'disabled'}>Show pairing code</button>
             ${pairedPhones().length || pairingInfo?.claimedAt ? `<button class="btn small ghost" id="pair-revoke">Forget all paired phones</button>` : ''}</div>`}
           ${pairedPhones().length ? `<div class="list" style="margin-top:12px">${pairedPhones().map(phone => `<div class="list-item">
             <div class="main"><div class="title">${esc(phone.label || 'Phone')}</div>
@@ -281,7 +287,7 @@ export async function mount(root, ctx) {
             <button class="btn small danger" data-forget-phone="${esc(phone.id)}">Forget</button>
           </div>`).join('')}</div>` : '<p class="help" style="margin-top:10px">No phone is paired over this network yet. A paired phone reconnects on its own after a Wi-Fi change or a bridge restart.</p>'}
           ${pairing && !pairing.lanEnabled ? `<div class="notice warn" style="margin-top:10px"><div><strong>The bridge is bound to this PC only.</strong><br>Start it with <code>STRATOS_HOST=0.0.0.0</code> (the desktop app does this by default) so the phone can reach it.</div></div>` : ''}
-          <p class="help" style="margin-top:8px">Only a short-lived code is unauthenticated; every telemetry, checklist and logbook request from the phone needs a per-phone cookie. Never forward port 8765 from your router.</p>
+          <p class="help" style="margin-top:8px">One-tap pairing accepts a new phone only from a private network address, is rate limited, and issues the same per-phone cookie the code path does; every telemetry, checklist and logbook request still needs it. Disable it by starting the bridge with <code>STRATOS_AUTO_PAIR=0</code>. Never forward port 8765 from your router.</p>
         </div>
         <div class="card">
           <div class="card-head"><h2>Relay pairing</h2><span class="spacer"></span>${relay?.configured ? tag('paired', 'good') : tag('not paired', 'muted')}</div>

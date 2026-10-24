@@ -1,0 +1,2493 @@
+{
+ "airports": {
+  "05C": {
+   "star": 2
+  },
+  "05U": {
+   "sid": 1
+  },
+  "06FA": {
+   "star": 6
+  },
+  "07FA": {
+   "star": 8
+  },
+  "10U": {
+   "sid": 1
+  },
+  "1B9": {
+   "star": 1
+  },
+  "1G3": {
+   "star": 3
+  },
+  "1K4": {
+   "star": 1
+  },
+  "1L7": {
+   "sid": 1
+  },
+  "1M5": {
+   "star": 6
+  },
+  "1O2": {
+   "sid": 1
+  },
+  "1U7": {
+   "sid": 2
+  },
+  "21D": {
+   "star": 1
+  },
+  "2P2": {
+   "sid": 1
+  },
+  "2S8": {
+   "sid": 1
+  },
+  "2W2": {
+   "star": 1
+  },
+  "2W5": {
+   "star": 1
+  },
+  "33N": {
+   "star": 1
+  },
+  "33V": {
+   "sid": 1
+  },
+  "39N": {
+   "star": 1
+  },
+  "3HO": {
+   "star": 2
+  },
+  "3M7": {
+   "star": 6
+  },
+  "3R9": {
+   "sid": 6,
+   "star": 4
+  },
+  "3W7": {
+   "sid": 1
+  },
+  "40U": {
+   "sid": 1
+  },
+  "41U": {
+   "sid": 2
+  },
+  "47N": {
+   "sid": 1,
+   "star": 2
+  },
+  "4S1": {
+   "sid": 1
+  },
+  "4V0": {
+   "sid": 1
+  },
+  "4V1": {
+   "sid": 1
+  },
+  "50F": {
+   "sid": 6,
+   "star": 6
+  },
+  "54T": {
+   "sid": 11,
+   "star": 7
+  },
+  "57C": {
+   "sid": 2,
+   "star": 1
+  },
+  "5C1": {
+   "sid": 5,
+   "star": 4
+  },
+  "65S": {
+   "sid": 1
+  },
+  "6A2": {
+   "star": 2
+  },
+  "6R3": {
+   "sid": 11,
+   "star": 5
+  },
+  "77S": {
+   "sid": 1
+  },
+  "7FL6": {
+   "star": 1
+  },
+  "7S0": {
+   "sid": 2
+  },
+  "8S1": {
+   "sid": 1
+  },
+  "C80": {
+   "sid": 1
+  },
+  "CA35": {
+   "star": 2
+  },
+  "CYQG": {
+   "star": 4
+  },
+  "CYXX": {
+   "star": 1
+  },
+  "CZBB": {
+   "star": 1
+  },
+  "D73": {
+   "star": 4
+  },
+  "E38": {
+   "sid": 1
+  },
+  "F41": {
+   "sid": 5,
+   "star": 6
+  },
+  "F45": {
+   "star": 4
+  },
+  "F46": {
+   "sid": 6,
+   "star": 9
+  },
+  "FA54": {
+   "star": 2
+  },
+  "I69": {
+   "star": 5
+  },
+  "KAAT": {
+   "sid": 2
+  },
+  "KABQ": {
+   "sid": 10,
+   "star": 9
+  },
+  "KACK": {
+   "star": 2
+  },
+  "KACV": {
+   "sid": 1
+  },
+  "KADS": {
+   "sid": 9,
+   "star": 10
+  },
+  "KADW": {
+   "star": 6
+  },
+  "KAEG": {
+   "star": 4
+  },
+  "KAEJ": {
+   "sid": 1
+  },
+  "KAFO": {
+   "sid": 2
+  },
+  "KAFP": {
+   "star": 4
+  },
+  "KAFW": {
+   "sid": 9,
+   "star": 7
+  },
+  "KAGS": {
+   "sid": 6,
+   "star": 2
+  },
+  "KAIB": {
+   "sid": 1
+  },
+  "KAIK": {
+   "sid": 6
+  },
+  "KAJO": {
+   "star": 2
+  },
+  "KAKH": {
+   "sid": 12,
+   "star": 4
+  },
+  "KAKQ": {
+   "star": 1
+  },
+  "KAKR": {
+   "star": 3
+  },
+  "KALM": {
+   "sid": 1
+  },
+  "KALN": {
+   "sid": 4,
+   "star": 2
+  },
+  "KANE": {
+   "sid": 8,
+   "star": 4
+  },
+  "KANK": {
+   "sid": 1
+  },
+  "KAOC": {
+   "sid": 1
+  },
+  "KAPA": {
+   "sid": 8,
+   "star": 11
+  },
+  "KAPC": {
+   "sid": 3,
+   "star": 2
+  },
+  "KAPF": {
+   "sid": 1,
+   "star": 3
+  },
+  "KAPV": {
+   "sid": 1
+  },
+  "KARB": {
+   "sid": 13,
+   "star": 4
+  },
+  "KARM": {
+   "sid": 7,
+   "star": 2
+  },
+  "KARR": {
+   "sid": 6
+  },
+  "KASE": {
+   "sid": 4,
+   "star": 3
+  },
+  "KATL": {
+   "sid": 17,
+   "star": 8
+  },
+  "KAUN": {
+   "sid": 1
+  },
+  "KAUS": {
+   "sid": 9,
+   "star": 6
+  },
+  "KAXH": {
+   "sid": 17,
+   "star": 7
+  },
+  "KAXX": {
+   "sid": 1
+  },
+  "KAZC": {
+   "sid": 1
+  },
+  "KBAF": {
+   "sid": 1,
+   "star": 2
+  },
+  "KBAZ": {
+   "sid": 5,
+   "star": 4
+  },
+  "KBCB": {
+   "sid": 2
+  },
+  "KBCE": {
+   "sid": 1
+  },
+  "KBCT": {
+   "sid": 2,
+   "star": 8
+  },
+  "KBDL": {
+   "sid": 1,
+   "star": 2
+  },
+  "KBDN": {
+   "sid": 1
+  },
+  "KBDR": {
+   "star": 2
+  },
+  "KBED": {
+   "star": 2
+  },
+  "KBFI": {
+   "sid": 3,
+   "star": 3
+  },
+  "KBFL": {
+   "sid": 2,
+   "star": 1
+  },
+  "KBIL": {
+   "star": 4
+  },
+  "KBJC": {
+   "sid": 8,
+   "star": 10
+  },
+  "KBKF": {
+   "sid": 4,
+   "star": 7
+  },
+  "KBKL": {
+   "sid": 1,
+   "star": 4
+  },
+  "KBKT": {
+   "sid": 1
+  },
+  "KBLF": {
+   "sid": 1
+  },
+  "KBLI": {
+   "sid": 2,
+   "star": 1
+  },
+  "KBLM": {
+   "star": 1
+  },
+  "KBLV": {
+   "sid": 4,
+   "star": 5
+  },
+  "KBMC": {
+   "sid": 1
+  },
+  "KBNA": {
+   "sid": 9,
+   "star": 4
+  },
+  "KBOI": {
+   "sid": 2,
+   "star": 5
+  },
+  "KBOS": {
+   "sid": 9,
+   "star": 4
+  },
+  "KBUR": {
+   "sid": 5,
+   "star": 6
+  },
+  "KBUU": {
+   "sid": 2,
+   "star": 1
+  },
+  "KBVY": {
+   "star": 2
+  },
+  "KBWI": {
+   "sid": 6,
+   "star": 5
+  },
+  "KBYY": {
+   "sid": 7,
+   "star": 2
+  },
+  "KBZN": {
+   "sid": 5,
+   "star": 5
+  },
+  "KCAK": {
+   "star": 3
+  },
+  "KCCO": {
+   "star": 2
+  },
+  "KCCR": {
+   "sid": 1,
+   "star": 1
+  },
+  "KCDW": {
+   "star": 3
+  },
+  "KCEF": {
+   "sid": 1,
+   "star": 2
+  },
+  "KCEZ": {
+   "sid": 2
+  },
+  "KCFE": {
+   "star": 1
+  },
+  "KCFO": {
+   "sid": 8,
+   "star": 9
+  },
+  "KCFT": {
+   "sid": 1
+  },
+  "KCGF": {
+   "sid": 5,
+   "star": 4
+  },
+  "KCHD": {
+   "sid": 9,
+   "star": 5
+  },
+  "KCHK": {
+   "star": 1
+  },
+  "KCHS": {
+   "sid": 5,
+   "star": 3
+  },
+  "KCJR": {
+   "star": 5
+  },
+  "KCLE": {
+   "sid": 5,
+   "star": 4
+  },
+  "KCLM": {
+   "sid": 1
+  },
+  "KCLT": {
+   "sid": 12,
+   "star": 12
+  },
+  "KCLW": {
+   "star": 4
+  },
+  "KCMA": {
+   "star": 1
+  },
+  "KCMH": {
+   "star": 5
+  },
+  "KCNI": {
+   "star": 2
+  },
+  "KCNO": {
+   "star": 2
+  },
+  "KCOD": {
+   "sid": 1
+  },
+  "KCOE": {
+   "sid": 1
+  },
+  "KCOF": {
+   "star": 1
+  },
+  "KCOI": {
+   "star": 3
+  },
+  "KCOS": {
+   "star": 2
+  },
+  "KCPK": {
+   "star": 2
+  },
+  "KCPR": {
+   "sid": 1
+  },
+  "KCPS": {
+   "sid": 4,
+   "star": 4
+  },
+  "KCPT": {
+   "sid": 6,
+   "star": 6
+  },
+  "KCRE": {
+   "star": 2
+  },
+  "KCRG": {
+   "star": 6
+  },
+  "KCRQ": {
+   "sid": 2,
+   "star": 1
+  },
+  "KCTB": {
+   "sid": 1
+  },
+  "KCTJ": {
+   "star": 1
+  },
+  "KCVB": {
+   "sid": 5,
+   "star": 4
+  },
+  "KCVC": {
+   "star": 3
+  },
+  "KCVG": {
+   "sid": 9,
+   "star": 5
+  },
+  "KCVO": {
+   "sid": 1
+  },
+  "KCXO": {
+   "sid": 19,
+   "star": 6
+  },
+  "KCXP": {
+   "sid": 1
+  },
+  "KDAA": {
+   "sid": 3,
+   "star": 4
+  },
+  "KDAB": {
+   "sid": 1,
+   "star": 1
+  },
+  "KDAG": {
+   "sid": 1
+  },
+  "KDAL": {
+   "sid": 21,
+   "star": 12
+  },
+  "KDAY": {
+   "star": 1
+  },
+  "KDCA": {
+   "sid": 9,
+   "star": 9
+  },
+  "KDCM": {
+   "star": 4
+  },
+  "KDED": {
+   "star": 1
+  },
+  "KDEN": {
+   "sid": 20,
+   "star": 15
+  },
+  "KDET": {
+   "sid": 13,
+   "star": 4
+  },
+  "KDFW": {
+   "sid": 26,
+   "star": 20
+  },
+  "KDIJ": {
+   "sid": 1
+  },
+  "KDJT": {
+   "sid": 5,
+   "star": 8
+  },
+  "KDLS": {
+   "sid": 1
+  },
+  "KDMW": {
+   "sid": 4,
+   "star": 1
+  },
+  "KDNL": {
+   "sid": 5
+  },
+  "KDOV": {
+   "star": 1
+  },
+  "KDPA": {
+   "sid": 6
+  },
+  "KDTA": {
+   "sid": 1
+  },
+  "KDTO": {
+   "sid": 9,
+   "star": 8
+  },
+  "KDTW": {
+   "sid": 13,
+   "star": 16
+  },
+  "KDUB": {
+   "sid": 1
+  },
+  "KDVO": {
+   "star": 2
+  },
+  "KDVT": {
+   "sid": 10,
+   "star": 4
+  },
+  "KDWH": {
+   "sid": 19,
+   "star": 5
+  },
+  "KDWX": {
+   "sid": 2
+  },
+  "KDXR": {
+   "star": 3
+  },
+  "KEAN": {
+   "sid": 1
+  },
+  "KEAT": {
+   "sid": 2
+  },
+  "KEDC": {
+   "sid": 6,
+   "star": 3
+  },
+  "KEFD": {
+   "sid": 17,
+   "star": 8
+  },
+  "KEGE": {
+   "sid": 3,
+   "star": 2
+  },
+  "KEHO": {
+   "star": 4
+  },
+  "KEKN": {
+   "sid": 1
+  },
+  "KEKS": {
+   "sid": 1
+  },
+  "KELP": {
+   "sid": 5,
+   "star": 5
+  },
+  "KELY": {
+   "sid": 1
+  },
+  "KEMM": {
+   "sid": 1
+  },
+  "KEMT": {
+   "star": 2
+  },
+  "KENV": {
+   "sid": 1
+  },
+  "KENW": {
+   "sid": 2,
+   "star": 1
+  },
+  "KEQY": {
+   "sid": 12,
+   "star": 4
+  },
+  "KESN": {
+   "sid": 4
+  },
+  "KETB": {
+   "sid": 2,
+   "star": 1
+  },
+  "KEVB": {
+   "star": 1
+  },
+  "KEVW": {
+   "sid": 1
+  },
+  "KEWB": {
+   "star": 1
+  },
+  "KEWR": {
+   "sid": 1,
+   "star": 6
+  },
+  "KEYE": {
+   "sid": 5,
+   "star": 2
+  },
+  "KEYW": {
+   "sid": 1,
+   "star": 2
+  },
+  "KEZF": {
+   "star": 4
+  },
+  "KFAF": {
+   "star": 1
+  },
+  "KFAT": {
+   "sid": 1,
+   "star": 1
+  },
+  "KFBL": {
+   "star": 1
+  },
+  "KFCM": {
+   "sid": 8,
+   "star": 4
+  },
+  "KFDK": {
+   "sid": 4,
+   "star": 1
+  },
+  "KFFC": {
+   "star": 2
+  },
+  "KFFO": {
+   "star": 1
+  },
+  "KFFZ": {
+   "sid": 2,
+   "star": 5
+  },
+  "KFHB": {
+   "star": 3
+  },
+  "KFLG": {
+   "sid": 1
+  },
+  "KFLL": {
+   "sid": 11,
+   "star": 10
+  },
+  "KFLV": {
+   "sid": 6,
+   "star": 3
+  },
+  "KFLY": {
+   "sid": 1
+  },
+  "KFMN": {
+   "sid": 2
+  },
+  "KFMY": {
+   "sid": 1,
+   "star": 3
+  },
+  "KFNL": {
+   "sid": 8,
+   "star": 9
+  },
+  "KFOK": {
+   "star": 2
+  },
+  "KFRG": {
+   "sid": 1,
+   "star": 4
+  },
+  "KFRR": {
+   "star": 4
+  },
+  "KFTW": {
+   "sid": 9,
+   "star": 7
+  },
+  "KFTY": {
+   "star": 5
+  },
+  "KFUL": {
+   "sid": 2,
+   "star": 2
+  },
+  "KFWS": {
+   "sid": 9,
+   "star": 7
+  },
+  "KFXE": {
+   "sid": 8,
+   "star": 10
+  },
+  "KGAI": {
+   "sid": 4,
+   "star": 1
+  },
+  "KGCN": {
+   "sid": 2
+  },
+  "KGED": {
+   "sid": 1
+  },
+  "KGEG": {
+   "star": 2
+  },
+  "KGEU": {
+   "sid": 11,
+   "star": 2
+  },
+  "KGEY": {
+   "sid": 1
+  },
+  "KGEZ": {
+   "sid": 5,
+   "star": 1
+  },
+  "KGGE": {
+   "star": 2
+  },
+  "KGHG": {
+   "star": 1
+  },
+  "KGHM": {
+   "star": 4
+  },
+  "KGIC": {
+   "sid": 1
+  },
+  "KGJT": {
+   "sid": 4
+  },
+  "KGKY": {
+   "sid": 9,
+   "star": 7
+  },
+  "KGLS": {
+   "sid": 17,
+   "star": 8
+  },
+  "KGMU": {
+   "sid": 2,
+   "star": 4
+  },
+  "KGNB": {
+   "sid": 1
+  },
+  "KGOK": {
+   "star": 1
+  },
+  "KGON": {
+   "star": 1
+  },
+  "KGPH": {
+   "sid": 6,
+   "star": 3
+  },
+  "KGPI": {
+   "sid": 1
+  },
+  "KGPM": {
+   "sid": 9,
+   "star": 7
+  },
+  "KGRK": {
+   "sid": 2
+  },
+  "KGSO": {
+   "sid": 4,
+   "star": 3
+  },
+  "KGSP": {
+   "sid": 2,
+   "star": 4
+  },
+  "KGTU": {
+   "sid": 6,
+   "star": 2
+  },
+  "KGUC": {
+   "sid": 3
+  },
+  "KGVL": {
+   "star": 1
+  },
+  "KGXY": {
+   "sid": 8,
+   "star": 9
+  },
+  "KGYH": {
+   "sid": 2,
+   "star": 4
+  },
+  "KGYL": {
+   "star": 1
+  },
+  "KGYR": {
+   "sid": 10,
+   "star": 2
+  },
+  "KGYY": {
+   "sid": 5,
+   "star": 2
+  },
+  "KHAF": {
+   "sid": 1
+  },
+  "KHAO": {
+   "star": 5
+  },
+  "KHBG": {
+   "sid": 1
+  },
+  "KHCR": {
+   "sid": 1
+  },
+  "KHDN": {
+   "star": 1
+  },
+  "KHEF": {
+   "sid": 3,
+   "star": 7
+  },
+  "KHEG": {
+   "star": 1
+  },
+  "KHEQ": {
+   "sid": 1
+  },
+  "KHES": {
+   "star": 2
+  },
+  "KHFD": {
+   "sid": 1,
+   "star": 1
+  },
+  "KHFY": {
+   "sid": 5,
+   "star": 2
+  },
+  "KHGR": {
+   "star": 1
+  },
+  "KHHR": {
+   "sid": 1,
+   "star": 3
+  },
+  "KHIO": {
+   "sid": 5,
+   "star": 2
+  },
+  "KHLN": {
+   "sid": 4
+  },
+  "KHMP": {
+   "star": 2
+  },
+  "KHND": {
+   "sid": 2,
+   "star": 4
+  },
+  "KHOU": {
+   "sid": 17,
+   "star": 11
+  },
+  "KHPN": {
+   "star": 4
+  },
+  "KHPY": {
+   "sid": 11,
+   "star": 7
+  },
+  "KHQU": {
+   "sid": 5
+  },
+  "KHQZ": {
+   "sid": 9,
+   "star": 9
+  },
+  "KHRF": {
+   "sid": 1
+  },
+  "KHSD": {
+   "star": 1
+  },
+  "KHSR": {
+   "sid": 2
+  },
+  "KHST": {
+   "sid": 9,
+   "star": 9
+  },
+  "KHVN": {
+   "star": 2
+  },
+  "KHWD": {
+   "star": 3
+  },
+  "KHWO": {
+   "star": 5
+  },
+  "KHWV": {
+   "star": 1
+  },
+  "KHWY": {
+   "star": 5
+  },
+  "KHXF": {
+   "sid": 2,
+   "star": 1
+  },
+  "KHYI": {
+   "sid": 6,
+   "star": 4
+  },
+  "KIAD": {
+   "sid": 10,
+   "star": 10
+  },
+  "KIAH": {
+   "sid": 21,
+   "star": 19
+  },
+  "KIDA": {
+   "sid": 2
+  },
+  "KIGQ": {
+   "star": 2
+  },
+  "KILE": {
+   "sid": 2
+  },
+  "KILG": {
+   "star": 3
+  },
+  "KIND": {
+   "sid": 3,
+   "star": 6
+  },
+  "KINT": {
+   "sid": 4,
+   "star": 3
+  },
+  "KIPJ": {
+   "sid": 12,
+   "star": 4
+  },
+  "KISM": {
+   "star": 11
+  },
+  "KISP": {
+   "star": 3
+  },
+  "KIWA": {
+   "sid": 10,
+   "star": 5
+  },
+  "KIWS": {
+   "sid": 17,
+   "star": 7
+  },
+  "KIXD": {
+   "sid": 6,
+   "star": 3
+  },
+  "KIYK": {
+   "sid": 2
+  },
+  "KJAC": {
+   "sid": 4
+  },
+  "KJAX": {
+   "sid": 5,
+   "star": 8
+  },
+  "KJFK": {
+   "sid": 2,
+   "star": 4
+  },
+  "KJGG": {
+   "star": 1
+  },
+  "KJPX": {
+   "star": 1
+  },
+  "KJQF": {
+   "sid": 12,
+   "star": 3
+  },
+  "KJST": {
+   "sid": 2
+  },
+  "KJVY": {
+   "star": 3
+  },
+  "KJWN": {
+   "star": 6
+  },
+  "KJWY": {
+   "sid": 6,
+   "star": 9
+  },
+  "KJYO": {
+   "sid": 4,
+   "star": 6
+  },
+  "KJZI": {
+   "sid": 2,
+   "star": 3
+  },
+  "KKLS": {
+   "sid": 1
+  },
+  "KKNB": {
+   "sid": 1
+  },
+  "KLAL": {
+   "sid": 2,
+   "star": 3
+  },
+  "KLAR": {
+   "sid": 1
+  },
+  "KLAS": {
+   "sid": 10,
+   "star": 11
+  },
+  "KLAX": {
+   "sid": 23,
+   "star": 24
+  },
+  "KLBX": {
+   "sid": 17,
+   "star": 8
+  },
+  "KLCK": {
+   "star": 5
+  },
+  "KLDJ": {
+   "star": 3
+  },
+  "KLEE": {
+   "star": 7
+  },
+  "KLFI": {
+   "star": 2
+  },
+  "KLGA": {
+   "sid": 5,
+   "star": 5
+  },
+  "KLGB": {
+   "sid": 5,
+   "star": 7
+  },
+  "KLGD": {
+   "sid": 1
+  },
+  "KLGU": {
+   "sid": 1
+  },
+  "KLKR": {
+   "sid": 12,
+   "star": 4
+  },
+  "KLLJ": {
+   "sid": 1
+  },
+  "KLLR": {
+   "sid": 1
+  },
+  "KLMO": {
+   "sid": 4,
+   "star": 2
+  },
+  "KLMT": {
+   "sid": 1
+  },
+  "KLNA": {
+   "star": 3
+  },
+  "KLNC": {
+   "sid": 9,
+   "star": 9
+  },
+  "KLNN": {
+   "sid": 5,
+   "star": 4
+  },
+  "KLOT": {
+   "sid": 6
+  },
+  "KLOU": {
+   "star": 3
+  },
+  "KLPR": {
+   "sid": 5,
+   "star": 3
+  },
+  "KLUD": {
+   "sid": 6,
+   "star": 7
+  },
+  "KLUF": {
+   "star": 1
+  },
+  "KLUG": {
+   "star": 3
+  },
+  "KLUK": {
+   "star": 5
+  },
+  "KLVJ": {
+   "sid": 11,
+   "star": 7
+  },
+  "KLVK": {
+   "sid": 1
+  },
+  "KLVN": {
+   "star": 4
+  },
+  "KLWM": {
+   "star": 2
+  },
+  "KLWS": {
+   "sid": 1
+  },
+  "KLXT": {
+   "sid": 6,
+   "star": 3
+  },
+  "KLXV": {
+   "sid": 2
+  },
+  "KLYH": {
+   "sid": 2
+  },
+  "KLZU": {
+   "star": 5
+  },
+  "KMAN": {
+   "sid": 2
+  },
+  "KMBT": {
+   "star": 6
+  },
+  "KMCF": {
+   "star": 4
+  },
+  "KMCI": {
+   "sid": 6,
+   "star": 7
+  },
+  "KMCO": {
+   "sid": 7,
+   "star": 13
+  },
+  "KMDW": {
+   "star": 3
+  },
+  "KMEM": {
+   "sid": 19,
+   "star": 9
+  },
+  "KMEV": {
+   "sid": 1
+  },
+  "KMFR": {
+   "sid": 3
+  },
+  "KMGE": {
+   "star": 5
+  },
+  "KMGG": {
+   "star": 1
+  },
+  "KMGY": {
+   "star": 1
+  },
+  "KMHK": {
+   "sid": 1
+  },
+  "KMHR": {
+   "star": 1
+  },
+  "KMHT": {
+   "sid": 1,
+   "star": 1
+  },
+  "KMHV": {
+   "sid": 2
+  },
+  "KMIA": {
+   "sid": 12,
+   "star": 9
+  },
+  "KMIC": {
+   "star": 4
+  },
+  "KMIV": {
+   "sid": 1
+  },
+  "KMJX": {
+   "star": 1
+  },
+  "KMKC": {
+   "sid": 6,
+   "star": 3
+  },
+  "KMKE": {
+   "sid": 2,
+   "star": 1
+  },
+  "KMKY": {
+   "sid": 1,
+   "star": 3
+  },
+  "KMLB": {
+   "sid": 1,
+   "star": 3
+  },
+  "KMMH": {
+   "sid": 3
+  },
+  "KMMU": {
+   "star": 3
+  },
+  "KMQJ": {
+   "sid": 5,
+   "star": 2
+  },
+  "KMQS": {
+   "star": 3
+  },
+  "KMQY": {
+   "star": 6
+  },
+  "KMRB": {
+   "sid": 4,
+   "star": 5
+  },
+  "KMRC": {
+   "star": 3
+  },
+  "KMRY": {
+   "sid": 1
+  },
+  "KMSO": {
+   "sid": 4
+  },
+  "KMSP": {
+   "sid": 9,
+   "star": 8
+  },
+  "KMSY": {
+   "star": 4
+  },
+  "KMTC": {
+   "sid": 12,
+   "star": 3
+  },
+  "KMTJ": {
+   "sid": 3
+  },
+  "KMTN": {
+   "sid": 4,
+   "star": 5
+  },
+  "KMTP": {
+   "star": 1
+  },
+  "KMWC": {
+   "sid": 2,
+   "star": 1
+  },
+  "KMWO": {
+   "star": 1
+  },
+  "KMYF": {
+   "sid": 2
+  },
+  "KMYL": {
+   "sid": 1
+  },
+  "KMYR": {
+   "star": 2
+  },
+  "KNBG": {
+   "star": 2
+  },
+  "KNEL": {
+   "star": 1
+  },
+  "KNEW": {
+   "star": 4
+  },
+  "KNFG": {
+   "star": 1
+  },
+  "KNFW": {
+   "sid": 9,
+   "star": 7
+  },
+  "KNGU": {
+   "star": 2
+  },
+  "KNIP": {
+   "star": 4
+  },
+  "KNQX": {
+   "star": 2
+  },
+  "KNRB": {
+   "star": 6
+  },
+  "KNTD": {
+   "star": 1
+  },
+  "KNTU": {
+   "star": 2
+  },
+  "KNUQ": {
+   "sid": 2,
+   "star": 2
+  },
+  "KNYG": {
+   "star": 5
+  },
+  "KNZY": {
+   "star": 2
+  },
+  "KOAK": {
+   "sid": 9,
+   "star": 6
+  },
+  "KOEO": {
+   "star": 2
+  },
+  "KOFF": {
+   "star": 5
+  },
+  "KOGD": {
+   "sid": 1,
+   "star": 1
+  },
+  "KOJC": {
+   "sid": 6,
+   "star": 3
+  },
+  "KOKC": {
+   "sid": 11,
+   "star": 7
+  },
+  "KOKV": {
+   "sid": 3,
+   "star": 4
+  },
+  "KOLS": {
+   "sid": 1
+  },
+  "KOMA": {
+   "star": 5
+  },
+  "KOMK": {
+   "sid": 1
+  },
+  "KOMN": {
+   "star": 1
+  },
+  "KONP": {
+   "sid": 1
+  },
+  "KONT": {
+   "sid": 3,
+   "star": 5
+  },
+  "KONZ": {
+   "sid": 12,
+   "star": 4
+  },
+  "KOPF": {
+   "sid": 10,
+   "star": 11
+  },
+  "KOQU": {
+   "star": 1
+  },
+  "KORD": {
+   "star": 11
+  },
+  "KORF": {
+   "sid": 3,
+   "star": 2
+  },
+  "KORH": {
+   "star": 1
+  },
+  "KORL": {
+   "sid": 2,
+   "star": 10
+  },
+  "KORS": {
+   "sid": 2
+  },
+  "KOSU": {
+   "star": 5
+  },
+  "KOTH": {
+   "sid": 1
+  },
+  "KOUN": {
+   "sid": 11,
+   "star": 7
+  },
+  "KOWD": {
+   "star": 1
+  },
+  "KOXC": {
+   "star": 2
+  },
+  "KOXR": {
+   "sid": 2,
+   "star": 1
+  },
+  "KOZW": {
+   "sid": 12,
+   "star": 4
+  },
+  "KPAE": {
+   "star": 3
+  },
+  "KPAO": {
+   "star": 1
+  },
+  "KPDK": {
+   "star": 5
+  },
+  "KPDX": {
+   "sid": 5,
+   "star": 5
+  },
+  "KPEZ": {
+   "sid": 5,
+   "star": 4
+  },
+  "KPGD": {
+   "star": 2
+  },
+  "KPHF": {
+   "star": 2
+  },
+  "KPHL": {
+   "star": 6
+  },
+  "KPHX": {
+   "sid": 15,
+   "star": 11
+  },
+  "KPIE": {
+   "sid": 3,
+   "star": 4
+  },
+  "KPIH": {
+   "sid": 1
+  },
+  "KPIT": {
+   "star": 4
+  },
+  "KPMP": {
+   "sid": 8,
+   "star": 10
+  },
+  "KPNE": {
+   "star": 3
+  },
+  "KPOC": {
+   "star": 2
+  },
+  "KPOU": {
+   "star": 1
+  },
+  "KPRB": {
+   "sid": 3
+  },
+  "KPRC": {
+   "sid": 1
+  },
+  "KPSP": {
+   "sid": 7,
+   "star": 4
+  },
+  "KPTK": {
+   "sid": 13,
+   "star": 4
+  },
+  "KPUJ": {
+   "star": 5
+  },
+  "KPVD": {
+   "star": 2
+  },
+  "KPVG": {
+   "star": 2
+  },
+  "KPVU": {
+   "sid": 2,
+   "star": 1
+  },
+  "KPWA": {
+   "sid": 11,
+   "star": 7
+  },
+  "KPWK": {
+   "sid": 2,
+   "star": 1
+  },
+  "KPWM": {
+   "sid": 2,
+   "star": 2
+  },
+  "KPYM": {
+   "star": 1
+  },
+  "KRAC": {
+   "sid": 2,
+   "star": 1
+  },
+  "KRAL": {
+   "sid": 1,
+   "star": 2
+  },
+  "KRBD": {
+   "sid": 9,
+   "star": 9
+  },
+  "KRCE": {
+   "star": 1
+  },
+  "KRCV": {
+   "sid": 1
+  },
+  "KRDD": {
+   "sid": 2
+  },
+  "KRDM": {
+   "sid": 1
+  },
+  "KRDU": {
+   "sid": 9,
+   "star": 6
+  },
+  "KRFD": {
+   "sid": 1,
+   "star": 4
+  },
+  "KRHV": {
+   "sid": 2,
+   "star": 1
+  },
+  "KRIC": {
+   "sid": 4,
+   "star": 3
+  },
+  "KRIF": {
+   "sid": 2
+  },
+  "KRIL": {
+   "sid": 3,
+   "star": 3
+  },
+  "KRIV": {
+   "star": 2
+  },
+  "KRMN": {
+   "star": 4
+  },
+  "KRND": {
+   "sid": 5,
+   "star": 8
+  },
+  "KRNH": {
+   "star": 2
+  },
+  "KRNM": {
+   "sid": 2
+  },
+  "KRNO": {
+   "sid": 6,
+   "star": 10
+  },
+  "KRNT": {
+   "star": 3
+  },
+  "KROA": {
+   "sid": 4
+  },
+  "KRQO": {
+   "star": 1
+  },
+  "KRSW": {
+   "sid": 1,
+   "star": 3
+  },
+  "KRTS": {
+   "sid": 1
+  },
+  "KRUQ": {
+   "sid": 12,
+   "star": 3
+  },
+  "KRVF": {
+   "sid": 2
+  },
+  "KRVS": {
+   "star": 1
+  },
+  "KRYN": {
+   "sid": 1
+  },
+  "KRYW": {
+   "sid": 6,
+   "star": 4
+  },
+  "KRYY": {
+   "star": 5
+  },
+  "KSAA": {
+   "sid": 1
+  },
+  "KSAD": {
+   "sid": 1
+  },
+  "KSAF": {
+   "sid": 3
+  },
+  "KSAN": {
+   "sid": 10,
+   "star": 7
+  },
+  "KSAT": {
+   "sid": 8,
+   "star": 8
+  },
+  "KSBA": {
+   "sid": 5,
+   "star": 1
+  },
+  "KSBD": {
+   "sid": 1,
+   "star": 2
+  },
+  "KSBP": {
+   "sid": 2
+  },
+  "KSDF": {
+   "sid": 7,
+   "star": 4
+  },
+  "KSDL": {
+   "sid": 12,
+   "star": 4
+  },
+  "KSDM": {
+   "sid": 2,
+   "star": 1
+  },
+  "KSEA": {
+   "sid": 8,
+   "star": 5
+  },
+  "KSEE": {
+   "sid": 2
+  },
+  "KSEZ": {
+   "sid": 1
+  },
+  "KSFB": {
+   "star": 8
+  },
+  "KSFF": {
+   "sid": 1,
+   "star": 2
+  },
+  "KSFO": {
+   "sid": 11,
+   "star": 13
+  },
+  "KSFQ": {
+   "star": 2
+  },
+  "KSFZ": {
+   "star": 1
+  },
+  "KSGH": {
+   "star": 1
+  },
+  "KSGJ": {
+   "star": 1
+  },
+  "KSGR": {
+   "sid": 17,
+   "star": 7
+  },
+  "KSGS": {
+   "star": 1
+  },
+  "KSGU": {
+   "sid": 2
+  },
+  "KSHD": {
+   "sid": 1
+  },
+  "KSJC": {
+   "sid": 7,
+   "star": 8
+  },
+  "KSKA": {
+   "star": 2
+  },
+  "KSKF": {
+   "sid": 5,
+   "star": 8
+  },
+  "KSLC": {
+   "sid": 7,
+   "star": 11
+  },
+  "KSLI": {
+   "sid": 1,
+   "star": 3
+  },
+  "KSMF": {
+   "sid": 3,
+   "star": 4
+  },
+  "KSMN": {
+   "sid": 2
+  },
+  "KSMO": {
+   "sid": 4,
+   "star": 6
+  },
+  "KSMQ": {
+   "star": 3
+  },
+  "KSMX": {
+   "sid": 1
+  },
+  "KSNA": {
+   "sid": 11,
+   "star": 7
+  },
+  "KSNC": {
+   "star": 1
+  },
+  "KSNL": {
+   "star": 1
+  },
+  "KSNS": {
+   "sid": 1
+  },
+  "KSPA": {
+   "sid": 2,
+   "star": 4
+  },
+  "KSPF": {
+   "sid": 1
+  },
+  "KSPG": {
+   "star": 4
+  },
+  "KSPK": {
+   "sid": 1
+  },
+  "KSQL": {
+   "star": 1
+  },
+  "KSRQ": {
+   "sid": 1,
+   "star": 3
+  },
+  "KSSF": {
+   "sid": 8,
+   "star": 8
+  },
+  "KSTJ": {
+   "sid": 6,
+   "star": 3
+  },
+  "KSTL": {
+   "sid": 17,
+   "star": 5
+  },
+  "KSTP": {
+   "sid": 8,
+   "star": 4
+  },
+  "KSTS": {
+   "sid": 3,
+   "star": 2
+  },
+  "KSUA": {
+   "sid": 1,
+   "star": 2
+  },
+  "KSUN": {
+   "sid": 1,
+   "star": 1
+  },
+  "KSUS": {
+   "sid": 4,
+   "star": 5
+  },
+  "KSUU": {
+   "star": 7
+  },
+  "KSVC": {
+   "sid": 1
+  },
+  "KSVH": {
+   "star": 1
+  },
+  "KSVR": {
+   "sid": 1
+  },
+  "KSWF": {
+   "star": 1
+  },
+  "KSYI": {
+   "star": 6
+  },
+  "KTAD": {
+   "sid": 1
+  },
+  "KTAN": {
+   "star": 1
+  },
+  "KTCM": {
+   "sid": 1,
+   "star": 4
+  },
+  "KTDO": {
+   "sid": 1
+  },
+  "KTEB": {
+   "sid": 1,
+   "star": 3
+  },
+  "KTIK": {
+   "star": 7
+  },
+  "KTIX": {
+   "star": 3
+  },
+  "KTKI": {
+   "sid": 9,
+   "star": 9
+  },
+  "KTMB": {
+   "sid": 9,
+   "star": 9
+  },
+  "KTME": {
+   "sid": 17,
+   "star": 6
+  },
+  "KTMK": {
+   "sid": 1
+  },
+  "KTOA": {
+   "sid": 1,
+   "star": 2
+  },
+  "KTPA": {
+   "sid": 6,
+   "star": 4
+  },
+  "KTPF": {
+   "star": 2
+  },
+  "KTRK": {
+   "sid": 2
+  },
+  "KTRM": {
+   "sid": 1,
+   "star": 4
+  },
+  "KTTD": {
+   "star": 2
+  },
+  "KTTF": {
+   "sid": 12,
+   "star": 4
+  },
+  "KTTN": {
+   "star": 3
+  },
+  "KTTS": {
+   "star": 1
+  },
+  "KTUL": {
+   "star": 1
+  },
+  "KTUS": {
+   "sid": 3,
+   "star": 2
+  },
+  "KTVL": {
+   "sid": 2
+  },
+  "KTVY": {
+   "sid": 1
+  },
+  "KTWF": {
+   "sid": 1
+  },
+  "KTYL": {
+   "sid": 1
+  },
+  "KTYQ": {
+   "sid": 5,
+   "star": 2
+  },
+  "KTZR": {
+   "star": 4
+  },
+  "KUAO": {
+   "sid": 3,
+   "star": 1
+  },
+  "KUDD": {
+   "star": 4
+  },
+  "KUES": {
+   "sid": 2,
+   "star": 1
+  },
+  "KUGN": {
+   "sid": 2,
+   "star": 1
+  },
+  "KUKI": {
+   "sid": 2
+  },
+  "KUMP": {
+   "sid": 5,
+   "star": 2
+  },
+  "KUUU": {
+   "star": 1
+  },
+  "KUZA": {
+   "sid": 12,
+   "star": 4
+  },
+  "KVAY": {
+   "star": 1
+  },
+  "KVCB": {
+   "sid": 1
+  },
+  "KVDF": {
+   "star": 3
+  },
+  "KVGT": {
+   "sid": 2,
+   "star": 3
+  },
+  "KVKX": {
+   "star": 1
+  },
+  "KVLL": {
+   "sid": 12,
+   "star": 4
+  },
+  "KVNC": {
+   "sid": 1,
+   "star": 3
+  },
+  "KVNY": {
+   "sid": 7,
+   "star": 6
+  },
+  "KVPC": {
+   "star": 5
+  },
+  "KVQQ": {
+   "star": 4
+  },
+  "KVUJ": {
+   "sid": 12,
+   "star": 3
+  },
+  "KWEA": {
+   "sid": 6,
+   "star": 6
+  },
+  "KWJF": {
+   "sid": 1
+  },
+  "KWMC": {
+   "sid": 1
+  },
+  "KWRI": {
+   "star": 2
+  },
+  "KWST": {
+   "star": 1
+  },
+  "KWVI": {
+   "sid": 2
+  },
+  "KXMR": {
+   "star": 1
+  },
+  "KXNX": {
+   "star": 6
+  },
+  "KXWA": {
+   "sid": 1
+  },
+  "KYIP": {
+   "sid": 13,
+   "star": 4
+  },
+  "KYKM": {
+   "sid": 3
+  },
+  "L08": {
+   "sid": 2
+  },
+  "L35": {
+   "sid": 1
+  },
+  "L45": {
+   "sid": 1
+  },
+  "L71": {
+   "sid": 1
+  },
+  "M02": {
+   "star": 6
+  },
+  "M46": {
+   "sid": 2
+  },
+  "M54": {
+   "star": 6
+  },
+  "M91": {
+   "star": 6
+  },
+  "N07": {
+   "star": 1
+  },
+  "N14": {
+   "star": 1
+  },
+  "N51": {
+   "star": 1
+  },
+  "N52": {
+   "star": 4
+  },
+  "N87": {
+   "star": 1
+  },
+  "O05": {
+   "sid": 1
+  },
+  "O22": {
+   "sid": 1
+  },
+  "O28": {
+   "sid": 2
+  },
+  "O43": {
+   "sid": 1
+  },
+  "O46": {
+   "sid": 1
+  },
+  "O69": {
+   "star": 2
+  },
+  "O85": {
+   "sid": 1
+  },
+  "P13": {
+   "sid": 1
+  },
+  "P19": {
+   "sid": 1,
+   "star": 3
+  },
+  "P33": {
+   "sid": 1
+  },
+  "P34": {
+   "sid": 1
+  },
+  "P52": {
+   "sid": 1
+  },
+  "PAAK": {
+   "sid": 1
+  },
+  "PAAQ": {
+   "sid": 1
+  },
+  "PACD": {
+   "sid": 2
+  },
+  "PACE": {
+   "sid": 1
+  },
+  "PACH": {
+   "sid": 1
+  },
+  "PACJ": {
+   "sid": 1
+  },
+  "PACV": {
+   "sid": 1
+  },
+  "PACX": {
+   "sid": 1
+  },
+  "PADK": {
+   "sid": 2
+  },
+  "PADM": {
+   "sid": 1
+  },
+  "PAED": {
+   "star": 2
+  },
+  "PAFA": {
+   "sid": 5,
+   "star": 2
+  },
+  "PAFE": {
+   "sid": 1
+  },
+  "PAGH": {
+   "sid": 1
+  },
+  "PAHU": {
+   "sid": 1
+  },
+  "PAHV": {
+   "sid": 1
+  },
+  "PAIK": {
+   "sid": 1
+  },
+  "PAJN": {
+   "sid": 1
+  },
+  "PAKH": {
+   "sid": 1
+  },
+  "PAKP": {
+   "sid": 1
+  },
+  "PAKT": {
+   "sid": 2
+  },
+  "PAKW": {
+   "sid": 2
+  },
+  "PAKX": {
+   "sid": 1
+  },
+  "PAMH": {
+   "sid": 1
+  },
+  "PANC": {
+   "sid": 3,
+   "star": 8
+  },
+  "PANO": {
+   "sid": 1
+  },
+  "PAOR": {
+   "sid": 1
+  },
+  "PAOU": {
+   "sid": 1
+  },
+  "PAPE": {
+   "sid": 1
+  },
+  "PAPG": {
+   "sid": 1
+  },
+  "PAPH": {
+   "sid": 1
+  },
+  "PAPN": {
+   "sid": 1
+  },
+  "PARC": {
+   "sid": 1
+  },
+  "PASD": {
+   "sid": 2
+  },
+  "PASI": {
+   "sid": 2
+  },
+  "PASL": {
+   "sid": 1
+  },
+  "PATE": {
+   "sid": 1
+  },
+  "PAUO": {
+   "sid": 1
+  },
+  "PAUT": {
+   "sid": 1
+  },
+  "PAVC": {
+   "sid": 1
+  },
+  "PAVD": {
+   "sid": 2
+  },
+  "PAVE": {
+   "sid": 1
+  },
+  "PAWD": {
+   "sid": 1
+  },
+  "PAWG": {
+   "sid": 1
+  },
+  "PAYA": {
+   "sid": 1,
+   "star": 1
+  },
+  "PFAK": {
+   "sid": 1
+  },
+  "PFEL": {
+   "sid": 1
+  },
+  "PFKT": {
+   "sid": 1
+  },
+  "PFKU": {
+   "sid": 1
+  },
+  "PFKW": {
+   "sid": 1
+  },
+  "PFTO": {
+   "sid": 2
+  },
+  "PFZK": {
+   "sid": 1
+  },
+  "PHHN": {
+   "sid": 1
+  },
+  "PHKO": {
+   "sid": 3,
+   "star": 2
+  },
+  "PHLI": {
+   "sid": 3
+  },
+  "PHLU": {
+   "sid": 1
+  },
+  "PHMK": {
+   "sid": 4
+  },
+  "PHNL": {
+   "sid": 8,
+   "star": 11
+  },
+  "PHOG": {
+   "sid": 7,
+   "star": 3
+  },
+  "PHTO": {
+   "sid": 2,
+   "star": 1
+  },
+  "POKA": {
+   "sid": 1
+  },
+  "S39": {
+   "sid": 1
+  },
+  "S50": {
+   "sid": 1
+  },
+  "S59": {
+   "sid": 1
+  },
+  "S69": {
+   "sid": 1
+  },
+  "T00": {
+   "sid": 11,
+   "star": 7
+  },
+  "T41": {
+   "sid": 17,
+   "star": 7
+  },
+  "T74": {
+   "sid": 6,
+   "star": 4
+  },
+  "T78": {
+   "sid": 11,
+   "star": 5
+  },
+  "T89": {
+   "sid": 1
+  },
+  "TISX": {
+   "sid": 2
+  },
+  "TJPS": {
+   "sid": 1
+  },
+  "TJSJ": {
+   "sid": 8,
+   "star": 5
+  },
+  "TJVQ": {
+   "sid": 1
+  },
+  "U02": {
+   "sid": 2
+  },
+  "U14": {
+   "sid": 1
+  },
+  "U34": {
+   "sid": 1
+  },
+  "U76": {
+   "sid": 1
+  },
+  "W00": {
+   "star": 1
+  },
+  "W43": {
+   "sid": 1
+  },
+  "W50": {
+   "star": 1
+  },
+  "X04": {
+   "star": 1
+  },
+  "X50": {
+   "star": 1
+  },
+  "X51": {
+   "sid": 9,
+   "star": 8
+  }
+ },
+ "coverage": "United States airports that publish SID and STAR procedures",
+ "cycle": "2611",
+ "effective": "2026-10-29",
+ "format": 1,
+ "generated": "2026-10-23",
+ "runwaySource": "OurAirports runways.csv (CC0)",
+ "source": "FAA CIFP (FAACIFP18, United States)"
+}

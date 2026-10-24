@@ -184,7 +184,7 @@ jobs:
       - name: Build standalone simulator bridge
         run: |
           python -m pip install --disable-pip-version-check pyinstaller
-          pyinstaller --noconfirm --clean --onefile --name stratos-bridge --distpath bridge-dist --workpath build/pyinstaller --specpath build stratos_bridge.py
+          pyinstaller --noconfirm --clean --onefile --name stratos-bridge --distpath bridge-dist --workpath build/pyinstaller --specpath build --add-data "navdata/cifp;navdata/cifp" stratos_bridge.py
           test -f bridge-dist/stratos-bridge.exe || { echo "::error::PyInstaller did not produce stratos-bridge.exe"; exit 1; }
 
       - name: Build Windows installer
@@ -246,7 +246,7 @@ jobs:
       - name: Build standalone simulator bridge
         run: |
           python -m pip install --disable-pip-version-check pyinstaller
-          pyinstaller --noconfirm --clean --onefile --name stratos-bridge --distpath bridge-dist --workpath build/pyinstaller --specpath build stratos_bridge.py
+          pyinstaller --noconfirm --clean --onefile --name stratos-bridge --distpath bridge-dist --workpath build/pyinstaller --specpath build --add-data "navdata/cifp:navdata/cifp" stratos_bridge.py
           test -f bridge-dist/stratos-bridge || { echo "::error::PyInstaller did not produce stratos-bridge"; exit 1; }
 
       - name: Build macOS app
@@ -304,7 +304,7 @@ jobs:
       - name: Build standalone simulator bridge
         run: |
           python -m pip install --disable-pip-version-check pyinstaller
-          pyinstaller --noconfirm --clean --onefile --name stratos-bridge --distpath bridge-dist --workpath build/pyinstaller --specpath build stratos_bridge.py
+          pyinstaller --noconfirm --clean --onefile --name stratos-bridge --distpath bridge-dist --workpath build/pyinstaller --specpath build --add-data "navdata/cifp:navdata/cifp" stratos_bridge.py
           test -f bridge-dist/stratos-bridge || { echo "::error::PyInstaller did not produce stratos-bridge"; exit 1; }
 
       - name: Build Linux AppImage

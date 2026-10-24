@@ -13,6 +13,7 @@ Thumbs.db
 
 # Bridge runtime state written into the data dir on first launch
 bridge_token.txt
+traffic_trails.json
 phone_pairs.json
 phone_pairs.json.tmp
 # Cached FAA chart documents (public-domain PDFs, still runtime state)
@@ -32,3 +33,6 @@ artifacts/
 
 # Natural Earth source vectors: rebuild with scripts/build-world.mjs --download
 tmp-natural-earth/
+
+# FAA CIFP and OurAirports downloads kept by scripts/build-navdata.py
+.navdata-cache/

@@ -1,0 +1,1 @@
+{"ok":true,"airport":"8S1","source":"FAA CIFP (FAACIFP18, United States)","cycle":"2611","runways":{},"procedures":{"sid":[{"id":"ANGIL1","transitions":[{"id":"RW36","runway":"36","combined":false,"points":[{"id":"TEPSE","lat":47.777342,"lon":-114.144542,"terminator":"DF"},{"id":"ANGIL","lat":47.964556,"lon":-114.157914,"terminator":"TF"}],"skipped":0,"complete":true}]}]}}

@@ -10,10 +10,32 @@ export class BridgeAuthError extends Error {
   constructor(message = 'The bridge needs its access token.') { super(message); this.name = 'BridgeAuthError'; }
 }
 
+/* The bridge can listen on another port (STRATOS_HTTP_PORT). Remember the
+   origin that answered so a page served by it keeps finding it. */
+const BRIDGE_BASE_KEY = 'stratos.bridgeBase';
+
+export function savedBridgeBase() {
+  try {
+    const value = localStorage.getItem(BRIDGE_BASE_KEY);
+    if (value && /^http:\/\/[^/]+$/.test(value)) return value;
+  } catch (_) {}
+  return '';
+}
+
+export function rememberBridgeBase(base) {
+  try {
+    if (base && /^http:\/\/[^/]+$/.test(base)) localStorage.setItem(BRIDGE_BASE_KEY, base);
+  } catch (_) {}
+}
+
 export function defaultBridgeBase() {
   try {
     const url = new URL(window.location.href);
     if (url.protocol === 'file:') return 'http://127.0.0.1:8765';
+    // Only set after a health check answered, so it is a real bridge even when
+    // it listens on another port or this page came from the dev server.
+    const saved = savedBridgeBase();
+    if (saved) return saved;
     if (url.port === '8765') return url.origin;
     if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') return 'http://127.0.0.1:8765';
     if (url.protocol === 'http:' && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(url.hostname)) return url.origin;
@@ -57,8 +79,23 @@ async function request(base, path, options = {}) {
   }
 }
 
-export function bridgeHealth(base = defaultBridgeBase(), timeout = 2500) {
-  return request(base, '/health', { timeout });
+export async function bridgeHealth(base = defaultBridgeBase(), timeout = 2500) {
+  try {
+    const health = await request(base, '/health', { timeout });
+    rememberBridgeBase(String(base).replace(/\/+$/, ''));
+    return health;
+  } catch (error) {
+    // A page the bridge itself serves knows where it is: try its own origin
+    // once, which also covers a bridge on a non-default port.
+    try {
+      if (location.protocol === 'http:' && location.origin !== String(base).replace(/\/+$/, '')) {
+        const health = await request(location.origin, '/health', { timeout });
+        rememberBridgeBase(location.origin);
+        return health;
+      }
+    } catch (_) {}
+    throw error;
+  }
 }
 
 export async function syncLogbook(base = defaultBridgeBase()) {
@@ -274,9 +311,12 @@ export class RelayClient {
       });
     } catch (error) {
       this.failures++;
+      // A dropped relay is retried, not reported as a dead end: the poll loop
+      // below keeps going and the phone says "Reconnecting".
       this.onStatus({
-        state: navigator.onLine ? 'error' : 'offline',
+        state: navigator.onLine ? 'reconnecting' : 'offline',
         detail: error.name === 'AbortError' ? 'Relay timed out.' : error.message,
+        failures: this.failures,
       });
     } finally {
       if (!this.closed) {

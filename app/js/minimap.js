@@ -16,6 +16,7 @@
    stays accurate at every zoom level without a second data model. */
 
 import { validLatLon } from './lib/geo.js';
+import { trailInk } from './lib/trailcolor.js';
 
 const TILE = 256;
 const TILE_LIMIT = 160;
@@ -42,10 +43,13 @@ export class MiniMap {
     this.ctx = canvas.getContext('2d');
     this.track = [];
     this.route = [];
+    this.traffic = [];
+    this.trafficTrail = [];
+    this.trafficSelected = '';
     this.position = null;
     this.heading = null;
     this.options = { padding: 34, attribution: true, ...options };
-    this.layers = { tiles: true, track: true, route: true, ...(options.layers || {}) };
+    this.layers = { tiles: true, track: true, route: true, traffic: true, ...(options.layers || {}) };
     this.follow = false;
     this.manualZoom = null;
     this.autoZoom = 6;
@@ -87,11 +91,46 @@ export class MiniMap {
     this.draw();
   }
 
+  /** Other aircraft near the flight, as { key, lat, lon, hdg, type, ... }. */
+  setTraffic(list) {
+    this.traffic = (Array.isArray(list) ? list : []).filter(p => p && validLatLon(Number(p.lat), Number(p.lon)));
+    if (this.trafficSelected && !this.traffic.some(p => p.key === this.trafficSelected)) {
+      this.trafficSelected = '';
+      this.trafficTrail = [];
+    }
+    this.draw();
+  }
+
+  /** The selected aircraft's recorded path, oldest first. */
+  setTrafficTrail(points) {
+    this.trafficTrail = (Array.isArray(points) ? points : [])
+      .filter(p => p && validLatLon(Number(p.lat), Number(p.lon)));
+    this.draw();
+  }
+
+  /** Highlight one target by key; an empty key clears the selection. */
+  selectTraffic(key) {
+    this.trafficSelected = key ? String(key) : '';
+    if (!this.trafficSelected) this.trafficTrail = [];
+    this.draw();
+  }
+
   /** Screen-space hit test. Returns { kind, index } or null. */
   hitTest(x, y) {
-    if (!this.route.length) return null;
     const view = this.fit();
     if (!view) return null;
+    // Aircraft are the smallest targets, so they are tested before the route.
+    if (this.layers.traffic && this.traffic.length) {
+      const radius = this.touch || this.options.touchFriendly ? 22 : 14;
+      let nearest = null;
+      this.traffic.forEach((target, index) => {
+        const p = this.project(target.lat, target.lon, view);
+        const distance = Math.hypot(p.x - x, p.y - y);
+        if (distance <= radius && (!nearest || distance < nearest.distance)) nearest = { index, distance };
+      });
+      if (nearest) return { kind: 'traffic', index: nearest.index };
+    }
+    if (!this.route.length) return null;
     const projected = this.route.map((point, index) => ({
       index,
       point,
@@ -211,6 +250,24 @@ export class MiniMap {
   setTrack(points) {
     this.track = (Array.isArray(points) ? points : []).filter(p => p && validLatLon(Number(p.lat), Number(p.lon)));
     this.draw();
+  }
+
+  /**
+   * Height above the ground for every recorded point, or null when the track
+   * carries no altitudes at all (a route preview). AGL is used where the
+   * recorder stored it; otherwise the height above the track's own lowest point,
+   * which is the departure elevation for a flight recorded from the gate.
+   */
+  trackHeights() {
+    if (!this.track.some(point => Number.isFinite(Number(point.alt)) || Number.isFinite(Number(point.agl)))) return null;
+    const alts = this.track.map(point => Number(point.alt)).filter(Number.isFinite);
+    const floor = alts.length ? Math.min(...alts) : 0;
+    return this.track.map(point => {
+      const agl = Number(point.agl);
+      if (point.agl != null && Number.isFinite(agl)) return Math.max(0, agl);
+      const alt = Number(point.alt);
+      return Math.max(0, (Number.isFinite(alt) ? alt : 0) - floor);
+    });
   }
 
   /** Planned route as an ordered list of { lat, lon, id }. */
@@ -474,20 +531,45 @@ export class MiniMap {
       ctx.beginPath();
       positions.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
       ctx.stroke();
-      ctx.strokeStyle = accent;
+      /* A recorded flight is coloured by height above the ground, the same ramp
+         the desktop map uses: white on the ground, then up through blue, green,
+         yellow and orange to magenta. A track without altitudes — a route
+         preview — keeps the plain accent line. */
+      const heights = this.trackHeights();
       ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      positions.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-      ctx.stroke();
+      if (heights) {
+        const inks = heights.map(trailInk);
+        let start = 0;
+        let ink = inks[0];
+        const run = (from, to) => {
+          ctx.beginPath();
+          for (let i = from; i <= to; i += 1) {
+            const p = positions[i];
+            i === from ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+          }
+          ctx.strokeStyle = ink;
+          ctx.stroke();
+        };
+        for (let i = 1; i < inks.length; i += 1) {
+          if (inks[i] !== ink) { run(start, i); start = i; ink = inks[i]; }
+        }
+        run(start, inks.length - 1);
+      } else {
+        ctx.strokeStyle = accent;
+        ctx.beginPath();
+        positions.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.stroke();
+      }
 
       // Recorded sample dots (not interpolated) so recorded data is visible.
       if (this.track.length <= 400) {
-        ctx.fillStyle = accent;
-        for (const p of positions) {
+        this.track.forEach((point, index) => {
+          ctx.fillStyle = heights ? trailInk(heights[index]) : accent;
+          const p = positions[index];
           ctx.beginPath();
           ctx.arc(p.x, p.y, 1.5, 0, Math.PI * 2);
           ctx.fill();
-        }
+        });
       }
       const start = positions[0];
       const end = positions[positions.length - 1];
@@ -495,6 +577,74 @@ export class MiniMap {
       ctx.beginPath(); ctx.arc(start.x, start.y, 4, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#f17b89';
       ctx.beginPath(); ctx.arc(end.x, end.y, 4, 0, Math.PI * 2); ctx.fill();
+    }
+
+    /* Other aircraft, after your own path so both stay readable. The selected
+       one keeps its recorded trail, drawn in the same altitude ramp as your own
+       flight; the others are small heading glyphs. */
+    if (this.layers.traffic && this.traffic.length) {
+      const selected = this.traffic.find(target => target.key === this.trafficSelected);
+      if (selected && this.trafficTrail.length > 1) {
+        const heights = this.trafficTrail.map(point => {
+          const value = Number(point.alt);
+          return Number.isFinite(value) ? Math.max(0, value) : 0;
+        });
+        const inks = heights.map(trailInk);
+        const path = this.trafficTrail.map(point => this.project(point.lat, point.lon, view));
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        path.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.strokeStyle = 'rgba(0,0,0,.45)';
+        ctx.lineWidth = 5;
+        ctx.stroke();
+        let start = 0;
+        let ink = inks[0];
+        const run = (from, to) => {
+          ctx.beginPath();
+          for (let i = from; i <= to; i += 1) {
+            i === from ? ctx.moveTo(path[i].x, path[i].y) : ctx.lineTo(path[i].x, path[i].y);
+          }
+          ctx.strokeStyle = ink;
+          ctx.lineWidth = 3;
+          ctx.stroke();
+        };
+        for (let i = 1; i < inks.length; i += 1) {
+          if (inks[i] !== ink) { run(start, i); start = i; ink = inks[i]; }
+        }
+        run(start, inks.length - 1);
+      }
+      // The selected aircraft is painted last so no neighbour can cover it.
+      const ordered = this.traffic
+        .map((target, index) => ({ target, index }))
+        .sort((a, b) => Number(a.target.key === this.trafficSelected) - Number(b.target.key === this.trafficSelected) || a.index - b.index);
+      for (const { target } of ordered) {
+        const p = this.project(target.lat, target.lon, view);
+        if (p.x < -20 || p.x > this.width + 20 || p.y < -20 || p.y > this.height + 20) continue;
+        const active = target.key === this.trafficSelected;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(((Number(target.hdg) || 0) * Math.PI) / 180);
+        ctx.beginPath();
+        ctx.moveTo(0, -6);
+        ctx.lineTo(4.5, 5);
+        ctx.lineTo(0, 2.5);
+        ctx.lineTo(-4.5, 5);
+        ctx.closePath();
+        ctx.fillStyle = active ? '#ffffff' : (this.theme() === 'light' ? '#1d4ed8' : '#8fb8ff');
+        ctx.fill();
+        ctx.restore();
+        if (active) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 11, 0, Math.PI * 2);
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          ctx.font = '600 11px system-ui, sans-serif';
+          ctx.fillStyle = text;
+          ctx.fillText(String(target.id || ''), p.x + 13, p.y + 4);
+        }
+      }
     }
 
     if (this.position) {

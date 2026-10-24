@@ -244,12 +244,15 @@ class FlightLifecycleTests(unittest.TestCase):
         self.assertFalse(profile["available"])
         self.assertEqual(profile["flights"], 0)
 
-    def test_current_flight_summary_has_no_track(self):
+    def test_current_flight_summary_carries_a_sampled_track(self):
         addon.process_telemetry_for_logbook(telemetry(gs=20), AIRPORTS)
         summary = addon.get_current_flight()
         self.assertIn("phase", summary)
-        self.assertNotIn("track", summary)
         self.assertEqual(summary["phase"], "TAXI")
+        # The live payload carries the recorded path, sampled, so a page opened
+        # halfway through can draw the flight from its first point.
+        self.assertIsInstance(summary["track"], list)
+        self.assertLessEqual(len(summary["track"]), addon.TRACK_STREAM_POINTS + 1)
 
     def test_stats_counts_only_complete_flights(self):
         addon.lb_save([
@@ -409,6 +412,293 @@ class ChecklistSyncTests(unittest.TestCase):
         self.assertIsNone(bridge.save_checklist("nope"))
         self.assertIsNone(bridge.save_checklist([1, 2, 3]))
         self.assertIsNone(bridge.checklist_snapshot())
+
+
+class PhoneDiscoveryTests(unittest.TestCase):
+    """The one-tap connection: mDNS name, LAN-only enrollment, RREF identity."""
+
+    def test_a_query_for_our_name_is_answered_with_the_lan_address(self):
+        query = (b"\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00"
+                 + bridge.dns_encode_name("stratos.local") + b"\x00\x01\x00\x01")
+        self.assertEqual(bridge.dns_questions(query), [("stratos.local", 1)])
+        reply = bridge.mdns_response(query, "192.168.1.20")
+        self.assertIsNotNone(reply)
+        self.assertEqual(reply[2] & 0x80, 0x80, "the reply is a response")
+        self.assertIn(b"\xc0\xa8\x01\x14", reply, "the A record carries the LAN address")
+
+    def test_a_query_for_another_name_is_left_alone(self):
+        query = (b"\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00"
+                 + bridge.dns_encode_name("printer.local") + b"\x00\x01\x00\x01")
+        self.assertIsNone(bridge.mdns_response(query, "192.168.1.20"))
+
+    def test_the_service_is_advertised_without_a_secret(self):
+        txt = bridge.mdns_txt()
+        self.assertIn(b"path=/live", txt)
+        self.assertNotIn(b"token", txt.lower())
+        self.assertTrue(bridge.mdns_txt().startswith(bytes([len(b"path=/live")])))
+
+    def test_auto_pairing_is_limited_to_the_local_network(self):
+        self.assertTrue(bridge.is_lan_address("192.168.1.5"))
+        self.assertTrue(bridge.is_lan_address("10.0.0.4"))
+        self.assertFalse(bridge.is_lan_address("8.8.8.8"))
+        self.assertFalse(bridge.is_lan_address("203.0.113.9"))
+
+    def test_auto_pairing_says_why_it_cannot_run(self):
+        original_host, original_enabled = bridge.HOST, bridge.AUTO_PAIR_ENABLED
+        try:
+            bridge.HOST = "127.0.0.1"
+            self.assertIn("only on this PC", bridge.auto_pair_gate("192.168.1.5"))
+            bridge.HOST = "0.0.0.0"
+            self.assertIn("local network", bridge.auto_pair_gate("203.0.113.9"))
+            bridge.AUTO_PAIR_ENABLED = False
+            self.assertIn("turned off", bridge.auto_pair_gate("192.168.1.5"))
+            bridge.AUTO_PAIR_ENABLED = True
+            self.assertEqual(bridge.auto_pair_gate("192.168.1.5"), "")
+        finally:
+            bridge.HOST, bridge.AUTO_PAIR_ENABLED = original_host, original_enabled
+
+    def test_auto_pairing_hands_out_its_own_secret(self):
+        original_host = bridge.HOST
+        try:
+            bridge.HOST = "0.0.0.0"
+            secret, record = bridge.auto_pair("192.168.1.5")
+            self.assertTrue(secret)
+            self.assertTrue(bridge.verify_phone_secret(secret))
+            self.assertEqual(record["pairedAt"] > 0, True)
+        finally:
+            bridge.HOST = original_host
+
+
+class XPlaneIdentityTests(unittest.TestCase):
+    def test_a_request_is_the_standard_rref_packet(self):
+        packet = bridge.rref_request(9003, "sim/aircraft/view/acf_tailnum[3]", 1)
+        self.assertEqual(packet[:4], b"RREF")
+        self.assertEqual(len(packet), 5 + 4 + 4 + 400)
+        self.assertEqual(bridge.struct.unpack("<i", packet[5:9])[0], 1)
+        self.assertEqual(bridge.struct.unpack("<i", packet[9:13])[0], 9003)
+        self.assertEqual(packet[13:13 + 34].rstrip(b"\x00"),
+                         b"sim/aircraft/view/acf_tailnum[3]")
+
+    def test_several_values_may_share_one_packet(self):
+        body = b"RREF\x00" + bridge.struct.pack("<if", 9000, 67.0) + bridge.struct.pack("<if", 9001, 45.0)
+        self.assertEqual(bridge.rref_values(body), [(9000, 67.0), (9001, 45.0)])
+        self.assertEqual(bridge.rref_values(b"DATA\x00"), [])
+
+    def test_characters_assemble_into_the_reported_text(self):
+        chars = {0: 78.0, 1: 56.0, 2: 51.0, 3: 49.0, 4: 50.0, 5: 67.0}
+        self.assertEqual(bridge.rref_text(chars), "N8312C")
+        self.assertEqual(bridge.rref_text({0: 78.0, 1: 0.0, 2: 56.0}), "N")
+        self.assertEqual(bridge.rref_text({1: 56.0, 2: 51.0}), "")
+
+    def test_placeholders_are_not_registrations(self):
+        for value in ("", "NONE", "N/A", "B738", "---"):
+            self.assertEqual(bridge.plausible_registration(value), "")
+        self.assertEqual(bridge.plausible_registration("n8312c"), "N8312C")
+        self.assertEqual(bridge.plausible_registration("G-TAWI"), "G-TAWI")
+        self.assertEqual(bridge.plausible_registration("B-1234"), "B-1234", "a country mark is not a type")
+        self.assertEqual(bridge.plausible_registration("MD-82"), "", "a type with a hyphen is still a type")
+
+    def test_the_subscription_covers_every_character_asked_for(self):
+        self.assertEqual(len(bridge.RREF_REQUESTS), 10 + 8 + 48)
+        names = [dataref for _index, dataref in bridge.RREF_REQUESTS]
+        self.assertIn("sim/aircraft/view/acf_tailnum[0]", names)
+        self.assertIn("sim/aircraft/view/acf_tailnum[9]", names)
+
+
+class RelayTrafficTests(unittest.TestCase):
+    """What a relayed phone gets: the list, and only the samples it lacks."""
+
+    def setUp(self):
+        self.directory = tempfile.mkdtemp(prefix="stratos-relay-traffic-")
+        self.file = bridge.TRAFFIC_FILE
+        bridge.TRAFFIC_FILE = os.path.join(self.directory, "traffic_trails.json")
+        with bridge.TRAFFIC_LOCK:
+            bridge.TRAFFIC.clear()
+        with bridge.state_lock:
+            self.saved_tr = bridge.state.get("tr")
+            self.saved_trt = bridge.state.get("trt")
+
+    def tearDown(self):
+        bridge.TRAFFIC_FILE = self.file
+        with bridge.TRAFFIC_LOCK:
+            bridge.TRAFFIC.clear()
+        with bridge.state_lock:
+            if self.saved_tr is None:
+                bridge.state.pop("tr", None)
+            else:
+                bridge.state["tr"] = self.saved_tr
+            if self.saved_trt is None:
+                bridge.state.pop("trt", None)
+            else:
+                bridge.state["trt"] = self.saved_trt
+
+    def test_the_batch_carries_the_list_and_every_new_sample(self):
+        now = int(time.time() * 1000)
+        with bridge.state_lock:
+            bridge.state["tr"] = [
+                {"id": "SWR219", "lat": 46.5, "lon": -122.9, "alt": 12000, "gs": 320, "hdg": 180},
+                {"id": "", "lat": 46.0, "lon": -122.0},
+                {"id": "BAD", "lat": None, "lon": None},
+            ]
+            bridge.state["trt"] = time.time()
+        bridge.record_traffic([
+            ["SWR219", 46.5, -122.9, 12000, now - 15000],
+            ["SWR219", 46.4, -122.8, 16000, now],
+            ["DLH400", 47.0, -121.0, 30000, now],
+        ])
+        batch = bridge.relay_traffic_batch({})
+        self.assertEqual([entry["id"] for entry in batch["list"]], ["SWR219"],
+                         "an entry without a usable position is not relayed")
+        self.assertEqual(batch["list"][0]["alt"], 12000)
+        keys = {point[0] for point in batch["points"]}
+        self.assertEqual(keys, {"SWR219", "DLH400"})
+        self.assertEqual([point[3] for point in batch["points"] if point[0] == "SWR219"], [12000, 16000],
+                         "a trail keeps the altitudes it recorded")
+
+    def test_only_samples_after_the_cursor_are_sent_again(self):
+        now = int(time.time() * 1000)
+        bridge.record_traffic([
+            ["SWR219", 46.5, -122.9, 12000, now - 15000],
+            ["SWR219", 46.4, -122.8, 16000, now],
+        ])
+        first = bridge.relay_traffic_batch({})
+        cursor = {}
+        for key, _lat, _lon, _alt, stamp in first["points"]:
+            cursor[key] = max(cursor.get(key, 0), stamp)
+        self.assertEqual(bridge.relay_traffic_batch(cursor)["points"], [],
+                         "nothing new means nothing sent")
+        bridge.record_traffic([["SWR219", 46.3, -122.7, 20000, now + 5000]])
+        second = bridge.relay_traffic_batch(cursor)
+        self.assertEqual([point[0] for point in second["points"]], ["SWR219"])
+        self.assertEqual(second["points"][0][3], 20000)
+
+    def test_the_batch_is_bounded(self):
+        now = int(time.time() * 1000)
+        with bridge.state_lock:
+            bridge.state["tr"] = [{"id": "A%d" % index, "lat": 40.0 + index / 100, "lon": 8.0, "alt": 1000}
+                                  for index in range(80)]
+            bridge.state["trt"] = time.time()
+        bridge.record_traffic([["A%d" % index, 40.0, 8.0, 1000, now] for index in range(40)])
+        batch = bridge.relay_traffic_batch({})
+        self.assertLessEqual(len(batch["list"]), 60)
+        self.assertLessEqual(len(batch["points"]), bridge.TRAFFIC_RELAY_MAX_POINTS)
+
+
+class StreamTrackTests(unittest.TestCase):
+    def test_the_stream_carries_the_whole_flight_evenly_sampled(self):
+        track = [{"lat": 37.0 + i * 0.001, "lon": -122.0, "alt": 1000 + i, "t": i}
+                 for i in range(2000)]
+        points = addon.stream_track(track)
+        self.assertLessEqual(len(points), addon.TRACK_STREAM_POINTS + 1)
+        self.assertEqual(points[0][0], 37.0, "the first point is kept")
+        self.assertEqual(points[-1][0], track[-1]["lat"], "the last point is kept")
+        # Chronological, and no invented positions.
+        self.assertEqual(points, sorted(points, key=lambda point: point[3]))
+        self.assertTrue(all(len(point) == 5 for point in points))
+        self.assertTrue(all(point[4] is None for point in points), "a sample without AGL says so instead of inventing one")
+
+    def test_a_short_track_is_passed_through_unchanged(self):
+        track = [{"lat": 1.0, "lon": 2.0, "alt": 3.0, "t": 4}, {"lat": 5.0, "lon": 6.0, "alt": 7.0, "t": 8}]
+        self.assertEqual(addon.stream_track(track), [[1.0, 2.0, 3.0, 4, None], [5.0, 6.0, 7.0, 8, None]])
+        self.assertEqual(addon.stream_track([]), [])
+
+    def test_the_stream_carries_the_height_above_ground_when_the_sim_gave_it(self):
+        track = [
+            {"lat": 1.0, "lon": 2.0, "alt": 5500.0, "t": 1004, "agl": 0.0},
+            {"lat": 5.0, "lon": 6.0, "alt": 9500.0, "t": 1008, "agl": 4000.0},
+        ]
+        self.assertEqual(addon.stream_track(track), [[1.0, 2.0, 5500.0, 1004, 0.0], [5.0, 6.0, 9500.0, 1008, 4000.0]])
+
+
+class TrafficTrailTests(unittest.TestCase):
+    """The bridge remembers the traffic the page has seen, so a trail survives."""
+
+    def setUp(self):
+        self.directory = tempfile.mkdtemp(prefix="stratos-trails-")
+        self.file = bridge.TRAFFIC_FILE
+        self.retention = bridge.TRAFFIC_RETENTION_S
+        bridge.TRAFFIC_FILE = os.path.join(self.directory, "traffic_trails.json")
+        with bridge.TRAFFIC_LOCK:
+            bridge.TRAFFIC.clear()
+        bridge.TRAFFIC_SAVE.update(at=0.0, dirty=False)
+
+    def tearDown(self):
+        bridge.TRAFFIC_FILE = self.file
+        bridge.TRAFFIC_RETENTION_S = self.retention
+        with bridge.TRAFFIC_LOCK:
+            bridge.TRAFFIC.clear()
+        bridge.TRAFFIC_SAVE.update(at=0.0, dirty=False)
+
+    def test_positions_are_recorded_once_each_and_in_order(self):
+        now = int(time.time() * 1000)
+        added = bridge.record_traffic([
+            ["4ca1b2", 47.1, -122.3, 12000, now - 2000],
+            ["4CA1B2", 47.1, -122.3, 12000, now - 2000],  # the same sample again
+            ["4CA1B2", 47.2, -122.2, 18000, now],
+        ])
+        self.assertEqual(added, 2, "a repeated position is not a second sample")
+        points = bridge.traffic_trail("4CA1B2")
+        self.assertEqual([point[0] for point in points], [47.1, 47.2])
+        self.assertEqual(points, sorted(points, key=lambda point: point[3]), "chronological")
+        self.assertEqual(bridge.traffic_trail("4ca1b2")[0][2], 12000, "the key is normalised")
+
+    def test_a_sample_that_arrives_late_does_not_rewind_the_path(self):
+        now = int(time.time() * 1000)
+        bridge.record_traffic([["ABC123", 47.0, -122.0, 10000, now]])
+        bridge.record_traffic([["ABC123", 46.0, -121.0, 9000, now - 60000]])
+        points = bridge.traffic_trail("ABC123")
+        self.assertEqual(len(points), 1, "a stale sample is dropped, not appended at the end")
+        self.assertEqual(points[0][0], 47.0)
+
+    def test_a_position_of_zero_zero_is_not_a_position(self):
+        added = bridge.record_traffic([["ABC123", 0, 0, 0, int(time.time() * 1000)],
+                                       ["ABC123", 200, 10, 0, int(time.time() * 1000)],
+                                       ["", 47.0, -122.0, 0, int(time.time() * 1000)]])
+        self.assertEqual(added, 0)
+        self.assertEqual(bridge.traffic_trail("ABC123"), [])
+
+    def test_the_trail_is_on_disk_and_survives_a_restart(self):
+        bridge.record_traffic([["DEF456", 45.0, 9.0, 30000, int(time.time() * 1000)]])
+        self.assertTrue(os.path.isfile(bridge.TRAFFIC_FILE), "the trail is written to the data folder")
+        with bridge.TRAFFIC_LOCK:
+            bridge.TRAFFIC.clear()
+        bridge.load_traffic_trails()
+        points = bridge.traffic_trail("DEF456")
+        self.assertEqual(len(points), 1)
+        self.assertEqual(points[0][2], 30000)
+
+    def test_the_retention_window_drops_an_old_trail(self):
+        bridge.TRAFFIC_RETENTION_S = 60
+        now = int(time.time() * 1000)
+        bridge.record_traffic([["OLD999", 40.0, 8.0, 20000, now - 120000]])
+        self.assertEqual(bridge.traffic_trail("OLD999"), [], "a sample past the window is not served")
+
+    def test_the_per_aircraft_cap_keeps_the_newest_samples(self):
+        now = int(time.time() * 1000)
+        points = [["CAP123", 40.0 + index * 0.01, 8.0, 30000, now + index] for index in range(bridge.TRAFFIC_MAX_POINTS + 40)]
+        bridge.record_traffic(points)
+        trail = bridge.traffic_trail("CAP123")
+        self.assertEqual(len(trail), bridge.TRAFFIC_MAX_POINTS)
+        self.assertEqual(trail[-1][0], points[-1][1], "the newest sample is kept")
+
+
+class AircraftPhotoTests(unittest.TestCase):
+    """The bridge serves photos for the pages it hosts, so the card works there."""
+
+    def test_only_a_registration_reaches_the_photo_service(self):
+        self.assertEqual(bridge.photo_registration(" n8312c "), "N8312C")
+        self.assertEqual(bridge.photo_registration("9V-SKA"), "9V-SKA")
+        self.assertEqual(bridge.photo_registration("B-1234"), "B-1234")
+        self.assertEqual(bridge.photo_registration("12345"), "", "a number is not a registration")
+        self.assertEqual(bridge.photo_registration("ASA123"), "", "a callsign is not a registration")
+        self.assertEqual(bridge.photo_registration("B738"), "", "a type code is not a registration")
+        self.assertEqual(bridge.photo_registration(""), "")
+        self.assertEqual(bridge.photo_registration(None), "")
+        self.assertEqual(bridge.photo_registration("N<script>"), "")
+
+    def test_a_found_photo_is_kept_longer_than_a_miss(self):
+        self.assertGreater(bridge.PHOTO_TTL, bridge.PHOTO_MISS_TTL)
+        self.assertGreaterEqual(bridge.PHOTO_MISS_TTL, 60, "a miss is cached too, so the card does not spam")
 
 
 if __name__ == "__main__":

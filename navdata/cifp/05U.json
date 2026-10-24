@@ -1,0 +1,1 @@
+{"ok":true,"airport":"05U","source":"FAA CIFP (FAACIFP18, United States)","cycle":"2611","runways":{},"procedures":{"sid":[{"id":"MINES1","transitions":[{"id":"RW36","runway":"36","combined":false,"points":[{"id":"ZOKPU","lat":40.173811,"lon":-115.935811,"terminator":"DF"},{"id":"YANKU","lat":40.338444,"lon":-115.493669,"terminator":"TF"}],"skipped":0,"complete":true}]}]}}
