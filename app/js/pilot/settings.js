@@ -200,6 +200,33 @@ export async function mount(root, ctx) {
             </label>`).join('')}
           </div>
         </div>
+        <div class="card colour-board" style="grid-column:1/-1">
+          <div class="card-head"><h2>Aviation colour board</h2><span class="spacer"></span>${tag('system palette', 'accent')}</div>
+          <p class="help">Every colour has one job, in the map, the rail, the cards and the phone. These are the values the interface actually uses, so a change here is a change everywhere.</p>
+          <div class="swatches">
+            <div class="swatch"><i class="chip" style="background:#38bdf8" aria-hidden="true"></i><div><b>Signature cyan</b><code>#38BDF8</code><span>Primary actions, active navigation, selected waypoints and interactive controls. The Stratos signature, used sparingly.</span></div></div>
+            <div class="swatch"><i class="chip" style="background:#a78bfa" aria-hidden="true"></i><div><b>Navigation violet</b><code>#A78BFA</code><span>Selected waypoint emphasis and STAR / arrival highlighting. The light map uses the deeper #7C3AED for contrast.</span></div></div>
+            <div class="swatch"><i class="chip" style="background:#f59e0b" aria-hidden="true"></i><div><b>Aviation amber</b><code>#F59E0B</code><span>Top of Descent, descent information and time-sensitive cautions.</span></div></div>
+            <div class="swatch"><i class="chip" style="background:#ffffff" aria-hidden="true"></i><div><b>Instrument white</b><code>#FFFFFF</code><span>Primary text, headings and the on-ground flight trail.</span></div></div>
+            <div class="swatch"><i class="chip" style="background:#0a1421" aria-hidden="true"></i><div><b>Deep charcoal</b><code>#0A1421</code><span>Primary background, exactly the night map and panel base.</span></div></div>
+            <div class="swatch"><i class="chip" style="background:#8b9db3" aria-hidden="true"></i><div><b>Muted grey</b><code>#8B9DB3</code><span>Secondary text, inactive controls and dividers.</span></div></div>
+            <div class="swatch"><i class="chip" style="background:#df827a" aria-hidden="true"></i><div><b>Alert red</b><code>#DF827A</code><span>Genuine errors and destructive actions only.</span></div></div>
+            <div class="swatch"><i class="chip" style="background:#5ec99a" aria-hidden="true"></i><div><b>Confirmed green</b><code>#5EC99A</code><span>Successful states and a live connection.</span></div></div>
+          </div>
+          <div class="board-demo" aria-label="Colour board in use">
+            <span class="demo-label">In use</span>
+            <span class="demo-btn">Import flight plan</span>
+            <span class="demo-route" aria-hidden="true"><i></i>Route</span>
+            <svg class="demo-wp" viewBox="0 0 40 40" aria-label="Selected waypoint" role="img">
+              <circle cx="20" cy="20" r="15" fill="rgba(167,139,250,.16)" stroke="#a78bfa" stroke-width="2"/>
+              <circle cx="20" cy="20" r="19" fill="none" stroke="rgba(216,180,254,.5)" stroke-width="1"/>
+              <path d="M20 9 L27 20 L20 31 L13 20 Z" fill="none" stroke="#a78bfa" stroke-width="2"/>
+              <circle cx="20" cy="20" r="2.4" fill="#a78bfa"/>
+            </svg>
+            <span class="demo-tod" aria-hidden="true">TOD</span>
+            <span class="demo-live" aria-hidden="true"><i></i>Live</span>
+          </div>
+        </div>
       </div>
 
       <div class="section-title"><h2>Simulator bridge</h2><span class="hint">Runs on this PC, not in the cloud</span></div>

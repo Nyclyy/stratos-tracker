@@ -230,7 +230,7 @@ table td,table th { border-color:rgba(145,168,177,.18); }
   --ui2:#132132;
   --mut:#8b9db3;
   --trf:#9dc0e0;
-  --acc:#4d9fe8;
+  --acc:#38bdf8;
   --red:#df827a;
   --grn:#5ec99a;
   --warn:#e7b36c;
@@ -253,7 +253,7 @@ table td,table th { border-color:rgba(145,168,177,.18); }
   --bg:#0a1421; --land:#101d2b; --coast:#2c3f55; --grid:rgba(150,180,215,.12);
   --ap:#e7b36c; --nav:#86bdb1; --route:#e7b36c; --own:#df827a;
   --txt:#e4ecf5; --ui:#0d1927; --ui2:#132132; --mut:#8b9db3;
-  --trf:#9dc0e0; --acc:#4d9fe8; --red:#df827a; --grn:#5ec99a;
+  --trf:#9dc0e0; --acc:#38bdf8; --red:#df827a; --grn:#5ec99a;
   --warn:#e7b36c; --mag:#9fb0d8; --line:rgba(140,170,205,.16); --focus:#e7b36c;
   color-scheme:dark;
 }

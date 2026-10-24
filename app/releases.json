@@ -3,65 +3,78 @@
   "product": "stratos",
   "source": "https://github.com/Nyclyy/stratos-tracker",
   "latest": {
-    "version": "2.1.21",
+    "version": "2.1.22",
     "releasedAt": "2026-10-24",
     "severity": "normal",
-    "summary": "A phone finds the simulator in one tap, its map shows nearby traffic with the paths Stratos actually recorded, and TOC, TOD and SID/STAR follow the planned route.",
+    "summary": "A calmer, more professional Stratos: five destinations on every page, a real flight-plan card in place of the pencil, and SimBrief SID and STAR that finally import.",
     "changelog": {
       "features": [
-        "One tap connects a phone: it finds the PC on the network, pairs itself and reconnects after a Wi-Fi change or a bridge restart. No QR code and no address to type; networks that block multicast keep the relay.",
-        "The phone's live map shows nearby aircraft, from VATSIM and from the traffic the bridge already polls, behind a Traffic layer button. Tap one for its altitude, speed, heading, distance and its recorded path.",
-        "A clicked aircraft's trail is the path Stratos recorded, kept for 45 minutes in the bridge's store: it survives a reload and matches on the PC and the phone, and a relayed phone gets it too.",
-        "The flown path is drawn as a trajectory coloured by height above ground, white on the ground through blue, green, yellow and orange to magenta at the flight levels, for your own aircraft and for any traffic you select.",
-        "SID and STAR paths follow the published legs from the runway to the procedure's last fix, from the simulator's CIFP data or the bundled FAA dataset, adding only the legs the plan does not draw.",
-        "TOC and TOD are placed on the planned route itself, calculated from the cruise level, the climb and descent profile and the constraints available, and they move when the cruise level or route changes."
+        "Five top-level destinations on every page — Flight Deck, Flight Planning, Logbook, Explore and Profile — with Live, Charts, Weather and the data pack one tap away in the map's tools menu.",
+        "The flight-plan card replaces the pencil control: callsign, aircraft, departure and arrival, SID and STAR with their planned runways, cruise, distance and time.",
+        "It expands in place for route, alternate, weather, weights, fuel, passengers, cargo and live progress, and remembers whether it is open.",
+        "Explore gathers Weather, Airports, Charts, Statistics and Live in one hub, linked from its own strip on the Explore page.",
+        "Settings documents the palette on an aviation colour board: cyan, violet, amber, white, charcoal, grey, red and green, each with its HEX and its job, beside real controls and map symbols.",
+        "SimBrief SID and STAR now import from the fields SimBrief actually writes, including plans with Detailed Navlog off, and a shortened ident is restored to the full published name when the plan's IFPS route confirms it."
       ],
       "improvements": [
-        "Waypoint markers are separated by meaning, SID, STAR, VOR, en-route fix, airport, TOC and TOD, and a selected point turns purple with a heavier ring on both mouse and touch.",
-        "The aircraft card detects a registration when the feed does not report one, shows a verified photo for it, and collapses to a strip keeping SID and STAR with the departure and arrival runways beneath.",
-        "A trail states how many positions it holds and where they came from, and the phone names the bridge or the relay.",
-        "Procedure data is cached, traffic polling stops while its layer is hidden, and a phone on the relay reuses the desktop's traffic list instead of fetching a second feed."
+        "The card keeps the SID above its departure runway and the STAR above its arrival runway, even while the rest of it is minimized.",
+        "The map rail and every page bar share one navigation list, with labels and tooltips shortened to match.",
+        "The flight summary prints ICAO codes instead of airport objects, and a detected callsign takes precedence over the plan's."
       ],
       "fixes": [
-        "TOC and TOD no longer appear at an arbitrary point: they are interpolated along the ordered route legs and kept inside the segment they belong to.",
-        "A no-position sample, a duplicate or an out-of-order one can no longer bend a traffic trail.",
-        "The phone's status line reports Connecting, Connected, Reconnecting and Disconnected from the actual socket instead of staying on its last label."
+        "A SimBrief plan no longer imports with no SID or STAR: they are read from `general`, where SimBrief writes them.",
+        "A plan without navlog fixes still imports its SID, STAR and runways and keeps the current route, instead of failing the whole import.",
+        "The weather search no longer pushes its Search button off a phone screen, and the toolbar no longer overflows at 390 px.",
+        "The Live page marks Explore as its section instead of leaving the bottom bar with no current item."
       ],
-      "performance": [
-        "The bridge posts only the trail samples the relay has not seen, at most 400 points every 15 seconds, and stops when the simulator is idle."
-      ],
+      "performance": [],
       "ui": [
-        "Traffic is drawn as small heading glyphs with the selected aircraft painted last, so a neighbour cannot cover it."
+        "Selected waypoints and the night accent now use the exact violet and cyan the colour board documents.",
+        "The flight-plan card uses the shell's panel styling, with a compact summary line and a single control to expand or minimize it."
       ],
       "compatibility": [
-        "The relay gained /api/traffic. An older relay answers 404 and a hosted phone falls back to VATSIM traffic with no relay trails; desktop builds before this version cannot post traffic to it."
+        "No storage format change: a plan stored by 2.1.21 gains its SID and STAR from its own route text the next time it is opened."
       ],
       "other": []
-    },
-    "downloads": {
-      "windows": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.21/Stratos-Setup.exe",
-        "sha256": "87c95fcfca46a008964324e53056753de472939e7a70ed8d96d6efd496424d16",
-        "size": 105650818
-      },
-      "mac-arm64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.21/Stratos-2.1.21-mac-arm64.dmg",
-        "sha256": "611d32b3a9efb6500d235318b6db11bbd5acd0ef7eaa4238ae29239f7ed95dc2",
-        "size": 121382971
-      },
-      "mac-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.21/Stratos-2.1.21-mac-x64.dmg",
-        "sha256": "6a112d365b7392d14202da588b79ce119c5067928ec96935dc5d53b5203bd0f7",
-        "size": 126712639
-      },
-      "linux-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.21/Stratos-2.1.21-linux-x64.AppImage",
-        "sha256": "146a81b361696d017ff93856224f7d64d5acdfff22383ae26aa5d7e41bc451c1",
-        "size": 142297325
-      }
     }
   },
   "releases": [
+    {
+      "version": "2.1.22",
+      "releasedAt": "2026-10-24",
+      "severity": "normal",
+      "summary": "A calmer, more professional Stratos: five destinations on every page, a real flight-plan card in place of the pencil, and SimBrief SID and STAR that finally import.",
+      "changelog": {
+        "features": [
+          "Five top-level destinations on every page — Flight Deck, Flight Planning, Logbook, Explore and Profile — with Live, Charts, Weather and the data pack one tap away in the map's tools menu.",
+          "The flight-plan card replaces the pencil control: callsign, aircraft, departure and arrival, SID and STAR with their planned runways, cruise, distance and time.",
+          "It expands in place for route, alternate, weather, weights, fuel, passengers, cargo and live progress, and remembers whether it is open.",
+          "Explore gathers Weather, Airports, Charts, Statistics and Live in one hub, linked from its own strip on the Explore page.",
+          "Settings documents the palette on an aviation colour board: cyan, violet, amber, white, charcoal, grey, red and green, each with its HEX and its job, beside real controls and map symbols.",
+          "SimBrief SID and STAR now import from the fields SimBrief actually writes, including plans with Detailed Navlog off, and a shortened ident is restored to the full published name when the plan's IFPS route confirms it."
+        ],
+        "improvements": [
+          "The card keeps the SID above its departure runway and the STAR above its arrival runway, even while the rest of it is minimized.",
+          "The map rail and every page bar share one navigation list, with labels and tooltips shortened to match.",
+          "The flight summary prints ICAO codes instead of airport objects, and a detected callsign takes precedence over the plan's."
+        ],
+        "fixes": [
+          "A SimBrief plan no longer imports with no SID or STAR: they are read from `general`, where SimBrief writes them.",
+          "A plan without navlog fixes still imports its SID, STAR and runways and keeps the current route, instead of failing the whole import.",
+          "The weather search no longer pushes its Search button off a phone screen, and the toolbar no longer overflows at 390 px.",
+          "The Live page marks Explore as its section instead of leaving the bottom bar with no current item."
+        ],
+        "performance": [],
+        "ui": [
+          "Selected waypoints and the night accent now use the exact violet and cyan the colour board documents.",
+          "The flight-plan card uses the shell's panel styling, with a compact summary line and a single control to expand or minimize it."
+        ],
+        "compatibility": [
+          "No storage format change: a plan stored by 2.1.21 gains its SID and STAR from its own route text the next time it is opened."
+        ],
+        "other": []
+      }
+    },
     {
       "version": "2.1.21",
       "releasedAt": "2026-10-24",

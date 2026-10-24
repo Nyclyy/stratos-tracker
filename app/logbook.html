@@ -301,13 +301,12 @@ a { color: var(--acc); }
 </div>
 
 <!-- Bottom nav -->
-<nav id="bottom-nav">
-  <a class="bnav-item" href="index.html"><span class="icon">⊕</span>Map</a>
-  <a class="bnav-item" href="weather.html"><span class="icon">⛅</span>Weather</a>
-  <a class="bnav-item" href="live.html"><span class="icon">◉</span>Live</a>
-  <a class="bnav-item act" href="#overview" onclick="switchTab(document.querySelector('.tab-btn[data-tab=overview]')); return false;"><span class="icon">📋</span>Logbook</a>
-  <a class="bnav-item" href="pilot.html"><span class="icon">◈</span>Pilot</a>
-  <a class="bnav-item" href="#profile" onclick="switchTab(document.querySelector('.tab-btn[data-tab=profile]')); return false;"><span class="icon">✈</span>Profile</a>
+<nav id="bottom-nav" aria-label="Sections">
+  <a class="bnav-item" href="index.html"><span class="icon">⊕</span>Deck</a>
+  <a class="bnav-item" href="index.html#plan"><span class="icon">↗</span>Plan</a>
+  <a class="bnav-item act" href="#overview" onclick="switchTab(document.querySelector('.tab-btn[data-tab=overview]')); return false;"><span class="icon">📋</span>Log</a>
+  <a class="bnav-item" href="discover.html"><span class="icon">✦</span>Explore</a>
+  <a class="bnav-item" href="pilot.html#settings"><span class="icon">◈</span>Profile</a>
 </nav>
 
 </div>

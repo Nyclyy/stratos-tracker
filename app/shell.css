@@ -111,8 +111,25 @@
 /* ── Compact screens ─────────────────────────────────────────────── */
 @media (max-width: 767px) {
   .app-shell { --shell-bar: 48px; }
-  .tb { gap: 8px; padding: 0 10px; }
-  .tb-nav { display: none; }
+  /* Pages without a rail put the five destinations on their own row inside
+     the bar, so the phone keeps the same navigation as the desktop. */
+  .tb { gap: 8px; padding: 0 10px; height: auto; min-height: var(--shell-bar); flex-wrap: wrap; row-gap: 2px; }
+  .tb-nav {
+    order: 20; width: 100%; margin: 0 -10px; padding: 4px 10px 6px;
+    display: flex; justify-content: space-between; gap: 0;
+    overflow-x: auto; scrollbar-width: none;
+    border-top: 1px solid var(--shell-line);
+  }
+  .tb-nav::-webkit-scrollbar { display: none; }
+  /* Five short labels fit the phone width without a sideways scroll. */
+  /* Equal columns, so all five fit; a two-word destination wraps instead of
+     scrolling the row sideways. */
+  .tb-nav a { flex: 1 1 0; min-width: 0; padding: 4px 1px; text-align: center; white-space: normal; line-height: 1.15; font-size: 10px; letter-spacing: 0; border-radius: 5px; }
+  /* An empty search slot and the flex gap only push the actions onto another row. */
+  .tb-search:empty, .tb-gap { display: none; }
+  /* Where the five links are in the bar, the mark is enough identity: the
+     wordmark is what pushes the action cluster onto a second row. */
+  .tb:has(.tb-nav) .tb-brand .tb-name { display: none; }
   .tb-brand small { font-size: 9.5px; letter-spacing: .04em; max-width: 16ch; }
   .tb-status .status span { display: none; }
   .tb-status .status { padding: 0 9px; }
@@ -182,8 +199,8 @@
   --shell-ink: #e7eef7;
   --shell-mute: #8397ac;
   --shell-faint: #61748a;
-  --shell-accent: #4d9fe8;
-  --shell-accent-soft: rgba(77, 159, 232, .12);
+  --shell-accent: #38bdf8;
+  --shell-accent-soft: rgba(56, 189, 248, .12);
   --shell-good: #3ecf8e;
   --shell-warn: #e9c05e;
   --shell-font: "Bahnschrift", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
@@ -571,6 +588,10 @@
   .rail-tip { display: none; }
   .tb-actions a[href*="settings"] { display: none; }
   #appbar #sb { width: 100%; padding: 0 10px; }
+  /* The bottom rail is the only navigation on a phone, so its labels must
+     stay visible even though the desktop rail opens collapsed. */
+  .app-shell[data-collapsed="1"] #tabs .tab span { display: block; }
+  #tabs .tab span { font-size: 10px; letter-spacing: .01em; }
   /* The bottom rail scrolls inside its own strip instead of widening the page. */
   #tabs { overflow-x: auto; overflow-y: hidden; }
   /* Map controls clear of the card and the bottom rail, not behind either. */

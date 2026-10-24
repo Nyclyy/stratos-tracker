@@ -60,12 +60,34 @@ function iconFor(item) {
 
 const PAGE_TITLE = {
   home: 'Flight Deck',
-  discover: 'Route Discovery',
-  logbook: 'Flight Logbook',
+  discover: 'Explore',
+  logbook: 'Logbook',
   weather: 'Weather',
   live: 'Live Tracking',
-  stats: 'Pilot Dashboard',
+  stats: 'Profile',
 };
+
+/**
+ * The five destinations. Every page shows the same five, in the same order:
+ * the sidebar rail on the Flight Deck, the bar on the pages that have no rail.
+ * Anything that used to have its own tab lives one step inside Flight Deck
+ * (the map's tools) or Explore (weather, airports, charts, statistics).
+ */
+const NAV = [
+  { href: 'index.html', label: 'Flight Deck', page: 'home' },
+  { href: 'index.html#plan', label: 'Flight Planning', page: 'plan' },
+  { href: 'logbook.html', label: 'Logbook', page: 'logbook' },
+  { href: 'discover.html', label: 'Explore', page: 'explore' },
+  { href: 'pilot.html#settings', label: 'Profile', page: 'profile' },
+];
+
+/** Which of the five a page belongs to, for the bar's current-page marker. */
+function navPage(page) {
+  if (page === 'discover') return 'explore';
+  if (page === 'logbook') return 'logbook';
+  if (page === 'stats' || page === 'checklists') return 'profile';
+  return page;
+}
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
@@ -316,13 +338,8 @@ function buildBar(bar, { theme = false, rail = false, search = null, status = nu
       <span class="tb-name">STRATOS<small class="tb-state" data-brand-state>${status ? '' : esc(context ? `${title} · ${context}` : title)}</small></span>
     </a>
     <div class="tb-search" data-search-slot></div>
-    ${rail ? "" : `<nav class="tb-nav" aria-label="Pages">
-      <a href="index.html" data-page="home">Flight Deck</a>
-      <a href="discover.html" data-page="discover">Discover</a>
-      <a href="logbook.html" data-page="logbook">Logbook</a>
-      <a href="weather.html" data-page="weather">Weather</a>
-      <a href="live.html" data-page="live">Live</a>
-      <a href="pilot.html#checklists" data-page="checklists">Checklists</a>
+    ${rail ? "" : `<nav class="tb-nav" aria-label="Sections">
+      ${NAV.map(item => `<a href="${item.href}" data-page="${item.page}">${esc(item.label)}</a>`).join('')}
     </nav>`}
     <span class="tb-gap"></span>
     ${status ? '' : `<div class="tb-status" data-status-host>
@@ -359,7 +376,7 @@ function buildBar(bar, { theme = false, rail = false, search = null, status = nu
   if (state && status) state.appendChild(status);
 
   bar.querySelectorAll('.tb-nav a').forEach(link => {
-    if (link.dataset.page === S.page) link.setAttribute('aria-current', 'page');
+    if (link.dataset.page === navPage(S.page)) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
 

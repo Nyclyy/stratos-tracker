@@ -84,6 +84,66 @@ export function runwayHeading(designator) {
   return n * 10;
 }
 
+/* ── SID and STAR from SimBrief ───────────────────────────────────────
+   SimBrief names the filed procedures in `general.sid_ident` and
+   `general.star_ident`, not in the airport blocks, so those are read first and
+   the older `origin.sid_ident` / `destination.star_ident` fields are kept as a
+   fallback. SimBrief is known to shorten procedure idents by one character in
+   the OFP text (OBOKA4G becomes OBOK4G, LITKU2X becomes LITK2X); the same plan
+   carries the full ident at the start and end of `general.route_ifps`, and the
+   full name is restored from it only when removing exactly one character
+   rebuilds the filed name. Nothing is guessed: a name is used only when the
+   plan itself states it. */
+
+// A procedure ident at the end of a written route: at least four letters and a
+// version digit (LITKU2X, LOGDA6N, SUMMA2). An airway (Y301, UL984) or a plain
+// fix (KALIF) cannot match, so neither is ever mistaken for a procedure.
+const PROCEDURE_IDENT = /^[A-Z]{4,}[A-Z0-9]*\d[A-Z0-9]*$/;
+
+/** The procedure idents written at the start and end of a filed route. */
+export function routeProcedures(routeText) {
+  const tokens = String(routeText || '').toUpperCase().split(/\s+/)
+    .filter(token => token && !token.includes('/'));
+  const usable = token => Boolean(token) && token !== 'DCT' && PROCEDURE_IDENT.test(token);
+  const first = tokens.find(token => token !== 'DCT') || null;
+  let last = null;
+  for (let i = tokens.length - 1; i >= 0; i -= 1) {
+    if (tokens[i] !== 'DCT') { last = tokens[i]; break; }
+  }
+  return {
+    sid: usable(first) ? first : null,
+    star: usable(last) && last !== first ? last : null,
+  };
+}
+
+/** The full ident SimBrief shortened, only when one removed character restores it. */
+function restoredIdent(full, stated) {
+  if (!full || !stated || full === stated) return null;
+  if (full.length !== stated.length + 1) return null;
+  for (let i = 0; i < full.length; i += 1) {
+    if (full.slice(0, i) + full.slice(i + 1) === stated) return full;
+  }
+  return null;
+}
+
+/**
+ * The SID, STAR and transitions a plan states, from its own fields and route.
+ * `ofp` is the normalised shape so an already-stored plan is handled as well.
+ */
+export function planProcedures(ofp) {
+  const flight = (ofp && ofp.flight) || {};
+  const origin = (ofp && ofp.origin) || {};
+  const destination = (ofp && ofp.destination) || {};
+  const ifps = routeProcedures(flight.routeIfps);
+  const written = routeProcedures(flight.routeText);
+  return {
+    sid: restoredIdent(ifps.sid, origin.sid) || restoredIdent(written.sid, origin.sid) || origin.sid || ifps.sid || written.sid || null,
+    star: restoredIdent(ifps.star, destination.star) || restoredIdent(written.star, destination.star) || destination.star || ifps.star || written.star || null,
+    sidTrans: origin.sidTrans || null,
+    starTrans: destination.starTrans || null,
+  };
+}
+
 /**
  * Normalise a raw SimBrief OFP (the json=v2 response) into a compact, JSON-safe
  * record. Missing fields come back null; nothing is derived to fill them.
@@ -104,7 +164,7 @@ export function parseOfp(json, fetchedAt = Date.now()) {
   const airline = upper(general.icao_airline);
   const flightNumber = str(general.flight_number);
 
-  return {
+  const ofp = {
     fetchedAt,
     units,
     flight: {
@@ -115,21 +175,24 @@ export function parseOfp(json, fetchedAt = Date.now()) {
       cruiseMach: str(general.cruise_mach),
       cruiseTasKt: firstNum(general.cruise_tas),
       costIndex: firstNum(general.costindex),
+      // Both written routes are kept: the plain one names the procedures as
+      // SimBrief prints them, the IFPS one usually carries the full ident.
       routeText: str(general.route),
+      routeIfps: str(general.route_ifps),
     },
     origin: {
       icao: upper(origin.icao_code),
       name: str(origin.name),
       rwy: upper(origin.plan_rwy),
-      sid: upper(origin.sid_ident),
-      sidTrans: upper(origin.sid_trans),
+      sid: upper(general.sid_ident || origin.sid_ident),
+      sidTrans: upper(general.sid_trans || origin.sid_trans),
     },
     destination: {
       icao: upper(dest.icao_code),
       name: str(dest.name),
       rwy: upper(dest.plan_rwy),
-      star: upper(dest.star_ident),
-      starTrans: upper(dest.star_trans),
+      star: upper(general.star_ident || dest.star_ident),
+      starTrans: upper(general.star_trans || dest.star_trans),
       approach: upper(dest.approach_ident),
       approachRwy: upper(dest.approach_rwy),
     },
@@ -168,6 +231,8 @@ export function parseOfp(json, fetchedAt = Date.now()) {
       lw: firstNum(weights.est_ldw),
       mlw: firstNum(weights.max_ldw),
       cg: str(weights.cg),
+      pax: firstNum(weights.pax_count),
+      cargo: firstNum(weights.cargo),
     },
     fixes: navFixes.map(fix => ({
       ident: upper(fix.ident) || 'WPT',
@@ -177,6 +242,15 @@ export function parseOfp(json, fetchedAt = Date.now()) {
       altFt: num(fix.altitude_feet),
     })),
   };
+  // The procedures are taken from the plan's own fields and route, including a
+  // full ident that SimBrief shortened, so the card and the procedure lookups
+  // use the name the navigation data actually publishes.
+  const procedures = planProcedures(ofp);
+  ofp.origin.sid = procedures.sid;
+  ofp.origin.sidTrans = procedures.sidTrans;
+  ofp.destination.star = procedures.star;
+  ofp.destination.starTrans = procedures.starTrans;
+  return ofp;
 }
 
 /** Save the parsed OFP (not the raw response) with the SimBrief id that produced it. */
@@ -198,7 +272,14 @@ export function loadOfp(storage) {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || !parsed.ofp || typeof parsed.ofp !== 'object') return null;
-    return { simbriefId: str(parsed.simbriefId), ofp: parsed.ofp };
+    // A plan stored before the procedures were read from `general` still names
+    // them in its route text, so the card and the map get them without a
+    // re-import. The stored record is left untouched.
+    const ofp = parsed.ofp;
+    const procedures = planProcedures(ofp);
+    ofp.origin = { ...(ofp.origin || {}), sid: procedures.sid, sidTrans: procedures.sidTrans };
+    ofp.destination = { ...(ofp.destination || {}), star: procedures.star, starTrans: procedures.starTrans };
+    return { simbriefId: str(parsed.simbriefId), ofp };
   } catch (_) {
     return null;
   }
@@ -329,7 +410,7 @@ export function buildSummary(input = {}) {
   const overview = [
     row('departure', 'Departure', airportLabel(originIcao, originName), originIcao ? planSource : null, { icao: originIcao }),
     row('destination', 'Destination', airportLabel(destIcao, destName), destIcao ? planSource : null, { icao: destIcao }),
-    row('alternate', 'Alternate', useOfp ? airportLabel(ofp.alternate.icao, ofp.alternate.name) : null, 'ofp', { icao: useOfp ? ofp.alternate.icao : null }),
+    row('alternate', 'Alternate', useOfp && ofp.alternate ? airportLabel(ofp.alternate.icao, ofp.alternate.name) : null, 'ofp', { icao: useOfp && ofp.alternate ? ofp.alternate.icao : null }),
     row('aircraft', 'Aircraft', useOfp ? [ofp.aircraft.icao, ofp.aircraft.variant || ofp.aircraft.name].filter(Boolean).join(' · ') || null : null, 'ofp'),
     row('callsign', 'Callsign', useOfp ? ofp.flight.callsign : null, 'ofp'),
     row('distance', 'Distance', distanceNm != null ? `${Math.round(distanceNm).toLocaleString('en-US')} nm` : null, distanceNm != null ? planSource : null),
@@ -378,6 +459,8 @@ export function buildSummary(input = {}) {
       weightRow('tow', 'Takeoff weight (TOW)', w.tow, w.mtow, ofpUnit, unit),
       weightRow('lw', 'Landing weight (LW)', w.lw, w.mlw, ofpUnit, unit),
     );
+    if (w.pax != null) weights.push({ key: 'pax', label: 'Passengers', value: w.pax, text: String(Math.round(w.pax)), limit: null, limitText: null, over: false, source: 'ofp' });
+    if (w.cargo != null) weights.push(weightRow('cargo', 'Cargo', w.cargo, null, ofpUnit, unit));
     if (w.cg) weights.push({ key: 'cg', label: 'Centre of gravity', value: null, text: w.cg, limit: null, limitText: null, over: false, source: 'ofp' });
   }
 
@@ -401,7 +484,7 @@ export function buildSummary(input = {}) {
     }
   }
 
-  const weather = buildWeather({ originIcao, destIcao, altIcao: useOfp ? ofp.alternate.icao : null, arrivalRwy: arrivalRwy || approachRwy, departureRwy, points, metars: input.metars || {}, now });
+  const weather = buildWeather({ originIcao, destIcao, altIcao: useOfp && ofp.alternate ? ofp.alternate.icao : null, arrivalRwy: arrivalRwy || approachRwy, departureRwy, points, metars: input.metars || {}, now });
 
   const notes = [];
   if (!ofp) notes.push('No SimBrief flight plan loaded. Weights, fuel and procedures are not available until you import one.');

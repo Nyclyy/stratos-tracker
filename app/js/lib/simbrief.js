@@ -81,7 +81,13 @@ export async function fetchSimbriefPlan(entered) {
     const xmlResponse = await fetch(`${SIMBRIEF_URL}?${query}`);
     if (xmlResponse.ok) fixes = xmlFixes(await xmlResponse.text());
   }
-  if (!fixes.length) {
+  // SimBrief publishes navlog fixes only when Detailed Navlog is enabled, but
+  // the plan still names its SID, STAR, runways and filed route. A response
+  // with no fixes is usable when it identifies the flight; one with neither is
+  // an error, never an empty import.
+  const ofp = parseOfp(data);
+  const usablePlan = Boolean(ofp && ((ofp.origin && (ofp.origin.icao || ofp.origin.sid)) || (ofp.destination && (ofp.destination.icao || ofp.destination.star))));
+  if (!fixes.length && !usablePlan) {
     const status = data && data.fetch && data.fetch.status ? ` SimBrief said: ${data.fetch.status}.` : '';
     throw new Error(`No waypoints found in the SimBrief plan.${status} Response fields: ${Object.keys(data || {}).join(', ') || 'none'}.`);
   }
@@ -93,6 +99,6 @@ export async function fetchSimbriefPlan(entered) {
     // The stored plan is what names the SID, the STAR and the planned runways.
     // Keeping it as the same normalised record the Flight Deck uses means the
     // tracking card shows the procedures the pilot actually filed, not a guess.
-    ofp: parseOfp(data),
+    ofp,
   };
 }

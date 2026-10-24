@@ -1,4 +1,37 @@
 {
+  "2.1.22": {
+    "summary": "A calmer, more professional Stratos: five destinations on every page, a real flight-plan card in place of the pencil, and SimBrief SID and STAR that finally import.",
+    "changelog": {
+      "features": [
+        "Five top-level destinations on every page — Flight Deck, Flight Planning, Logbook, Explore and Profile — with Live, Charts, Weather and the data pack one tap away in the map's tools menu.",
+        "The flight-plan card replaces the pencil control: callsign, aircraft, departure and arrival, SID and STAR with their planned runways, cruise, distance and time.",
+        "It expands in place for route, alternate, weather, weights, fuel, passengers, cargo and live progress, and remembers whether it is open.",
+        "Explore gathers Weather, Airports, Charts, Statistics and Live in one hub, linked from its own strip on the Explore page.",
+        "Settings documents the palette on an aviation colour board: cyan, violet, amber, white, charcoal, grey, red and green, each with its HEX and its job, beside real controls and map symbols.",
+        "SimBrief SID and STAR now import from the fields SimBrief actually writes, including plans with Detailed Navlog off, and a shortened ident is restored to the full published name when the plan's IFPS route confirms it."
+      ],
+      "improvements": [
+        "The card keeps the SID above its departure runway and the STAR above its arrival runway, even while the rest of it is minimized.",
+        "The map rail and every page bar share one navigation list, with labels and tooltips shortened to match.",
+        "The flight summary prints ICAO codes instead of airport objects, and a detected callsign takes precedence over the plan's."
+      ],
+      "fixes": [
+        "A SimBrief plan no longer imports with no SID or STAR: they are read from `general`, where SimBrief writes them.",
+        "A plan without navlog fixes still imports its SID, STAR and runways and keeps the current route, instead of failing the whole import.",
+        "The weather search no longer pushes its Search button off a phone screen, and the toolbar no longer overflows at 390 px.",
+        "The Live page marks Explore as its section instead of leaving the bottom bar with no current item."
+      ],
+      "performance": [],
+      "ui": [
+        "Selected waypoints and the night accent now use the exact violet and cyan the colour board documents.",
+        "The flight-plan card uses the shell's panel styling, with a compact summary line and a single control to expand or minimize it."
+      ],
+      "compatibility": [
+        "No storage format change: a plan stored by 2.1.21 gains its SID and STAR from its own route text the next time it is opened."
+      ],
+      "other": []
+    }
+  },
   "2.1.21": {
     "summary": "A phone finds the simulator in one tap, its map shows nearby traffic with the paths Stratos actually recorded, and TOC, TOD and SID/STAR follow the planned route.",
     "changelog": {

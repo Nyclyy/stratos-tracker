@@ -50,15 +50,24 @@ export function timingStatus(scheduled, estimated) {
  */
 export function overviewHeader({ ofp = null, flight = {}, route = [] } = {}) {
   const general = (ofp && ofp.general) || {};
-  const callsign = flight.callsign || general.icao_airline && general.flight_number
-    ? `${general.icao_airline || ''}${general.flight_number || ''}`.trim()
+  // A detected callsign wins over the plan's; the plan's is used only when the
+  // airline and flight number are both present, so no half callsign is printed.
+  const planCallsign = general.icao_airline && general.flight_number
+    ? `${general.icao_airline}${general.flight_number}`.trim()
     : '';
-  const dep = (ofp && ofp.origin) || (route[0] && route[0].id) || null;
-  const arr = (ofp && ofp.destination) || (route.length ? route[route.length - 1].id : null) || null;
-  const scheduledOut = ofp && ofp.times ? ofp.times.scheduledOut : null;
-  const estimatedOut = ofp && ofp.times ? ofp.times.estimatedOut : null;
-  const scheduledIn = ofp && ofp.times ? ofp.times.scheduledIn : null;
-  const estimatedIn = ofp && ofp.times ? ofp.times.estimatedIn : null;
+  const callsign = flight.callsign || planCallsign;
+  // The normalised plan stores airports as objects; a caller may hand in a
+  // plain id. Either way the header prints an ICAO, never "[object Object]".
+  const icao = value => (typeof value === 'string' ? value : value && value.icao ? value.icao : null);
+  const dep = icao(ofp && ofp.origin) || (route[0] && route[0].id) || null;
+  const arr = icao(ofp && ofp.destination) || (route.length ? route[route.length - 1].id : null) || null;
+  // The normalised plan carries depUtc/arrUtc; a raw SimBrief payload carries
+  // the scheduled/estimated pair. Whichever exists is used, and nothing is invented.
+  const times = (ofp && ofp.times) || {};
+  const scheduledOut = times.scheduledOut ?? times.depUtc ?? null;
+  const estimatedOut = times.estimatedOut ?? null;
+  const scheduledIn = times.scheduledIn ?? times.arrUtc ?? null;
+  const estimatedIn = times.estimatedIn ?? null;
   const alternate = ofp && ofp.alternate && ofp.alternate.icao ? ofp.alternate : null;
   return {
     alternate: alternate ? { icao: text(alternate.icao), name: text(alternate.name) } : null,

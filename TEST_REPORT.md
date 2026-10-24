@@ -2,6 +2,44 @@
 
 Date: 2026-10-19. Environment: Linux x64 cloud VM, Node v24.21.0, Python 3 (FreeStyle build), Chromium 156 via Playwright (headless, software rasterisation, private library prefix). No simulator, iPhone, Windows host or Vercel account was available.
 
+## 2026-10-24 — SimBrief SID and STAR import (Windows 11 x64)
+
+The real `json=v2` payload for the saved plan (WZZ2469, LHBP→EPWA, Pilot ID 1049175) was fetched in the preview browser. It showed three things the importer assumed otherwise: the procedures live in `general.sid_ident` / `general.star_ident` (the airport blocks carry none), each ident is shortened by one character in the OFP text (`LITK2X` for `LITKU2X`, `LOGD6N` for `LOGDA6N`), and a plan with Detailed Navlog off returns no navlog fixes at all.
+
+| Check | Method | Result |
+| --- | --- | --- |
+| SID and STAR are read | `parseOfp` against the live payload | pass — `LITKU2X` and `LOGDA6N`, with departure runway 31L and arrival runway 11 |
+| The shortened ident is restored | live payload's `general.route_ifps` | pass — only when removing exactly one character rebuilds the filed name; a different procedure is never substituted |
+| The Flight Deck card shows them | stored plan in Chromium | pass — SID `LITKU2X` / RWY 31L and STAR `LOGDA6N` / RWY 11, including a plan stored before the fix (derived from its own route text) |
+| A plan without navlog fixes still imports its procedures | `fetchSimbriefPlan` with `navlog.fix: []` | pass — fixes stay empty, the OFP (SID, STAR, runways) is returned and saved, and the current route is kept with a clear message |
+| Nothing is invented | airway/fix-only routes | pass — `Y301`, `UL984`, `KALIF` and `DCT` are never read as a procedure |
+| Suites | `npm test` | 295 JavaScript tests pass |
+
+Limitations: the bridge was not running, so the imported SID/STAR were not rendered as procedure geometry in this pass; the procedure lookups now receive the full idents.
+
+## 2026-10-24 — five-tab shell, flight-plan card and colour board (Windows 11 x64)
+
+Environment: Windows 11 x64, the project's `npm run dev` server on 127.0.0.1:8123, Chromium in the preview panel at 1280×820 and 390×844, a stored KSEA→KPDX route and a stored SimBrief-shaped OFP (CYUL→CYYZ, A321, SID BMO/24L, STAR VERDO/05) built in the page to exercise the expanded card. No simulator and no bridge were running, so weather stayed honestly missing.
+
+| Check | Method | Result |
+| --- | --- | --- |
+| Five destinations, never more | rail inspected at 1280 and 390 | pass — Flight Deck, Flight Planning, Logbook, Explore, Profile; active state moves between the two in-page tabs and the three links |
+| Every former tab still reachable | map tools menu and Explore inspected | pass — Live, Charts, Weather and Data live in the Layers menu; Weather, Airports, Charts, Statistics and Live are linked from Explore |
+| Same five on pages without a rail | pilot.html and discover.html at 390 | pass — the bar puts the five on a second row (92 px), no sideways scroll, Profile marked current on the pilot page |
+| Same five in the legacy bottom bars | logbook, weather and live at 390 | pass — five items each; the weather search no longer overflows after the input got `min-width:0` |
+| The pencil control is gone | source and DOM | pass — `#bPlan` removed, Plan mode is a control in the route sheet and the card has Build a route |
+| Empty card | route and OFP cleared | pass — "Import flight plan" prompt, primary Import Flight Plan button, Build a route beside it, above the tab bar and clear of the controls |
+| Loaded card | stored plan, expanded | pass — ASA123/B738, KSEA→KPDX, SID SUMMA2 with RWY 16L, STAR HELNS6 with RWY 28R, FL350, 124 nm, 0:59 |
+| Rich card | built OFP with alternate, weights, pax, cargo and fuel | pass — CYUL→CYYZ, BMO/24L, VERDO/05, FL360, 280 nm, 2:04, alternate CYOW, ZFW 63,000 kg, TOW 75,000 kg, LW 68,000 kg, 168 passengers, 3,000 kg cargo, block 12,000 kg, landing 2,500 kg |
+| Missing data is not invented | no bridge and no METAR route | pass — "No live METAR yet", an OFP without weights says to refresh it, a plan without a runway says "runway not in plan" |
+| The old flight summary still renders | Flight summary action | **failed, fixed** — the header printed `[object Object] → [object Object]` because `overviewHeader` printed the plan's airport object; it now prints the ICAO for both object and string endpoints (`tests/overview.test.mjs`) |
+| Colour board | Settings in Chromium | pass — eight swatches with HEX and jobs, the chips compute to those exact colours, the demo button uses `#38BDF8` on `#092127`, no page overflow at 390 |
+| Colour tokens are the live ones | source | pass — night `--acc`, the rail accent and the marker selection colour now all carry the board's values |
+| Reduced motion | source | pass — every entrance animation is inside `prefers-reduced-motion: no-preference` |
+| Suites | `npm test`, `npm run test:py` | 289 JavaScript and 69 Python tests pass |
+
+Limitations: the bridge was not running, so the card's auto-fetched METARs, live progress and the phone handshake were verified only as honest missing states in this pass (they were exercised against the real bridge earlier); the card's weather freshness is marked after 90 minutes, and the stored OFP used in the rich-card check was local test data, not a live SimBrief response.
+
 ## 2026-10-23 — hosted phone: the desktop's traffic through the relay (Windows 11 x64)
 
 Environment: Windows 11 x64, the real bridge on 8765, `relay/server.mjs` 1.1.0 on loopback 8787, the dev server on 8123 standing in for `https://www.stratos-tracker.com/app/` (same app, relay-paired phone, no bridge reachable), the local test feed and the live VATSIM feed.

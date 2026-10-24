@@ -60,7 +60,9 @@ a:hover { text-decoration: underline; }
   padding: 12px 14px; display: flex; gap: 8px; align-items: center;
 }
 #icao-input {
-  flex: 1; background: var(--land); border: 1px solid var(--coast);
+  /* Without this the long placeholder sets the input's intrinsic width and
+     pushes the Search button off a phone screen. */
+  flex: 1; min-width: 0; background: var(--land); border: 1px solid var(--coast);
   border-radius: 10px; color: var(--txt); font: inherit; font-size: 16px;
   padding: 10px 14px; outline: none; text-transform: uppercase;
   letter-spacing: .06em;
@@ -73,6 +75,10 @@ a:hover { text-decoration: underline; }
   cursor: pointer; white-space: nowrap;
 }
 #search-btn:hover { filter: brightness(1.1); }
+@media (max-width: 480px) {
+  #search-wrap { padding: 10px; gap: 6px; }
+  #search-btn { padding: 10px 12px; font-size: 13px; }
+}
 #recent-strip {
   display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 14px;
   background: var(--ui2); border-bottom: 1px solid var(--coast);
@@ -339,11 +345,12 @@ html[data-embed="1"] #recent-strip { width:100%; }
 </div><!-- /main -->
 
 <!-- Bottom nav -->
-<nav id="bottom-nav">
-  <a class="bnav-item" href="index.html"><span class="icon">⊕</span>Map</a>
-  <a class="bnav-item act" href="weather.html"><span class="icon">⛅</span>Weather</a>
-  <a class="bnav-item" href="logbook.html"><span class="icon">📋</span>Logbook</a>
-  <a class="bnav-item" href="logbook.html#profile"><span class="icon">✈</span>Profile</a>
+<nav id="bottom-nav" aria-label="Sections">
+  <a class="bnav-item" href="index.html"><span class="icon">⊕</span>Deck</a>
+  <a class="bnav-item" href="index.html#plan"><span class="icon">↗</span>Plan</a>
+  <a class="bnav-item" href="logbook.html"><span class="icon">📋</span>Log</a>
+  <a class="bnav-item act" href="discover.html"><span class="icon">✦</span>Explore</a>
+  <a class="bnav-item" href="pilot.html#settings"><span class="icon">◈</span>Profile</a>
 </nav>
 
 </div><!-- /app -->

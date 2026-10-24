@@ -462,12 +462,19 @@ test('the home sidebar is a real rail that collapses and remembers the choice', 
     assert.ok(rail.closest('.app-shell'), 'the rail lives in the shell, not inside the map');
     assert.equal(document.querySelector('#app #tabs'), null, 'the map no longer owns the navigation');
     const items = [...rail.querySelectorAll('.tab')].filter(item => !item.classList.contains('rail-toggle'));
-    assert.equal(items.length, 11, 'eleven destinations in the sidebar');
+    assert.equal(items.length, 5, 'five top-level destinations, never more');
     const hrefs = [...rail.querySelectorAll('a.tab')].map(a => a.getAttribute('href'));
-    assert.deepEqual(hrefs, ['discover.html', 'logbook.html', 'pilot.html#airports', 'pilot.html#career', 'pilot.html#settings']);
-    for (const id of ['bMap', 'bLive', 'bCh', 'bRoute', 'bWx', 'bData']) {
-      assert.ok(document.getElementById(id), `${id} still drives its map panel`);
+    assert.deepEqual(hrefs, ['logbook.html', 'discover.html', 'pilot.html#settings']);
+    for (const id of ['bMap', 'bRoute']) {
+      assert.ok(document.getElementById(id), `${id} is one of the five tabs`);
     }
+    // Features that used to own a tab now live in the map's own tools menu, so
+    // every one of them is still one interaction away.
+    for (const id of ['bLive', 'bCh', 'bWx', 'bData']) {
+      assert.ok(document.getElementById(id), `${id} still drives its map panel`);
+      assert.ok(document.getElementById(id).closest('#lay'), `${id} lives in the map tools menu`);
+    }
+    assert.equal(document.getElementById('bPlan'), null, 'the pencil-circle control is gone');
     // The Flight Deck bar carries the page's own state line rather than two
     // duplicate pills: one honest sentence about the feed it is actually reading.
     assert.equal(document.querySelectorAll('[data-status]').length, 0, 'no duplicate status pills beside the state line');
@@ -522,16 +529,16 @@ test('the icon rail names itself on hover and keyboard focus', async () => {
   try {
     const rail = document.querySelector('#tabs');
     const toggle = rail.querySelector('.rail-toggle');
-    const item = rail.querySelector('.tab[data-label="Flight Logbook"]');
+    const item = rail.querySelector('.tab[data-label="Logbook"]');
     const tip = document.body.querySelector('.rail-tip');
     assert.ok(tip, 'one tooltip serves the icon rail');
-    assert.equal(item.getAttribute('aria-label'), 'Flight Logbook', 'the hidden label stays in the accessible name');
+    assert.equal(item.getAttribute('aria-label'), 'Logbook', 'the hidden label stays in the accessible name');
     assert.equal(item.hasAttribute('title'), false, 'no native title competes with the focus tooltip while collapsed');
 
     // The tooltip follows keyboard focus, not just the mouse.
     item.dispatchEvent(new window.Event('focusin', { bubbles: true }));
     assert.equal(tip.hidden, false, 'focus shows the tooltip');
-    assert.equal(tip.textContent, 'Flight Logbook', 'the tooltip carries the destination name');
+    assert.equal(tip.textContent, 'Logbook', 'the tooltip carries the destination name');
     item.dispatchEvent(new window.Event('focusout', { bubbles: true }));
     assert.equal(tip.hidden, true, 'leaving hides it again');
 
@@ -546,7 +553,7 @@ test('the icon rail names itself on hover and keyboard focus', async () => {
 
     // Expanded rows print their labels, so the native title is enough there.
     toggle.dispatchEvent(new window.Event('click', { bubbles: true }));
-    assert.equal(item.getAttribute('title'), 'Flight Logbook', 'the expanded row keeps a native title');
+    assert.equal(item.getAttribute('title'), 'Logbook', 'the expanded row keeps a native title');
     assert.equal(tip.hidden, true, 'the tooltip stays out of the labelled sidebar');
     item.dispatchEvent(new window.Event('focusin', { bubbles: true }));
     assert.equal(tip.hidden, true, 'focusing an expanded row never opens it');
@@ -1114,7 +1121,7 @@ test('the map draws waypoint symbols over a route line it never rewrites', async
 test('a selected waypoint turns purple without touching the route line', async () => {
   const fs = await import('node:fs');
   const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
-  assert.match(page, /const MKSELN='#a855f7',MKSELD='#7c3aed'/, 'the selection palette is the app purple');
+  assert.match(page, /const MKSELN='#a78bfa',MKSELD='#7c3aed'/, 'the selection palette is the board violet');
   assert.match(page, /function mkSelHalo\(x,y,r\)/, 'the selection indicator is its own pass');
   assert.match(page, /function mkDraw\(kind,x,y,r,override\)/, 'a glyph can be redrawn in the selection colour');
   assert.match(page, /chosen=wpIdx===i,col=chosen\?mkSelColor\(\):null/, 'only the selected marker changes colour');
@@ -1280,4 +1287,67 @@ test('the phone page reconnects on its own and retries when the network returns'
   assert.match(live, /function connectLocal\(\)/, 'one button drives the connection');
   assert.match(live, /blocksLocalBridge\(location\)/, 'an HTTPS page navigates instead of failing a mixed-content fetch');
   assert.match(live, /location\.href = phoneConnectUrl\(\)/, 'the bridge page is opened, with nothing to type');
+});
+
+test('the flight-plan card replaces the pencil and never invents a value', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  assert.match(page, /<div id="fp" class="box" aria-live="polite"><\/div>/, 'the map owns a flight-plan card');
+  assert.equal(page.includes('id="bPlan"'), false, 'the pencil-in-a-circle control is gone');
+  assert.match(page, /Import a flight plan to view your route, departure, arrival, weather and flight details\./, 'the empty state explains the card');
+  assert.match(page, /class="primary" data-fp-act="import">Import Flight Plan</, 'the import action is the primary button');
+  // The SID/STAR runway sits under its own procedure, and an absent one says so.
+  assert.match(page, /const block=\(label,row,rwyRow,ofpOn\)/, 'the procedure block takes its own runway row');
+  assert.match(page, /rwyRow&&rwyRow\.rwy\?'RWY '\+esc\(rwyRow\.rwy\)/, 'the planned runway is printed when the plan states one');
+  assert.match(page, /runway not in plan/, 'a plan without a runway says so');
+  assert.match(page, /no procedure claimed/, 'no plan means no procedure is claimed');
+  // Weather is fetched for the two airports and reuses the page cache.
+  assert.match(page, /function fpWxFetch\(\)/, 'the card refreshes the departure and arrival weather itself');
+  assert.match(page, /if\(now-fpWxAt<240000\)return/, 'the refresh is rate limited');
+  assert.match(page, /getMetar\(a\)/, 'it reuses the existing METAR pipeline');
+  assert.match(page, /This SimBrief plan carries no weight or fuel figures/, 'an OFP without weights is described, not filled in');
+  assert.match(page, /fpstale/, 'stale data is marked');
+});
+
+test('the colour board documents the palette the interface really uses', async () => {
+  const fs = await import('node:fs');
+  const settings = fs.readFileSync(new URL('../app/js/pilot/settings.js', import.meta.url), 'utf8');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  const shell = fs.readFileSync(new URL('../app/shell.css', import.meta.url), 'utf8');
+  const ui = fs.readFileSync(new URL('../app/stratos-ui.css', import.meta.url), 'utf8');
+  assert.match(settings, /Aviation colour board/, 'the board lives in Settings');
+  for (const hex of ['#38bdf8', '#a78bfa', '#f59e0b', '#ffffff', '#0a1421', '#8b9db3', '#df827a', '#5ec99a']) {
+    assert.ok(settings.toLowerCase().includes(hex), `${hex} is shown with its job`);
+  }
+  assert.match(settings, /class="board-demo"/, 'the board shows real controls, markers and a TOD');
+  // The documented values are the live tokens, not a second palette.
+  assert.match(page, /--acc:#38bdf8/);
+  assert.match(page, /const MKSELN='#a78bfa'/);
+  assert.match(shell, /--shell-accent: #38bdf8/);
+  assert.match(ui, /--acc:#38bdf8/);
+});
+
+test('every page offers the same five destinations', async () => {
+  const fs = await import('node:fs');
+  const read = name => fs.readFileSync(new URL(`../app/${name}`, import.meta.url), 'utf8');
+  const index = read('index.html');
+  const rail = index.match(/<nav id="tabs"[\s\S]*?<\/nav>/)[0];
+  assert.equal((rail.match(/class="tab/g) || []).length, 6, 'five destinations and the collapse control');
+  const shell = read('js/shell.js');
+  const nav = shell.match(/const NAV = \[([\s\S]*?)\];/)[1];
+  assert.equal((nav.match(/href:/g) || []).length, 5, 'the bar and the rail share one five-item list');
+  for (const href of ['index.html', 'index.html#plan', 'logbook.html', 'discover.html', 'pilot.html#settings']) {
+    assert.ok(nav.includes(`'${href}'`), `${href} is one of the five`);
+  }
+  // The pages without a rail carry the same five in their own bottom bar.
+  for (const name of ['logbook.html', 'weather.html', 'live.html']) {
+    const page = read(name);
+    assert.equal((page.match(/class="bnav-item|bottom-live[\s\S]*?<\/nav>/g) || []).length >= 1, true, `${name} has a bottom bar`);
+    assert.ok(!/href="weather.html"[^>]*>\s*<span[^>]*>⛅/.test(page), `${name} no longer gives Weather its own tab`);
+  }
+  // Features that lost a tab are one step inside Explore.
+  const discover = read('discover.html');
+  for (const href of ['weather.html', 'pilot.html#airports', 'pilot.html#charts', 'pilot.html#career', 'live.html']) {
+    assert.ok(discover.includes(`href="${href}"`), `${href} is reachable from Explore`);
+  }
 });

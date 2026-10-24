@@ -783,10 +783,18 @@ export async function mount(root, ctx) {
         ss: fix.is_sid_star == '1' ? (String(fix.stage || '').toUpperCase() === 'DES' ? 'star' : 'sid') : '',
         aw: fix.via_airway && !/^DCT$/i.test(fix.via_airway) ? String(fix.via_airway).toUpperCase() : '',
       })).filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lon));
-      if (imported.length < 2) throw new Error('No usable coordinates in the SimBrief plan.');
       // The normalised OFP carries the SID, STAR and planned runways, so the
       // Flight Deck card can show them without a second import there.
       if (ofp) saveOfp(localStorage, ofp, entered);
+      const procs = ofp ? [ofp.origin.sid ? `SID ${ofp.origin.sid}` : '', ofp.destination.star ? `STAR ${ofp.destination.star}` : ''].filter(Boolean).join(' · ') : '';
+      if (imported.length < 2) {
+        // Detailed Navlog off: no fixes, but the plan still names the
+        // procedures, so they are imported and the current route is kept.
+        if (!ofp) throw new Error('No usable coordinates in the SimBrief plan.');
+        toast(`SimBrief plan saved${procs ? ` — ${procs}` : ''}. It has no navlog fixes, so the route was left unchanged. Turn on Detailed Navlog in SimBrief to import waypoints.`, 'bad');
+        render();
+        return;
+      }
       pushUndo();
       points = imported;
       name = `${origin || points[0].id} → ${destination || points[points.length - 1].id} (SimBrief)`;
@@ -798,7 +806,7 @@ export async function mount(root, ctx) {
       const tas = Number(general.cruise_tas);
       if (Number.isFinite(tas) && tas > 0) cruiseKts = tas;
       persistActive();
-      toast(`Imported ${points.length} waypoints from SimBrief. Weather, winds and fuel are not imported.`, 'good');
+      toast(`Imported ${points.length} waypoints from SimBrief${procs ? ` — ${procs}` : ''}. Weather, winds and fuel are not imported.`, 'good');
       render();
     } catch (error) {
       toast(`SimBrief import failed: ${error.message}`, 'bad');

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { fetchSimbriefPlan, simbriefQuery, validateSimbriefId } from '../app/js/lib/simbrief.js';
+import { loadOfp, parseOfp, planProcedures, routeProcedures } from '../app/js/lib/flightsummary.js';
 
 // The payload shape the SimBrief json=v2 endpoint returns, trimmed to the fields
 // the planner and the tracking card read.
@@ -52,6 +53,105 @@ test('simbrief: a username query and id validation stay strict', () => {
   assert.equal(simbriefQuery('pilot.name'), 'username=pilot.name');
   assert.equal(validateSimbriefId('abc def').ok, false);
   assert.equal(validateSimbriefId('123456').kind, 'pilot');
+});
+
+test('simbrief: the SID and STAR are read where SimBrief actually writes them', () => {
+  // A real json=v2 response puts the procedures in `general`, leaves the
+  // airport blocks without them, and shortens each ident by one character
+  // (LITKU2X -> LITK2X). `route_ifps` carries the full name.
+  const ofp = parseOfp({
+    general: {
+      sid_ident: 'LITK2X', sid_trans: '', star_ident: 'LOGD6N', star_trans: '',
+      route: 'LITK2X LITKU Y301 KALIF DCT ULPUK DCT ORTEB DCT KONZI DCT LOGDA LOGD6N',
+      route_ifps: 'LITKU2X LITKU Y301 KALIF DCT ULPUK DCT ORTEB DCT KONZI DCT LOGDA LOGDA6N',
+    },
+    origin: { icao_code: 'LHBP', plan_rwy: '31L' },
+    destination: { icao_code: 'EPWA', plan_rwy: '11' },
+  });
+  assert.equal(ofp.origin.sid, 'LITKU2X', 'the full SID ident the navigation data publishes');
+  assert.equal(ofp.destination.star, 'LOGDA6N', 'the full STAR ident');
+  assert.equal(ofp.origin.rwy, '31L');
+  assert.equal(ofp.destination.rwy, '11');
+  assert.equal(ofp.flight.routeIfps, 'LITKU2X LITKU Y301 KALIF DCT ULPUK DCT ORTEB DCT KONZI DCT LOGDA LOGDA6N');
+});
+
+test('simbrief: the older airport-block procedure fields still work', () => {
+  const ofp = parseOfp({ origin: { sid_ident: 'SUMMA2' }, destination: { star_ident: 'HRMNS3' } });
+  assert.equal(ofp.origin.sid, 'SUMMA2');
+  assert.equal(ofp.destination.star, 'HRMNS3');
+});
+
+test('simbrief: a plan that only names the procedures in its route still yields them', () => {
+  const ofp = parseOfp({ general: { route: 'SUMMA2 SUMMA J523 BLUIT HRMNS3' } });
+  assert.equal(ofp.origin.sid, 'SUMMA2');
+  assert.equal(ofp.destination.star, 'HRMNS3');
+  // A plan with no procedure filed invents none: airways, fixes and DCT are not
+  // procedure idents.
+  assert.deepEqual(routeProcedures('DCT KALIF J523 BLUIT'), { sid: null, star: null });
+  assert.deepEqual(routeProcedures('KSEA/16L DCT KALIF UL984 KPDX/28R'), { sid: null, star: null });
+});
+
+test('simbrief: a shortened ident is only restored when one character explains it', () => {
+  assert.deepEqual(planProcedures({
+    flight: { routeIfps: 'LITKU2X LITKU LOGDA6N' },
+    origin: { sid: 'LITK2X' },
+    destination: { star: 'LOGD6N' },
+  }), { sid: 'LITKU2X', star: 'LOGDA6N', sidTrans: null, starTrans: null });
+  // A genuinely different procedure is never swapped in for the filed one.
+  const kept = planProcedures({ flight: { routeIfps: 'SUMMAX3 X HRMNS3' }, origin: { sid: 'SUMMA2' } });
+  assert.equal(kept.sid, 'SUMMA2');
+});
+
+test('simbrief: a plan stored before this fix still shows its SID and STAR', () => {
+  const stored = {
+    simbriefId: '1049175',
+    ofp: {
+      flight: { routeText: 'LITK2X LITKU Y301 KALIF DCT KONZI DCT LOGDA LOGD6N' },
+      origin: { icao: 'LHBP', sid: null, sidTrans: null },
+      destination: { icao: 'EPWA', star: null, starTrans: null },
+    },
+  };
+  const memory = { getItem: () => JSON.stringify(stored) };
+  const loaded = loadOfp(memory);
+  assert.equal(loaded.ofp.origin.sid, 'LITK2X');
+  assert.equal(loaded.ofp.destination.star, 'LOGD6N');
+  assert.equal(loaded.ofp.origin.icao, 'LHBP', 'the rest of the plan is untouched');
+});
+
+test('simbrief: a plan with Detailed Navlog off still imports its SID and STAR', async () => {
+  const realFetch = globalThis.fetch;
+  let call = 0;
+  globalThis.fetch = async () => {
+    call += 1;
+    if (call === 1) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          general: {
+            sid_ident: 'LITK2X', star_ident: 'LOGD6N', route_distance: '344',
+            route: 'LITK2X LITKU Y301 KALIF DCT KONZI DCT LOGDA LOGD6N',
+            route_ifps: 'LITKU2X LITKU Y301 KALIF DCT KONZI DCT LOGDA LOGDA6N',
+          },
+          origin: { icao_code: 'LHBP', plan_rwy: '31L' },
+          destination: { icao_code: 'EPWA', plan_rwy: '11' },
+          navlog: { fix: [] },
+        }),
+      };
+    }
+    // The XML fallback has no fixes either, as when Detailed Navlog is off.
+    return { ok: false, status: 400 };
+  };
+  try {
+    const plan = await fetchSimbriefPlan('1049175');
+    assert.equal(plan.fixes.length, 0, 'there is no navlog to import');
+    assert.equal(plan.ofp.origin.sid, 'LITKU2X', 'the SID is still imported');
+    assert.equal(plan.ofp.destination.star, 'LOGDA6N', 'the STAR is still imported');
+    assert.equal(plan.ofp.origin.rwy, '31L');
+    assert.equal(plan.ofp.destination.rwy, '11');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
 
 test('simbrief: a plan with no fixes is an error, not an empty route', async () => {

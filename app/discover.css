@@ -152,3 +152,32 @@
   .discover .cats { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   .discover .cat small { display: none; }
 }
+
+/* Explore hub: the features that used to have their own top-level tab live
+   here, one step inside Explore, as a compact link row. */
+.discover .explore-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 0 0 22px;
+}
+.discover .explore-strip a {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--ui);
+  color: var(--txt);
+  text-decoration: none;
+  transition: border-color .16s ease, background-color .16s ease;
+}
+.discover .explore-strip a:hover {
+  border-color: var(--acc);
+  background: var(--ui2);
+  text-decoration: none;
+}
+.discover .explore-strip b { display: block; font-size: 12.5px; letter-spacing: .01em; }
+.discover .explore-strip span { display: block; margin-top: 2px; font-size: 10.5px; color: var(--mut); }
+@media (max-width: 560px) {
+  .discover .explore-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

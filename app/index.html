@@ -61,7 +61,7 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 #lay select{width:100%;padding:8px 9px;border-radius:9px;border:1px solid var(--ui2);background:var(--ui2);color:var(--txt);font:inherit;font-size:12.5px}
 #lay option:disabled{color:var(--mut)}
 
-:root[data-theme=night]{--bg:#060c14;--land:#0d1721;--coast:#28425a;--grid:rgba(140,180,220,.08);--ap:#f6c453;--nav:#5eead4;--route:#22d3ee;--own:#f8b84e;--txt:#e8f1fa;--ui:rgba(9,16,25,.96);--ui2:#152230;--mut:#8299ae;--trf:#8fb8ff;--acc:#38bdf8}
+:root[data-theme=night]{--bg:#0a1421;--land:#0d1721;--coast:#28425a;--grid:rgba(140,180,220,.08);--ap:#f6c453;--nav:#5eead4;--route:#22d3ee;--own:#f8b84e;--txt:#e8f1fa;--ui:rgba(9,16,25,.96);--ui2:#152230;--mut:#8b9db3;--trf:#8fb8ff;--acc:#38bdf8}
 #tel{display:none!important}.live #sheet{bottom:76px}
 #fc{display:none;top:12px;left:12px;width:358px;max-width:calc(100% - 24px);z-index:3;padding:14px 16px;border-radius:16px;background:color-mix(in srgb,var(--surface) 93%,transparent);border:1px solid color-mix(in srgb,var(--coast) 42%,transparent);box-shadow:var(--sh-2)}
 .fh{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--mut);font-weight:700;letter-spacing:.08em}.fh b{font-size:15px;color:var(--txt);letter-spacing:.01em}
@@ -132,10 +132,70 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 #fc .fca button{padding:5px 9px;border-radius:7px;font-size:11px;font-weight:600;border:1px solid color-mix(in srgb,var(--coast) 45%,transparent);background:var(--ui2);color:var(--txt);cursor:pointer}
 #fc .fca button:hover{border-color:var(--acc)}
 #fc .fca button.on{border-color:var(--acc);color:var(--acc)}
+/* Flight-plan card. It is the map's import surface and its at-a-glance plan:
+   an empty prompt before a plan exists, then the route, the procedures and the
+   numbers that matter. The pencil button it replaces is gone. */
+#fp{display:none;left:12px;bottom:30px;width:358px;max-width:calc(100% - 24px);max-height:calc(100% - 44px);overflow:auto;z-index:3;padding:13px 15px 14px;border-radius:16px;background:color-mix(in srgb,var(--surface) 94%,transparent);border:1px solid color-mix(in srgb,var(--coast) 44%,transparent);box-shadow:var(--sh-2)}
+#fp.show{display:block}
+@keyframes fpIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:no-preference){#fp.show{animation:fpIn .18s var(--ease)}
+/* The existing panels get the same short entrance, never a loop. */
+#sheet{animation:fpIn .16s var(--ease)}
+#fc{animation:fpIn .16s var(--ease)}}
+#fp .fptop{display:flex;align-items:center;gap:8px;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);font-weight:700}
+#fp .fptop b{font-size:11.5px;letter-spacing:.04em;text-transform:none;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#fp .fptop .sp{flex:1}
+#fp .fptop em{font-style:normal;color:var(--acc);font-size:9.5px;letter-spacing:.1em;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);border-radius:999px;padding:2px 7px}
+#fp .fpx{flex:0 0 auto;width:24px;height:24px;min-height:0;display:grid;place-items:center;padding:0;border-radius:7px;border:1px solid color-mix(in srgb,var(--coast) 40%,transparent);background:none;color:var(--mut);font-size:11px;line-height:1;cursor:pointer}
+#fp .fpx:hover{color:var(--txt);border-color:var(--acc)}
+#fp .fpr{display:flex;align-items:center;gap:10px;margin:10px 0 2px;font-size:26px;font-weight:800;letter-spacing:.035em;line-height:1}
+#fp .fpr .arw{flex:1;height:1px;background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--txt) 28%,transparent) 0 6px,transparent 6px 12px)}
+#fp .fpsub{font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#fp .fpproc{display:grid;grid-template-columns:1fr 1fr;gap:7px 12px;margin-top:10px;padding-top:9px;border-top:1px solid color-mix(in srgb,var(--coast) 30%,transparent)}
+#fp .fpp-k{display:block;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);font-weight:700}
+#fp .fpp b{display:block;font-size:12.5px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#fp .fpp b small{font-size:10px;font-weight:600;color:var(--mut)}
+#fp .fpp-r{display:block;font-size:10.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#fp .fpstats{display:flex;flex-wrap:wrap;gap:5px 12px;margin-top:9px;font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums}
+#fp .fpstats b{color:var(--txt);font-weight:700}
+#fp .fpcat{font-size:9px;font-weight:800;letter-spacing:.08em;border-radius:3px;padding:1px 5px;border:1px solid color-mix(in srgb,var(--coast) 55%,transparent)}
+#fp .fpcat.vfr{color:#4ade80;border-color:rgba(74,222,128,.4)}
+#fp .fpcat.mvfr{color:#60a5fa;border-color:rgba(96,165,250,.4)}
+#fp .fpcat.ifr{color:#f87171;border-color:rgba(248,113,113,.4)}
+#fp .fpcat.lifr{color:#c084fc;border-color:rgba(192,132,252,.4)}
+#fp .fpempty{margin-top:8px}
+#fp .fpempty b{display:block;font-size:16px;color:var(--txt);letter-spacing:.01em}
+#fp .fpempty span{display:block;margin-top:3px;font-size:11.5px;line-height:1.45;color:var(--mut)}
+#fp .fpacts{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+#fp .fpacts button{min-height:0;padding:6px 10px;border-radius:8px;font-size:11.5px;font-weight:600;border:1px solid color-mix(in srgb,var(--coast) 45%,transparent);background:var(--ui2);color:var(--txt);cursor:pointer}
+#fp .fpacts button:hover{border-color:var(--acc)}
+#fp .fpacts button.primary{background:var(--acc);border-color:var(--acc);color:#06161d;font-weight:750}
+#fp .fpsec{margin-top:10px;padding-top:9px;border-top:1px solid color-mix(in srgb,var(--coast) 30%,transparent)}
+#fp .fp-sec-h{display:flex;align-items:center;gap:8px;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);font-weight:700}
+#fp .fpkv{display:grid;grid-template-columns:1fr auto;gap:3px 12px;margin:6px 0 0;font-size:11.5px}
+#fp .fpkv dt{margin:0;color:var(--mut);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#fp .fpkv dd{margin:0;text-align:right;color:var(--txt);font-variant-numeric:tabular-nums;font-weight:600;max-width:62%}
+#fp .fpwx{font-size:11px;color:var(--mut);line-height:1.45;margin-top:4px}
+#fp .fpwx code{display:block;margin-top:3px;font-size:10px;line-height:1.35;white-space:pre-wrap;word-break:break-all;background:color-mix(in srgb,var(--ui2) 80%,transparent);color:var(--mut);padding:4px 6px;border-radius:6px}
+#fp .fpstale{color:#fbbf24}
+#mwtools{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#mwtools button{padding:7px 8px;border-radius:8px;font-size:11.5px;font-weight:600}
+/* A workspace that is open is marked in the signature cyan like every other
+   active control, not in the route's colour. */
+#mwtools button.on{background:var(--acc);border-color:var(--acc);color:#06161d}
+@media(max-width:767px){#fp{left:8px;right:8px;width:auto;bottom:12px;max-height:min(52dvh,470px);overflow:auto;padding:12px 13px}
+#app:has(#fp.show) #attr{display:none}
+/* The card owns the bottom of the map, so the floating controls move to the
+   top-right corner instead of sitting on top of it. */
+#app:has(#fp.show) #fab{top:10px;bottom:auto}
+/* An expanded card is the thing being read; the map controls return when it is
+   minimized, so nothing floats over the text. */
+#app:has(#fp.fpexp) #fab{display:none}
+#fp .fpr{font-size:24px}}
 #cv{display:none;position:absolute;top:0;left:0;right:0;z-index:6;padding:10px 12px 8px;background:var(--surface);border-bottom:1px solid var(--ui2)}
 .chartmode #cv{display:block}.cvh{display:flex;align-items:center;gap:10px}.cvt{flex:1;min-width:0;display:flex;flex-direction:column}.cvt b{font-size:22px}.cvt span{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #ci{display:none;position:absolute;left:0;right:0;bottom:0;top:124px;background:var(--bg);color:var(--txt);z-index:5;overflow:auto;padding:14px 16px 30px}.chartinfo #ci{display:block}
-.chartmode #fab,.chartmode #tabs,.chartmode #sheet,.chartmode #fc,.chartmode #lay,.chartmode #res{display:none!important}
+.chartmode #fab,.chartmode #tabs,.chartmode #sheet,.chartmode #fc,.chartmode #lay,.chartmode #res,.chartmode #fp{display:none!important}
 #attr{position:absolute;left:10px;bottom:62px;z-index:1;padding:2px 6px;border-radius:6px;background:color-mix(in srgb,var(--ui) 76%,transparent);color:var(--mut);font-size:10px;pointer-events:none}
 @media(min-width:768px){#attr{left:92px;bottom:8px}}
 .wxhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
@@ -254,7 +314,7 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 <meta property="og:site_name" content="Stratos">
 </head><body><div class="app-shell">
 <header id="appbar" class="tb" data-title="Flight Deck" data-context="Live Map"></header>
-<nav id="tabs" aria-label="Sections"><button class="tab" id="bMap" data-group="Flight Operations" data-label="Flight Deck"><b>&#8982;</b><span>Flight Deck</span></button><a class="tab" href="discover.html" data-group="Flight Operations" data-label="Route Discovery"><b>&#10022;</b><span>Route Discovery</span></a><button class="tab" id="bLive" data-group="Flight Operations" data-label="Live Tracking"><b>&#9673;</b><span>Live Tracking</span></button><button class="tab" id="bRoute" data-group="Flight Operations" data-label="Flight Planning"><b>&#8599;</b><span>Flight Planning</span></button><button class="tab" id="bCh" data-group="Flight Operations" data-label="Charts"><b>&#9707;</b><span>Charts</span></button><a class="tab" href="logbook.html" data-group="Flight Operations" data-label="Flight Logbook"><b>&#9776;</b><span>Flight Logbook</span></a><button class="tab" id="bWx" data-group="Flight Intelligence" data-label="Weather"><b>&#9729;</b><span>Weather</span></button><a class="tab" href="pilot.html#airports" data-group="Flight Intelligence" data-label="Airports"><b>&#9678;</b><span>Airports</span></a><a class="tab" href="pilot.html#career" data-group="Flight Intelligence" data-label="Flight Statistics"><b>&#9733;</b><span>Flight Statistics</span></a><button class="tab" id="bData" data-group="Application" data-label="Data &amp; Performance"><b>&#9636;</b><span>Data &amp; Performance</span></button><a class="tab" href="pilot.html#settings" data-group="Application" data-label="Settings"><b>&#9881;</b><span>Settings</span></a><button class="tab rail-toggle" data-rail-toggle type="button" title="Collapse sidebar" aria-label="Collapse sidebar"><b>&#8249;</b><span>Collapse</span></button></nav>
+<nav id="tabs" aria-label="Sections"><button class="tab act" id="bMap" data-group="Fly" data-label="Flight Deck"><b>&#8982;</b><span>Flight Deck</span></button><button class="tab" id="bRoute" data-group="Fly" data-label="Flight Planning"><b>&#8599;</b><span>Flight Planning</span></button><a class="tab" href="logbook.html" data-group="Fly" data-label="Logbook"><b>&#9776;</b><span>Logbook</span></a><a class="tab" href="discover.html" data-group="Explore" data-label="Explore"><b>&#10022;</b><span>Explore</span></a><a class="tab" href="pilot.html#settings" data-group="Account" data-label="Profile &amp; Settings"><b>&#9881;</b><span>Profile</span></a><button class="tab rail-toggle" data-rail-toggle type="button" title="Collapse sidebar" aria-label="Collapse sidebar"><b>&#8249;</b><span>Collapse</span></button></nav>
 <div class="app-main">
 <div id="app">
 <canvas id="map" aria-label="Aviation chart map"></canvas>
@@ -266,10 +326,11 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 <button id="st" data-shell-status>No connection</button>
 <div id="res" class="box"></div>
 <div id="fc" class="box"></div>
+<div id="fp" class="box" aria-live="polite"></div>
 <div id="online" class="box"><b id="olPlace">–</b><span id="olCount">–</span></div>
 <div id="fab"><button id="bTheme" class="fab" title="Theme">Day</button>
-<button id="bLay" class="fab" title="Layers">&#9776;</button><button id="bPlan" class="fab" title="Add waypoints">&#9998;</button><button id="bFol" class="fab" title="Follow aircraft">&#9992;</button><button id="bZi" class="fab" title="Zoom in">+</button><button id="bZo" class="fab" title="Zoom out">−</button>
-</div><div id="lay"><b>Map layers</b><button data-l="apt" class="on">Airports</button><button data-l="nav" class="on">Navaids</button><button data-l="trf" class="on">Traffic</button><button data-l="trl">All trails</button><button data-l="rte" class="on">Route</button><button data-l="grid">Grid</button><b>Traffic source</b><select id="trs" aria-label="Traffic source"><option value="vatsim">VATSIM — live pilots</option><option value="adsb">ADS-B — community feeds</option></select><div class="m" id="trsnote" style="max-width:220px;margin-top:2px">Both sources are keyless and free.</div><b>Map style</b><div id="ms"></div></div>
+<button id="bLay" class="fab" title="Layers and tools">&#9776;</button><button id="bFol" class="fab" title="Follow aircraft">&#9992;</button><button id="bZi" class="fab" title="Zoom in">+</button><button id="bZo" class="fab" title="Zoom out">−</button>
+</div><div id="lay"><b>Map layers</b><button data-l="apt" class="on">Airports</button><button data-l="nav" class="on">Navaids</button><button data-l="trf" class="on">Traffic</button><button data-l="trl">All trails</button><button data-l="rte" class="on">Route</button><button data-l="grid">Grid</button><b>Traffic source</b><select id="trs" aria-label="Traffic source"><option value="vatsim">VATSIM — live pilots</option><option value="adsb">ADS-B — community feeds</option></select><div class="m" id="trsnote" style="max-width:220px;margin-top:2px">Both sources are keyless and free.</div><b>Map style</b><div id="ms"></div><b>Workspaces</b><div id="mwtools"><button id="bLive" type="button">Live tracking</button><button id="bCh" type="button">Charts</button><button id="bWx" type="button">Weather</button><button id="bData" type="button">Data</button></div></div>
 
 <div id="cv"><div class="cvh"><button id="cvx" aria-label="Back">&#8592;</button><div class="cvt"><b id="cvi"></b><span id="cvn"></span><span id="cvm"></span></div><button id="cvf">Fit</button></div><div class="seg" id="cvs"></div></div><div id="ci"></div>
 <div id="chart"></div>
@@ -574,7 +635,7 @@ function addWp(o){route.push(wp(o));save();panel='route';trav=Math.min(trav,tota
 /* own-ship sim */
 function pos(d){const l=legs();let i=0;while(i<l.length-1&&d>l[i]){d-=l[i];i++}if(!route[i+1])return{lat:V.lat,lon:V.lon,hdg:0};const a=route[i],b=route[i+1],h=brg(a,b);return{...fwd(a,h,Math.min(d,l[i])),hdg:h}}
 function alt(d){const t=total();return Math.max(route[0]?.elev||0,Math.min(6500,route[0].elev+d*180,(route.at(-1).elev||0)+(t-d)*260))}
-function step(dt){if(V.tz!=null){const diff=V.tz-V.z;if(Math.abs(diff)>0.001){const dz=diff*Math.min(1,dt*14);const newZ=Math.abs(diff)<0.002?V.tz:V.z+dz;if(V.anchor){const pNew=wpx(V.anchor.geo[0],V.anchor.geo[1],newZ);const dx=V.anchor.sx-W/2,dy=V.anchor.sy-H/2;const cNew=[pNew[0]-dx,pNew[1]-dy];const p=wun(cNew[0],cNew[1],newZ);V.lon=p[0];V.lat=p[1];V.z=newZ}else{V.z=newZ}if(V.z===V.tz){V.tz=null;V.anchor=null}}else{V.z=V.tz;V.tz=null;V.anchor=null}}if(V.in){const c=wpx(V.lon,V.lat,V.z),p=wun(c[0]-V.in[0]*dt,c[1]-V.in[1]*dt,V.z),f=Math.exp(-4*dt);V.lon=p[0];V.lat=p[1];V.in=[V.in[0]*f,V.in[1]*f];if(Math.hypot(V.in[0],V.in[1])<8)V.in=null}const ok=!!liveOk();$('#app').classList.toggle('live',ok);const tx=ok?'● Live from '+(live.d.src||'simulator'):(deskStatus&&deskStatus.state==='error'?'Bridge: '+(deskStatus.detail||'error — see Pilot → Settings'):deskStatus&&deskStatus.state!=='connected'&&deskStatus.state!=='stopped'?'Bridge: '+(deskStatus.detail||deskStatus.state):wtTxt());if($('#st').textContent!=tx)$('#st').textContent=tx;if(deskStatus)$('#st').title=deskStatus.detail||deskStatus.state;if(ok)liveStep(dt);else wtStep(dt);fcRender(ok);olTick();return;trav+=CRUISE/3600*dt*WARP;if(trav>=t)trav=0;const p=pos(trav);own.lat=p.lat;own.lon=p.lon;own.hdg=p.hdg;own.alt=alt(trav);own.vs=(alt(trav+.1)-own.alt)*CRUISE/6;
+function step(dt){fpTick();if(V.tz!=null){const diff=V.tz-V.z;if(Math.abs(diff)>0.001){const dz=diff*Math.min(1,dt*14);const newZ=Math.abs(diff)<0.002?V.tz:V.z+dz;if(V.anchor){const pNew=wpx(V.anchor.geo[0],V.anchor.geo[1],newZ);const dx=V.anchor.sx-W/2,dy=V.anchor.sy-H/2;const cNew=[pNew[0]-dx,pNew[1]-dy];const p=wun(cNew[0],cNew[1],newZ);V.lon=p[0];V.lat=p[1];V.z=newZ}else{V.z=newZ}if(V.z===V.tz){V.tz=null;V.anchor=null}}else{V.z=V.tz;V.tz=null;V.anchor=null}}if(V.in){const c=wpx(V.lon,V.lat,V.z),p=wun(c[0]-V.in[0]*dt,c[1]-V.in[1]*dt,V.z),f=Math.exp(-4*dt);V.lon=p[0];V.lat=p[1];V.in=[V.in[0]*f,V.in[1]*f];if(Math.hypot(V.in[0],V.in[1])<8)V.in=null}const ok=!!liveOk();$('#app').classList.toggle('live',ok);const tx=ok?'● Live from '+(live.d.src||'simulator'):(deskStatus&&deskStatus.state==='error'?'Bridge: '+(deskStatus.detail||'error — see Pilot → Settings'):deskStatus&&deskStatus.state!=='connected'&&deskStatus.state!=='stopped'?'Bridge: '+(deskStatus.detail||deskStatus.state):wtTxt());if($('#st').textContent!=tx)$('#st').textContent=tx;if(deskStatus)$('#st').title=deskStatus.detail||deskStatus.state;if(ok)liveStep(dt);else wtStep(dt);fcRender(ok);olTick();return;trav+=CRUISE/3600*dt*WARP;if(trav>=t)trav=0;const p=pos(trav);own.lat=p.lat;own.lon=p.lon;own.hdg=p.hdg;own.alt=alt(trav);own.vs=(alt(trav+.1)-own.alt)*CRUISE/6;
 T.forEach(a=>{const p=fwd(a,a.hdg,a.gs/3600*dt*WARP);a.lat=p.lat;a.lon=p.lon});
 const el=route.length>1?t-trav:0;$('#tGS').textContent=CRUISE;$('#tAL').textContent=Math.round(own.alt/10)*10;$('#tHD').textContent=String(Math.round(own.hdg)%360).padStart(3,'0');$('#tVS').textContent=Math.round(own.vs/50)*50;$('#tDS').textContent=el.toFixed(1);$('#tEt').textContent=hm(el/CRUISE);
 if(V.fol){V.lon=own.lon;V.lat=own.lat}}
@@ -644,7 +705,7 @@ function mkClimb(x,y,r,c,up){mkPen(c,2);cx.arc(x,y,r*.72,0,7);cx.stroke();
 /* A selected point is redrawn in the app's purple, over a soft halo. The
    halo is the selection indicator; it is painted after every marker so it
    cannot be covered, and the route line beneath it is never touched. */
-const MKSELN='#a855f7',MKSELD='#7c3aed';
+const MKSELN='#a78bfa',MKSELD='#7c3aed';
 function mkSelColor(){return mkLightBg()?MKSELD:MKSELN}
 function mkSelHalo(x,y,r){
   const c=mkSelColor();
@@ -918,8 +979,21 @@ async function importSB(){
     const d=await r.json();
     let fp=d.navlog&&Array.isArray(d.navlog.fix)?d.navlog.fix:[];
     if(!fp.length){const x=await fetch(`https://www.simbrief.com/api/xml.fetcher.php?${q}`);if(x.ok){const doc=new DOMParser().parseFromString(await x.text(),'text/xml');fp=Array.from(doc.querySelectorAll('navlog > fix')).map(f=>{const t=n=>(f.querySelector(n)?.textContent||'').trim();return{ident:t('ident'),name:t('name'),pos_lat:t('pos_lat'),pos_long:t('pos_long'),altitude_feet:t('altitude_feet'),type:t('type')}})}}
-    if(!fp.length){const st=d.fetch&&d.fetch.status?' SimBrief said: '+d.fetch.status+'.':'';throw new Error('No waypoints found in the SimBrief plan.'+st+' Response fields: '+(Object.keys(d).join(', ')||'none')+'.')}
-    localStorage.setItem('stratos.simbriefId',id);try{if(window.FP)FP.saveOfp(localStorage,FP.parseOfp(d),id)}catch(_){}
+    localStorage.setItem('stratos.simbriefId',id);
+    // The parsed plan names the SID, STAR and runways, so it is kept for the
+    // flight-plan card and the procedure lookups. A plan without navlog fixes
+    // (Detailed Navlog off) is still worth importing for those procedures.
+    let plan=null;try{if(window.FP)plan=FP.parseOfp(d)}catch(_){}
+    const known=Boolean(plan&&((plan.origin&&(plan.origin.icao||plan.origin.sid))||(plan.destination&&(plan.destination.icao||plan.destination.star))));
+    if(!fp.length&&!known){const st=d.fetch&&d.fetch.status?' SimBrief said: '+d.fetch.status+'.':'';throw new Error('No waypoints found in the SimBrief plan.'+st+' Response fields: '+(Object.keys(d).join(', ')||'none')+'.')}
+    if(plan)try{FP.saveOfp(localStorage,plan,id)}catch(_){}
+    if(!fp.length){
+      const procs=plan?[plan.origin&&plan.origin.sid?'SID '+plan.origin.sid:'',plan.destination&&plan.destination.star?'STAR '+plan.destination.star:''].filter(Boolean).join(' · '):'';
+      fpExp=true;try{localStorage.setItem('stratos.fpExpanded','1')}catch(_){}
+      panel=null;render();
+      alert('SimBrief plan saved'+(procs?' · '+procs:'')+'. This plan has no navlog fixes, so your route was left unchanged. Turn on Detailed Navlog in SimBrief to import waypoints.');
+      return;
+    }
     const imported={origin:d.origin&&d.origin.icao_code,destination:d.destination&&d.destination.icao_code};
     route=fp.map((w,i)=>({
       id:w.ident||('WP'+(i+1)),
@@ -934,14 +1008,17 @@ async function importSB(){
       aw:w.via_airway&&!/^DCT$/i.test(w.via_airway)?String(w.via_airway).toUpperCase():''
     })).filter(w=>!isNaN(w.lat)&&!isNaN(w.lon));
     placeTod();
-    save();trav=0;panel='route';render();
+    // Land on the map with the new flight-plan card open, not the editor: the
+    // card is the post-import surface, and Edit route is one tap away.
+    save();trav=0;panel=null;fpExp=true;try{localStorage.setItem('stratos.fpExpanded','1')}catch(_){}
+    render();
     if(route.length){V.lon=route[0].lon;V.lat=route[0].lat;V.tz=null;setFol(false)}
-    alert('SimBrief plan loaded: '+(imported.origin||'')+' → '+(imported.destination||'')+' ('+route.length+' waypoints)');
+    const procs=plan?[plan.origin&&plan.origin.sid?'SID '+plan.origin.sid:'',plan.destination&&plan.destination.star?'STAR '+plan.destination.star:''].filter(Boolean).join(' · '):'';
+    alert('SimBrief plan loaded: '+(imported.origin||'')+' → '+(imported.destination||'')+' ('+route.length+' waypoints)'+(procs?' · '+procs:''));
   }catch(e){
     alert('SimBrief import error: '+(e.message||e));
   }
 }
-$('#bPlan').onclick=()=>{plan=!plan;$('#bPlan').classList.toggle('on',plan);if(plan){panel='route';render()}};
 $('#bRoute').onclick=()=>{panel=panel=='route'?null:'route';render()};
 document.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{L[b.dataset.l]^=1;b.classList.toggle('on')});
 /* Traffic source. VATSIM publishes a keyless feed of its live pilots, and the
@@ -1103,16 +1180,16 @@ function wpFocus(i){const p=route[i];if(!p)return;setFol(false);V.lon=p.lon;V.la
 function wpDetail(i){const p=route[i];if(!p)return'';const prev=route[i-1],next=route[i+1];let cum=0;for(let j=1;j<=i;j++)cum+=dist(route[j-1],route[j]);const alt=Number(p.elev)||0,planAlt=window.FP&&p.k!='apt'?FP.plannedAltitudeFt((FP.loadOfp(localStorage)||{}).ofp,p.id):null,course=next?brg(p,next):prev?brg(prev,p):null;const rows=[['Altitude',alt>0?Math.round(alt).toLocaleString()+' ft'+(p.k=='apt'?' (field elevation)':' (planned)'):planAlt?Math.round(planAlt).toLocaleString()+' ft (planned, SimBrief)':'Not in the plan'],['From previous',prev?Math.round(dist(prev,p))+' nm':'Departure'],['To next',next?Math.round(dist(p,next))+' nm':'Destination'],['Course'+(next?' to next':''),course==null?'–':String(Math.round(course)).padStart(3,'0')+'°'],['From departure',Math.round(cum)+' nm'],['ETE from departure @ '+CRUISE+' kt',hm(cum/CRUISE)]];
 if(p.ss=='sid'||p.ss=='star')rows.push(['Procedure',p.ss=='sid'?'SID fix (departure)':'STAR fix (arrival)']);
 if(p.aw)rows.push(['Airway',esc(p.aw)]);return'<div class="wpd"><h3>'+(i+1)+'. '+esc(p.id)+' · '+esc(p.name||p.id)+'</h3><table>'+rows.map(r=>'<tr><td class="m">'+r[0]+'</td><td>'+r[1]+'</td></tr>').join('')+'</table><div class="row"><button onclick="wpFocus('+i+')">Focus on map</button></div></div>'}
-function render(){const s=$('#sheet');tabHi();if(!panel){s.style.display='none';return}s.style.display='block';
+function render(){const s=$('#sheet');tabHi();fpRender();if(!panel){s.style.display='none';return}s.style.display='block';
 if(panel=='fsum'){s.innerHTML=fsumHtml();return}if(panel=='live'){s.innerHTML=liveHtml();return}if(panel=='data'){s.innerHTML=dataHtml();return}if(panel=='wx'){s.innerHTML=wxHtml();return}if(panel=='charts'){s.innerHTML=chHtml();return}if(panel=='sel'&&sel){const o=sel;if(o.k=='apt'){getMetar(o);s.innerHTML=aptHtml(o);return}
 if(o.k=='apt')getMetar(o);if(o.k=='apt')s.innerHTML=`<h3>${o.id} · ${o.name}</h3><div class="m">Elev ${o.elev} ft · TWR ${o.twr} · ATIS ${o.atis}</div><div class="m">Runways: ${pairs(o).map(p=>p.map(x=>String(x).padStart(2,'0')).join('/')).join(', ')}</div><code>${o.metar}</code><div class="m">${dec(o.metar)}</div><div class="m">${mAge(o)}</div><div class="m">Real-time reports from AviationWeather.gov via the bridge. Wind uses gusts.</div><div class="m">${o.rws?'':'Unverified placeholder data. Import the data pack (Data tab) for real runways, frequencies and layout.<br>'}${o.lat.toFixed(3)}, ${o.lon.toFixed(3)}${liveOk()?' - '+Math.round(dist(own,o))+' nm from you':''}</div>${rwTable(o)}<div class="row"><button onclick="openChart(sel)">Layout</button><button onclick="chSel=sel;panel='charts';render()">Charts</button><button onclick="addSel()">Add to route</button><button onclick="chartMap()">Zoom in</button></div>`;
 else if(o.k=='nav')s.innerHTML=`<h3>${o.id} · ${o.name}</h3><div class="m">${o.type} · ${o.freq} · ${o.lat.toFixed(3)}, ${o.lon.toFixed(3)}</div><div class="row"><button onclick="addSel()">Add to route</button></div>`;
 else s.innerHTML=`<h3>${o.id}</h3><div class="m">Alt ${Math.round(o.alt/10)*10} ft · ${o.gs?o.gs+' kt · ':''}HDG ${String(Math.round(o.hdg)).padStart(3,'0')}°</div>`;return}
 const t=total();s.innerHTML=`<h3>Flight plan</h3><div class="m">${route.length?route.map(p=>p.id).join(' → '):'Empty'} · ${t.toFixed(0)} nm · ${hm(t/CRUISE)} @ ${CRUISE} kt</div>
 <table>${route.map((p,i)=>`<tr onclick="wpSel(${i})" style="cursor:pointer;${wpIdx===i?'background:rgba(127,127,127,.18)':''}"><td>${i+1}</td><td>${p.id}</td><td class="m">${p.name}</td><td>${i?Math.round(dist(route[i-1],p))+' nm':''}</td><td><button onclick="event.stopPropagation();rm(${i})" aria-label="Remove">✕</button></td></tr>`).join('')}</table>${wpIdx!=null?wpDetail(wpIdx):''}
-<div class="m">${plan?'Plan mode on: tap map, airports or navaids to add waypoints.':'Turn on Plan, then tap the map to add waypoints.'}</div>
+<div class="m">${plan?'Plan mode on: tap the map, an airport or a navaid to add a waypoint.':'Plan mode is off; turn it on to add waypoints by tapping the map.'}</div>
 <div class="m">Descent planned at <b>${DESC_FT_PER_NM} ft/nm</b> — ${DESC_SRC=='sim'?'measured from your simulator flights':'default planning value (no measured descent yet)'}</div>
-<div class="row"><button onclick="importSB()">Import SimBrief</button><button onclick="panel='fsum';render()">Flight summary</button><button onclick="changeSB()">SimBrief ID</button><button onclick="defRoute();save();render()">Reset</button><button onclick="route=[];save();trav=0;render()">Clear</button><button onclick="exp('pln')">MSFS .PLN</button><button onclick="exp('fms')">X-Plane .FMS</button></div><div id="ex"></div>`}
+<div class="row"><button onclick="importSB()">Import SimBrief</button><button onclick="panel='fsum';render()">Flight summary</button><button class="${plan?'on':''}" onclick="plan=!plan;render()">Plan mode</button><button onclick="changeSB()">SimBrief ID</button><button onclick="defRoute();save();render()">Reset</button><button onclick="route=[];save();trav=0;render()">Clear</button><button onclick="exp('pln')">MSFS .PLN</button><button onclick="exp('fms')">X-Plane .FMS</button></div><div id="ex"></div>`}
 const pad=n=>String(n).padStart(2,'0');
 function openChart(a){sel=a;getMetar(a);getFaa(a);const pr=pairs(a),ln=RL[a.id]||[],mx=Math.max(...pr.map((p,i)=>ln[i]||8000)),k=230/mx,w=wind(a.metar);
 let s=`<svg viewBox="0 0 600 600" role="img" aria-label="${a.id} airport diagram"><rect width="600" height="600" rx="12" fill="${C.land}" stroke="${C.coast}"/>`;
@@ -1194,7 +1271,14 @@ function dataHtml(){return '<h3>Offline data pack</h3><div class="m">'+(pk.info|
 function getFaa(){/* the Charts workspace owns chart data now */}
 $('#bData').onclick=()=>{panel=panel=='data'?null:'data';render()};
 idb('get').then(t=>{if(t)applyPack(JSON.parse(t))}).catch(()=>{});
-function tabHi(){[['bMap',null],['bCh','charts'],['bRoute','route'],['bWx','wx'],['bLive','live'],['bData','data']].forEach(([i,p])=>$('#'+i).classList.toggle('act',p?panel==p:!panel||panel=='sel'))}
+function tabHi(){
+  const deck=!panel||panel=='sel';
+  const planning=panel=='route'||panel=='fsum';
+  const map=$('#bMap'),routeTab=$('#bRoute');
+  if(map)map.classList.toggle('act',deck);
+  if(routeTab)routeTab.classList.toggle('act',planning);
+  [['bCh','charts'],['bWx','wx'],['bLive','live'],['bData','data']].forEach(([i,p])=>{const el=$('#'+i);if(el)el.classList.toggle('on',panel==p)});
+}
 $('#bLay').onclick=()=>{const l=$('#lay');l.style.display=l.style.display=='flex'?'none':'flex'};
 $('#bMap').onclick=()=>{panel=null;sel=null;tk=false;render()};
 $('#st').onclick=()=>{panel='live';render()};
@@ -1408,7 +1492,7 @@ function liveStep(dt){T.forEach(a=>{if(Date.now()-(a.seen||0)<45000){const p=fwd
 $('#tGS').textContent=Math.round(gs);$('#tAL').textContent=Math.round(own.alt);$('#tHD').textContent=String(Math.round(own.hdg+360)%360).padStart(3,'0');$('#tVS').textContent=Math.round(own.vs/10)*10;$('#tDS').textContent=isFinite(el)?el.toFixed(1):'–';$('#tEt').textContent=isFinite(el)&&gs>30?hm(el/gs):'–';if(V.fol){V.lon=own.lon;V.lat=own.lat}}
 let wxList=[];try{wxList=JSON.parse(localStorage.getItem('dl.wx')||'[]')}catch(_){}
 function wxAdd(a){if(!wxList.includes(a.id)){wxList.unshift(a.id);wxList=wxList.slice(0,8);try{localStorage.setItem('dl.wx',JSON.stringify(wxList))}catch(_){}}}
-function mRef(a){if(CH.on&&CH.a===a)chHead();if(panel=='sel'&&sel==a)render();if($('#chart').style.display=='block'&&sel==a)openChart(a)}
+function mRef(a){if(CH.on&&CH.a===a)chHead();if(panel=='sel'&&sel==a)render();if($('#chart').style.display=='block'&&sel==a)openChart(a);fpRender()}
 function getMetar(a,force){if(!force&&a.mf&&Date.now()-a.mf<300000)return;a.mf=Date.now();wxAdd(a);return mget(a);
 if(location.protocol!='http:'){a.me='METAR needs the bridge. The weather service blocks direct browser requests, and this preview has no internet access.';mRef(a);return}
 fetch('/metar?ids='+a.id).then(r=>r.text()).then(t=>{t=(t||'').trim().split('\n')[0];if(t){a.metar=t;a.mt=Date.now();a.me=''}else a.me='No METAR reported for this airport.';mRef(a)}).catch(()=>{a.me='METAR fetch failed. Is the bridge running with internet?';mRef(a)})}
@@ -1519,6 +1603,11 @@ window.exp=f=>{const o=route;if(o.length<2){$('#ex').innerHTML='<div class="m">A
 if(f=='pln')x=`<?xml version="1.0" encoding="UTF-8"?>\n<SimBase.Document Type="AceXML" version="1,0">\n<FlightPlan.FlightPlan>\n<Title>${o[0].id} to ${o.at(-1).id}</Title>\n<FPType>VFR</FPType>\n<RouteType>Direct</RouteType>\n<DepartureID>${o[0].id}</DepartureID>\n<DestinationID>${o.at(-1).id}</DestinationID>\n`+o.map(p=>`<ATCWaypoint id="${p.id}"><ATCWaypointType>${p.k=='apt'?'Airport':p.k=='nav'?'VOR':'User'}</ATCWaypointType><WorldPosition>${dms(p.lat,'N','S')},${dms(p.lon,'E','W')},+${String(p.elev.toFixed(2)).padStart(9,'0')}</WorldPosition></ATCWaypoint>`).join('\n')+`\n</FlightPlan.FlightPlan>\n</SimBase.Document>`;
 else x=`I\n1100 Version\nCYCLE 2610\nADEP ${o[0].id}\nADES ${o.at(-1).id}\nNUMENR ${o.length}\n`+o.map(p=>`${p.k=='apt'?1:p.k=='nav'?3:28} ${p.id} ${p.k=='apt'?'ADEP':'DRCT'} ${p.elev.toFixed(6)} ${p.lat.toFixed(6)} ${p.lon.toFixed(6)}`).join('\n');
 $('#ex').innerHTML='<div class="m">Copy into a .'+f+' file:</div><textarea readonly></textarea>';const t=$('#ex textarea');t.value=x;t.focus();t.select()};
+/* The five-tab shell links Flight Planning to index.html#plan, so a fresh load
+   or a hash change opens the planning workspace instead of landing on the map. */
+function openHashPanel(){if(location.hash=='#plan'){panel='route';render()}}
+openHashPanel();
+addEventListener('hashchange',()=>{if(location.hash=='#plan'){panel='route';render()}});
 render();
 function mAge(a){return a.mt?'Live METAR, checked '+new Date(a.mt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' (updates every 5 min)':(a.me||'Loading METAR...')}
 setInterval(()=>{A.forEach(a=>{if(a.mf&&Date.now()-a.mf>=300000)getMetar(a)})},60000);
@@ -1955,6 +2044,158 @@ function fcRender(ok){
     }
   }
   if(s!==fcS){fcS=s;e.innerHTML=s;e.style.display='block';clampCard()}}
+/* ── Flight-plan card ────────────────────────────────────────────────
+   The map's own plan surface: what to import before a plan exists, then the
+   route, SID/STAR with their runways, cruise, distance, weather and payload.
+   Everything it prints comes from the stored SimBrief plan, the planned route,
+   the saved METARs or the live snapshot; a missing value says so. It replaces
+   the old pencil-in-a-circle button, which only opened the route editor. */
+/* Kept as var so the first render(), which runs before this block executes,
+   can call fpRender/fpTick without a temporal-dead-zone error. */
+var fpExp=(()=>{try{return localStorage.getItem('stratos.fpExpanded')=='1'}catch(_){return false}})();
+var fpS='',fpSumCache=null,fpSumKey='',fpWxAt=0,fpTickAt=0;
+function fpOfp(){try{const s=window.FP&&FP.loadOfp(localStorage);return s&&s.ofp?s.ofp:null}catch(_){return null}}
+function fpRow(sum,key){const list=sum&&sum.overview?sum.overview:[];return list.find(r=>r.key==key)||null}
+function fpProcRow(sum,key){const list=sum&&sum.procedures?sum.procedures:[];return list.find(r=>r.key==key)||null}
+function fpWind(w){if(!w)return'–';const d=w.direction==null?'VRB':String(Math.round(w.direction)).padStart(3,'0')+'°';return d+' '+Math.round(w.speedKt||0)+' kt'+(w.gustKt?' G'+Math.round(w.gustKt):'')}
+function fpBuild(force){
+  if(!window.FS)return null;
+  const metars={};A.forEach(a=>{if(a.metar&&a.mt)metars[a.id]={metar:a.metar,fetchedAt:a.mt,source:'METAR'}});
+  const key=route.map(p=>p.id+':'+Number(p.lat).toFixed(3)+':'+Number(p.lon).toFixed(3)).join(',')+'|'+(localStorage.getItem('stratos.ofp')||'')+'|'+Object.keys(metars).map(k=>k+metars[k].fetchedAt).join(',');
+  if(!force&&key===fpSumKey&&fpSumCache)return fpSumCache;
+  try{fpSumCache=FS.buildSummary({route,ofp:fpOfp(),cruiseKts:CRUISE,weightUnit:'kg',metars,position:liveOk()?{lat:own.lat,lon:own.lon}:null});fpSumKey=key}catch(e){fpSumCache=null;if(window.console)console.warn('Flight-plan summary:',e)}
+  return fpSumCache;
+}
+/* Fetch the departure and arrival METARs once a plan exists, then no more than
+   every four minutes. getMetar owns the five-minute cache, so a re-render can
+   never turn into a request loop. */
+function fpWxFetch(){
+  const now=Date.now();if(now-fpWxAt<240000)return;fpWxAt=now;
+  const ofp=fpOfp(),ids=[];
+  if(ofp&&ofp.origin&&ofp.origin.icao)ids.push(ofp.origin.icao);
+  if(ofp&&ofp.destination&&ofp.destination.icao)ids.push(ofp.destination.icao);
+  if(!ids.length&&route.length>1)ids.push(route[0].id,route[route.length-1].id);
+  ids.forEach(id=>{const a=A.find(z=>z.id==id);if(a&&(!a.mt||now-a.mt>300000))getMetar(a)});
+}
+function fpCat(sum,icao){
+  const list=(sum&&sum.weather&&sum.weather.stations)||[];
+  const st=list.find(s=>s.icao==icao);if(!st||!st.category)return'';
+  const cls=String(st.category).toLowerCase();
+  return '<span class="fpcat '+esc(cls)+'" title="'+esc(st.category)+' observation">'+esc(icao)+' '+esc(st.category)+'</span>';
+}
+function fpStation(sum,icao){
+  const list=(sum&&sum.weather&&sum.weather.stations)||[];
+  return list.find(s=>s.icao==icao)||null;
+}
+function fpToggleBtn(){return '<button type="button" class="fpx" data-fp-act="toggle" aria-expanded="'+(fpExp?'true':'false')+'" title="'+(fpExp?'Minimize':'Show route, weather and payload')+'">'+(fpExp?'&#9662;':'&#9652;')+'</button>'}
+function fpRender(){
+  const e=document.getElementById('fp');if(!e)return;
+  if(panel){if(fpS){fpS=''}e.classList.remove('show');return}
+  const ofp=fpOfp(),has=route.length>1||Boolean(ofp);
+  let s;
+  if(!has){
+    s='<div class="fptop"><span>Flight plan</span><span class="sp"></span><em>Not imported</em></div>'
+      +'<div class="fpempty"><b>Import flight plan</b><span>Import a flight plan to view your route, departure, arrival, weather and flight details.</span></div>'
+      +'<div class="fpacts"><button type="button" class="primary" data-fp-act="import">Import Flight Plan</button><button type="button" data-fp-act="plan">Build a route</button></div>';
+  } else {
+    fpWxFetch();
+    const sum=fpBuild(false);
+    const dep=fpRow(sum,'departure')||{},arr=fpRow(sum,'destination')||{};
+    const sid=fpProcRow(sum,'sid')||{},star=fpProcRow(sum,'star')||{};
+    const depRwy=fpProcRow(sum,'depRwy')||{},arrRwy=fpProcRow(sum,'arrRwy')||{},approach=fpProcRow(sum,'approach')||{};
+    const depId=(dep.icao||(route[0]&&route[0].id)||'').toUpperCase();
+    const arrId=(arr.icao||(route.length>1&&route[route.length-1].id)||'').toUpperCase();
+    const nameOf=id=>(A.find(z=>z.id==id)||{}).name||'';
+    const depName=dep.value||nameOf(depId)||depId||'Departure';
+    const arrName=arr.value||nameOf(arrId)||arrId||'Destination';
+    const callsign=(fpRow(sum,'callsign')||{}).value||live.d&&live.d.callsign||'';
+    const aircraft=(fpRow(sum,'aircraft')||{}).value||live.d&&live.d.aircraft||'';
+    const cruise=(fpRow(sum,'cruise')||{}).value||'';
+    const dist=(fpRow(sum,'distance')||{}).value||'';
+    const ete=(fpRow(sum,'ete')||{}).value||'';
+    const alt=fpRow(sum,'alternate')||{};
+    const prog=sum&&sum.route?sum.route.progress:null;
+    const plan=Boolean(ofp);
+    const block=(label,row,rwyRow,ofpOn)=>{
+      const value=row&&row.value?esc(row.value):'—';
+      // The runway directly under the procedure name, from the plan's own
+      // runway row. A procedure without a stated runway says so.
+      const rwy=rwyRow&&rwyRow.rwy?'RWY '+esc(rwyRow.rwy):(ofpOn?'runway not in plan':'no procedure claimed');
+      return '<div class="fpp"><span class="fpp-k">'+label+'</span><b>'+value+'</b><span class="fpp-r">'+rwy+'</span></div>';
+    };
+    const stats='<div class="fpstats">'
+      +(cruise?'<span><b>'+esc(cruise)+'</b> cruise</span>':'')
+      +(dist?'<span><b>'+esc(dist)+'</b></span>':'')
+      +(ete?'<span><b>'+esc(ete)+'</b></span>':'')
+      +fpCat(sum,depId)+fpCat(sum,arrId)
+      +'</div>';
+    const header='<div class="fptop">'+(liveOk()?'<span class="dot"></span>':'')+'<b>'+esc(callsign||'Flight plan')+'</b><span class="sp"></span>'+(aircraft?'<span>'+esc(aircraft)+'</span>':'')+fpToggleBtn()+'</div>';
+    const routeLine='<div class="fpr"><span>'+esc(depId||'—')+'</span><span class="arw"></span><span>'+esc(arrId||'—')+'</span></div>'
+      +'<div class="fpsub">'+esc(depName)+' → '+esc(arrName)+'</div>';
+    const procs='<div class="fpproc">'+block('SID',sid,depRwy,plan)+block('STAR',star,arrRwy||approach,plan)+'</div>';
+    let extra='';
+    if(fpExp){
+      if(sum&&Array.isArray(sum.notes)&&sum.notes.length)extra+='<div class="fpsec"><div class="fpwx fpstale">'+sum.notes.map(n=>esc(n)).join('<br>')+'</div></div>';
+      const rows=[];
+      if(alt.value)rows.push(['Alternate',esc(alt.value)]);
+      if(approach.value)rows.push(['Approach',esc(approach.value)]);
+      if(prog)rows.push(['Remaining',Math.round(prog.remainingNm)+' nm']);
+      if(rows.length)extra+='<div class="fpsec"><div class="fp-sec-h">Route</div><dl class="fpkv">'+rows.map(r=>'<dt>'+r[0]+'</dt><dd>'+r[1]+'</dd>').join('')+'</dl></div>';
+      const wx=[depId,arrId].filter(Boolean).map(id=>{
+        const st=fpStation(sum,id);if(!st)return '';
+        const cat=st.category?'<span class="fpcat '+esc(String(st.category).toLowerCase())+'">'+esc(st.category)+'</span> ':' ';
+        const age=st.ageMin!=null?'<span class="'+(st.ageMin>90?'fpstale':'')+'"> · '+Math.round(st.ageMin)+' min old</span>':'';
+        const body=st.metar?esc(st.metar):esc(st.status=='missing'?'No live METAR yet.':'No usable observation.');
+        return '<div class="fpwx"><b>'+esc(id)+'</b> '+cat+esc(fpWind(st.wind))+age+'<code>'+body+'</code></div>';
+      }).join('');
+      if(wx)extra+='<div class="fpsec"><div class="fp-sec-h">Departure and arrival weather</div>'+wx+'</div>';
+      const weights=(sum&&sum.weights)||[],fuel=(sum&&sum.fuel)||[];
+      const pick=(list,key)=>(list.find(w=>w.key==key)||{}).text||'';
+      const wrows=[];
+      const zfw=pick(weights,'zfw'),tow=pick(weights,'tow'),lw=pick(weights,'lw'),pax=(weights.find(w=>w.key=='pax')||{}).text||'',cargo=(weights.find(w=>w.key=='cargo')||{}).text||'';
+      if(zfw)wrows.push(['ZFW',esc(zfw)]);if(tow)wrows.push(['Takeoff weight',esc(tow)]);if(lw)wrows.push(['Landing weight',esc(lw)]);
+      if(pax)wrows.push(['Passengers',esc(pax)]);if(cargo)wrows.push(['Cargo',esc(cargo)]);
+      const blockFuel=pick(fuel,'block'),landFuel=pick(fuel,'landing');
+      if(blockFuel)wrows.push(['Block fuel',esc(blockFuel)]);if(landFuel)wrows.push(['Landing fuel',esc(landFuel)]);
+      if(wrows.length)extra+='<div class="fpsec"><div class="fp-sec-h">Weights and fuel'+(sum&&sum.units?' · '+esc(sum.units.weight):'')+'</div><dl class="fpkv">'+wrows.map(r=>'<dt>'+r[0]+'</dt><dd>'+r[1]+'</dd>').join('')+'</dl></div>';
+      else extra+='<div class="fpsec"><div class="fp-sec-h">Weights and fuel</div><div class="fpwx">'+(plan?'This SimBrief plan carries no weight or fuel figures. Refresh the OFP to fetch them.':'Import a SimBrief OFP to see weights, fuel and passengers.')+'</div></div>';
+      if(liveOk()){
+        const gs=Math.round(live.d&&live.d.gs||0),al=Math.round(own.alt||0),phase=String((live.d&&live.d.flightPhase)||'').replace(/_/g,' ');
+        const left=prog?prog.remainingNm:null;
+        const eta=left!=null&&gs>30?zTime(Date.now()/1000+left/gs*3600):'–';
+        extra+='<div class="fpsec"><div class="fp-sec-h">Live progress</div><dl class="fpkv">'
+          +'<dt>Altitude</dt><dd>'+al.toLocaleString()+' ft</dd>'
+          +'<dt>Groundspeed</dt><dd>'+gs+' kt</dd>'
+          +(left!=null?'<dt>Distance remaining</dt><dd>'+Math.round(left)+' nm</dd>':'')
+          +'<dt>Estimated arrival</dt><dd>'+eta+'</dd>'
+          +(phase?'<dt>Flight phase</dt><dd>'+esc(phase)+'</dd>':'')+'</dl></div>';
+      }
+    }
+    s=header+routeLine+procs+stats+extra
+      +'<div class="fpacts">'
+      +(fpExp?'<button type="button" data-fp-act="toggle">Minimize</button>':'<button type="button" data-fp-act="toggle">Details</button>')
+      +'<button type="button" data-fp-act="edit">Edit route</button>'
+      +'<button type="button" data-fp-act="summary">Flight summary</button>'
+      +'<button type="button" data-fp-act="refresh">Refresh OFP</button></div>';
+  }
+  if(s!==fpS){fpS=s;e.innerHTML=s}
+  e.classList.add('show');
+  e.classList.toggle('fpexp',Boolean(fpExp));
+}
+function fpTick(){const n=performance.now();if(n-fpTickAt<900)return;fpTickAt=n;fpRender()}
+(function fpCardEvents(){
+  const e=document.getElementById('fp');if(!e)return;
+  e.addEventListener('click',ev=>{
+    const t=ev.target.closest('[data-fp-act]');if(!t)return;
+    const act=t.dataset.fpAct;
+    if(act=='import'){importSB();return}
+    if(act=='refresh'){importSB();return}
+    if(act=='plan'){plan=true;panel='route';render();return}
+    if(act=='toggle'){fpExp=!fpExp;try{localStorage.setItem('stratos.fpExpanded',fpExp?'1':'0')}catch(_){}fpRender();return}
+    if(act=='edit'){panel='route';render();return}
+    if(act=='summary'){panel='fsum';render();return}
+  });
+})();
 /* The native Charts workspace owns chart viewing now. */
 function chartLauncherHtml(a){const id=(a&&a.id)||'';const url='pilot.html#charts'+(id?'?icao='+encodeURIComponent(id):'');let h='<div style="margin-top:12px"><b>'+esc(id)+'</b> <span class="m">'+esc((a&&a.name)||'')+'</span></div>';h+='<div class="m" style="margin-top:8px">Official terminal procedures open in the integrated Charts workspace: zoom, pan, fit, pages and full screen, without leaving Stratos.</div><div class="row" style="margin-top:10px"><a href="'+url+'"><button class="on">Open Charts'+(id?' for '+esc(id):'')+'</button></a></div>';return h}
 function openChartsPage(icao){location.href='pilot.html#charts'+(icao?'?icao='+encodeURIComponent(icao):'')}
@@ -1992,6 +2233,7 @@ try{if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').t
 </script>
 <script type="module">
   import * as FP from './js/flightpanel.js';
+  import * as FS from './js/lib/flightsummary.js';
   import * as VATSIM from './js/lib/vatsim.js';
   import * as AC from './js/lib/aircraft.js';
   import * as PHOTO from './js/lib/aircraftphoto.js';
@@ -2005,6 +2247,7 @@ try{if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').t
   window.VATSIM = VATSIM;
   window.AC = AC;
   window.FP = FP;
+  window.FS = FS;
   window.PHOTO = PHOTO;
   window.REG = REG;
 </script>
