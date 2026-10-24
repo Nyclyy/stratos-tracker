@@ -1,4 +1,38 @@
 {
+  "2.1.21": {
+    "summary": "A phone finds the simulator in one tap, its map shows nearby traffic with the paths Stratos actually recorded, and TOC, TOD and SID/STAR follow the planned route.",
+    "changelog": {
+      "features": [
+        "One tap connects a phone: it finds the PC on the network, pairs itself and reconnects after a Wi-Fi change or a bridge restart. No QR code and no address to type; networks that block multicast keep the relay.",
+        "The phone's live map shows nearby aircraft, from VATSIM and from the traffic the bridge already polls, behind a Traffic layer button. Tap one for its altitude, speed, heading, distance and its recorded path.",
+        "A clicked aircraft's trail is the path Stratos recorded, kept for 45 minutes in the bridge's store: it survives a reload and matches on the PC and the phone, and a relayed phone gets it too.",
+        "The flown path is drawn as a trajectory coloured by height above ground, white on the ground through blue, green, yellow and orange to magenta at the flight levels, for your own aircraft and for any traffic you select.",
+        "SID and STAR paths follow the published legs from the runway to the procedure's last fix, from the simulator's CIFP data or the bundled FAA dataset, adding only the legs the plan does not draw.",
+        "TOC and TOD are placed on the planned route itself, calculated from the cruise level, the climb and descent profile and the constraints available, and they move when the cruise level or route changes."
+      ],
+      "improvements": [
+        "Waypoint markers are separated by meaning, SID, STAR, VOR, en-route fix, airport, TOC and TOD, and a selected point turns purple with a heavier ring on both mouse and touch.",
+        "The aircraft card detects a registration when the feed does not report one, shows a verified photo for it, and collapses to a strip keeping SID and STAR with the departure and arrival runways beneath.",
+        "A trail states how many positions it holds and where they came from, and the phone names the bridge or the relay.",
+        "Procedure data is cached, traffic polling stops while its layer is hidden, and a phone on the relay reuses the desktop's traffic list instead of fetching a second feed."
+      ],
+      "fixes": [
+        "TOC and TOD no longer appear at an arbitrary point: they are interpolated along the ordered route legs and kept inside the segment they belong to.",
+        "A no-position sample, a duplicate or an out-of-order one can no longer bend a traffic trail.",
+        "The phone's status line reports Connecting, Connected, Reconnecting and Disconnected from the actual socket instead of staying on its last label."
+      ],
+      "performance": [
+        "The bridge posts only the trail samples the relay has not seen, at most 400 points every 15 seconds, and stops when the simulator is idle."
+      ],
+      "ui": [
+        "Traffic is drawn as small heading glyphs with the selected aircraft painted last, so a neighbour cannot cover it."
+      ],
+      "compatibility": [
+        "The relay gained /api/traffic. An older relay answers 404 and a hosted phone falls back to VATSIM traffic with no relay trails; desktop builds before this version cannot post traffic to it."
+      ],
+      "other": []
+    }
+  },
   "2.1.20": {
     "summary": "The route is drawn with chart symbols, long legs carry their heading and distance, and map labels are set in a chart typeface.",
     "changelog": {
