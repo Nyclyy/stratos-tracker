@@ -124,7 +124,7 @@ Severity is a published fact, not a nag screen:
 - `important` — still optional, but a dismissal from an earlier, less serious copy of the same release no longer suppresses the prompt;
 - `critical` — requires `--reason`; the dialog explains why. It is only treated as *required* when a real `minimumSupported` version excludes this install or the reason is supplied. There is no hidden kill switch.
 
-Do not hand-edit `app/releases.json` into an inconsistent state: `--check` enforces valid semantic versions, unique releases, a `latest` that really is the newest stable release, ISO dates and a reason on critical entries, and validates every curated entry. The release workflow regenerates the manifest at release time, so notes reflect what is actually committed. The GitHub Action needs only the default `GITHUB_TOKEN` with `contents: write`; no extra secrets are required for the manifest.
+Do not hand-edit `app/releases.json` into an inconsistent state: `--check` enforces valid semantic versions, unique releases, a `latest` that really is the newest stable release, ISO dates and a reason on critical entries, and validates every curated entry. The release workflow regenerates the manifest at release time, so notes reflect what is actually committed. Once the release is live, the publish job commits that generated manifest back to `main` as `app/releases.json`, because the website serves that copy rather than the release asset; the new version's installer URL, SHA-256 and size are on the site as soon as it redeploys, instead of waiting for the next release to carry them. The GitHub Action needs only the default `GITHUB_TOKEN` with `contents: write`; no extra secrets are required for the manifest.
 
 ### Automatic updates
 

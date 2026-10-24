@@ -396,7 +396,8 @@ jobs:
 
       # The notes and manifest are generated from the commits being released, so
       # they describe what is actually in this build. The committed manifest is
-      # only read for its history; the release gets a copy.
+      # only read for its history; the release gets a copy, and the publish job
+      # writes that copy back to main once the release is live.
       - name: Write the release notes and manifest
         run: |
           set -euo pipefail
@@ -435,3 +436,33 @@ jobs:
           gh release edit "$TAG" --draft=false
           node scripts/check-release.mjs "$VERSION"
           echo "- Published $TAG" >> "$GITHUB_STEP_SUMMARY"
+
+      # The website is built from main and serves app/releases.json from its own
+      # origin; the browser reads the GitHub asset only when that copy cannot be
+      # loaded. The generated manifest therefore has to be on main, or the site
+      # announces a version with no installer beside it until the next release.
+      - name: Record the manifest on main
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git fetch --quiet origin main
+            git checkout -B main origin/main
+            cp dist/releases.json app/releases.json
+            if git diff --quiet -- app/releases.json; then
+              echo "app/releases.json already carries $TAG's download table"
+              exit 0
+            fi
+            git add app/releases.json
+            git commit --quiet -m "Publish the $VERSION download table" \
+              -m "The site serves this manifest from its own origin, so the installer URLs, hashes and sizes written for the release belong on main, not only on the release."
+            if git push --quiet origin main; then
+              echo "app/releases.json on main now lists $TAG's downloads"
+              exit 0
+            fi
+            echo "main moved while $TAG was being published; retrying from its new head"
+            sleep 5
+          done
+          echo "::error::app/releases.json could not be updated on main"
+          exit 1
