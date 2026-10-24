@@ -37,6 +37,28 @@
         "The relay gained /api/traffic. An older relay answers 404 and a hosted phone falls back to VATSIM traffic with no relay trails; desktop builds before this version cannot post traffic to it."
       ],
       "other": []
+    },
+    "downloads": {
+      "windows": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.21/Stratos-Setup.exe",
+        "sha256": "87c95fcfca46a008964324e53056753de472939e7a70ed8d96d6efd496424d16",
+        "size": 105650818
+      },
+      "mac-arm64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.21/Stratos-2.1.21-mac-arm64.dmg",
+        "sha256": "611d32b3a9efb6500d235318b6db11bbd5acd0ef7eaa4238ae29239f7ed95dc2",
+        "size": 121382971
+      },
+      "mac-x64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.21/Stratos-2.1.21-mac-x64.dmg",
+        "sha256": "6a112d365b7392d14202da588b79ce119c5067928ec96935dc5d53b5203bd0f7",
+        "size": 126712639
+      },
+      "linux-x64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.21/Stratos-2.1.21-linux-x64.AppImage",
+        "sha256": "146a81b361696d017ff93856224f7d64d5acdfff22383ae26aa5d7e41bc451c1",
+        "size": 142297325
+      }
     }
   },
   "releases": [
@@ -75,6 +97,28 @@
           "The relay gained /api/traffic. An older relay answers 404 and a hosted phone falls back to VATSIM traffic with no relay trails; desktop builds before this version cannot post traffic to it."
         ],
         "other": []
+      },
+      "downloads": {
+        "windows": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.21/Stratos-Setup.exe",
+          "sha256": "87c95fcfca46a008964324e53056753de472939e7a70ed8d96d6efd496424d16",
+          "size": 105650818
+        },
+        "mac-arm64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.21/Stratos-2.1.21-mac-arm64.dmg",
+          "sha256": "611d32b3a9efb6500d235318b6db11bbd5acd0ef7eaa4238ae29239f7ed95dc2",
+          "size": 121382971
+        },
+        "mac-x64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.21/Stratos-2.1.21-mac-x64.dmg",
+          "sha256": "6a112d365b7392d14202da588b79ce119c5067928ec96935dc5d53b5203bd0f7",
+          "size": 126712639
+        },
+        "linux-x64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.21/Stratos-2.1.21-linux-x64.AppImage",
+          "sha256": "146a81b361696d017ff93856224f7d64d5acdfff22383ae26aa5d7e41bc451c1",
+          "size": 142297325
+        }
       }
     },
     {
