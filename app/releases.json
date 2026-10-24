@@ -36,6 +36,28 @@
         "No storage format change: a plan stored by 2.1.21 gains its SID and STAR from its own route text the next time it is opened."
       ],
       "other": []
+    },
+    "downloads": {
+      "windows": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.22/Stratos-Setup.exe",
+        "sha256": "2a21e09c718577edc0038d6c532f4921ce13a5e11164f209bd7ac6c26bd83e48",
+        "size": 105668980
+      },
+      "mac-arm64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.22/Stratos-2.1.22-mac-arm64.dmg",
+        "sha256": "9d2ed361dc497dfcc9d0fbe4ece42fa5f0482d72df84b76950b3bd3a10f36790",
+        "size": 121410681
+      },
+      "mac-x64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.22/Stratos-2.1.22-mac-x64.dmg",
+        "sha256": "6e96b2333439fac3f0dfa25bfe69d237233e0deb61f798e82424128f06ec15ea",
+        "size": 126745009
+      },
+      "linux-x64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.22/Stratos-2.1.22-linux-x64.AppImage",
+        "sha256": "6c0c4fde8e35f52ff59971223bc4b0804890927265b2e870a9d327a3ccc08a55",
+        "size": 142317538
+      }
     }
   },
   "releases": [
@@ -73,6 +95,28 @@
           "No storage format change: a plan stored by 2.1.21 gains its SID and STAR from its own route text the next time it is opened."
         ],
         "other": []
+      },
+      "downloads": {
+        "windows": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.22/Stratos-Setup.exe",
+          "sha256": "2a21e09c718577edc0038d6c532f4921ce13a5e11164f209bd7ac6c26bd83e48",
+          "size": 105668980
+        },
+        "mac-arm64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.22/Stratos-2.1.22-mac-arm64.dmg",
+          "sha256": "9d2ed361dc497dfcc9d0fbe4ece42fa5f0482d72df84b76950b3bd3a10f36790",
+          "size": 121410681
+        },
+        "mac-x64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.22/Stratos-2.1.22-mac-x64.dmg",
+          "sha256": "6e96b2333439fac3f0dfa25bfe69d237233e0deb61f798e82424128f06ec15ea",
+          "size": 126745009
+        },
+        "linux-x64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.22/Stratos-2.1.22-linux-x64.AppImage",
+          "sha256": "6c0c4fde8e35f52ff59971223bc4b0804890927265b2e870a9d327a3ccc08a55",
+          "size": 142317538
+        }
       }
     },
     {
