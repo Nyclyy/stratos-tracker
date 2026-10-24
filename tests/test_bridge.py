@@ -567,6 +567,10 @@ class RelayTrafficTests(unittest.TestCase):
             cursor[key] = max(cursor.get(key, 0), stamp)
         self.assertEqual(bridge.relay_traffic_batch(cursor)["points"], [],
                          "nothing new means nothing sent")
+        # record_traffic never accepts a stamp in the future, so the sample has to
+        # arrive after the one already stored or it would collapse onto its
+        # millisecond and count as nothing new.
+        time.sleep(0.02)
         bridge.record_traffic([["SWR219", 46.3, -122.7, 20000, now + 5000]])
         second = bridge.relay_traffic_batch(cursor)
         self.assertEqual([point[0] for point in second["points"]], ["SWR219"])
