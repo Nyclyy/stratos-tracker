@@ -420,6 +420,16 @@ The integration test is the important one: it starts the real Python bridge and 
 - Bridge logbook writes use a temp file + atomic replace; in-progress flights are recovered and marked incomplete rather than discarded.
 - The Windows uninstaller does not delete user data (`deleteAppDataOnUninstall:false`).
 
+## Website download offer
+
+The public site offers the packaged build from the tracker itself, as website chrome only:
+
+- `app/js/downloads.js` mounts only on an `https` page that is not loopback and has no `window.stratosDesktop`, so the packaged app (`file://`), the bridge's plain http page and a local dev server never render it.
+- Installers come from `app/releases.json` — the table the release workflow writes for each tag, with its URL and size — and, only when that table is missing, from the GitHub release's own attached assets. No asset URL is built by hand, and a manifest that cannot be read leaves a link to the releases page instead of a dead button.
+- Dismissal is stored per version: `×` hides the panel in place and leaves a `↓ Downloads` control that reopens it, and a later installer may ask once more.
+
+Verified with `node scripts/dl-offer-check.mjs`, a real Chromium against `app/` served over https under a mapped, non-loopback host name: 14/14 checks — the panel lists the four published installers with the release's own URLs, it measures 436×221 and overlaps none of `#fab`, `#tabs`, the layers button or the location badge, the map stays mounted underneath, `×` hides it without a reload, the chip reopens it, a reload keeps it dismissed, a 390 px phone gets a 374 px panel clear of the bottom rail, and both the plain http page and the `file://` desktop page mount nothing. `npm test` runs 323 passing tests, including `tests/downloads.test.mjs`.
+
 ## Reproduce
 
 ```bash
@@ -429,6 +439,7 @@ npm run test:py
 npm run test:integration
 node scripts/benchmark.mjs
 npx playwright install chromium && node scripts/world-bench.mjs
+node scripts/dl-offer-check.mjs   # the website download offer, over https
 
 # Charts in a real browser (needs the bridge on 127.0.0.1:8765)
 python stratos_bridge.py --no-sim &

@@ -9,7 +9,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "node scripts/dev-server.mjs",
-    "test": "node --test tests/lib.test.mjs tests/charts.test.mjs tests/modules.test.mjs tests/ui.test.mjs tests/discover.test.mjs tests/relay.test.mjs tests/routeweather.test.mjs tests/minimap.test.mjs tests/windsaloft.test.mjs tests/routeplan.test.mjs tests/checklists.test.mjs tests/updates.test.mjs tests/updateui.test.mjs tests/feeds.test.mjs tests/vatsim.test.mjs tests/aircraft.test.mjs tests/overview.test.mjs tests/liveprogress.test.mjs tests/devserver.test.mjs tests/aircraftphoto.test.mjs tests/aircraftreg.test.mjs tests/connect.test.mjs tests/profile.test.mjs tests/simbrief.test.mjs tests/procedures.test.mjs tests/efb.test.mjs && node relay/worker/test/smoke.mjs",
+    "test": "node --test tests/lib.test.mjs tests/charts.test.mjs tests/modules.test.mjs tests/ui.test.mjs tests/discover.test.mjs tests/relay.test.mjs tests/routeweather.test.mjs tests/minimap.test.mjs tests/windsaloft.test.mjs tests/routeplan.test.mjs tests/checklists.test.mjs tests/updates.test.mjs tests/updateui.test.mjs tests/feeds.test.mjs tests/vatsim.test.mjs tests/aircraft.test.mjs tests/overview.test.mjs tests/liveprogress.test.mjs tests/devserver.test.mjs tests/aircraftphoto.test.mjs tests/aircraftreg.test.mjs tests/connect.test.mjs tests/profile.test.mjs tests/simbrief.test.mjs tests/procedures.test.mjs tests/efb.test.mjs tests/downloads.test.mjs && node relay/worker/test/smoke.mjs",
     "release:notes": "node scripts/release-notes.mjs",
     "release:check": "node scripts/release-notes.mjs --check && node scripts/check-release.mjs",
     "test:py": "python3 -m unittest -v tests.test_bridge tests.test_cifp",

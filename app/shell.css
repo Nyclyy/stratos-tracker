@@ -616,3 +616,86 @@
   .fr { font-size: 22px; }
   .fg b { font-size: 13px; }
 }
+
+/* ── Website download offer ─────────────────────────────────────────
+   Website chrome only: app/js/downloads.js mounts it when the page is the
+   public https site, never in the packaged app or on the bridge's own page.
+   It sits in the free strip at the top of the map, above the cards but below
+   the chart view, and stays out of the map's own controls. */
+.dl-offer {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  box-sizing: border-box;
+  width: min(436px, calc(100% - 24px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 11px 13px 12px;
+  border-radius: 14px;
+  background: linear-gradient(165deg, rgba(16, 30, 43, .97), rgba(7, 14, 23, .98));
+  border: 1px solid rgba(56, 189, 248, .26);
+  box-shadow: 0 14px 38px rgba(3, 9, 16, .46);
+  color: #e8f1fa;
+  font-family: var(--shell-font);
+  text-align: left;
+}
+.dl-offer[hidden], .dl-chip[hidden] { display: none; }
+.dl-top { display: flex; align-items: center; gap: 8px; }
+.dl-eyebrow {
+  font-size: 9.5px; font-weight: 750; letter-spacing: .16em; text-transform: uppercase;
+  color: #38bdf8;
+}
+.dl-ver {
+  font-size: 10px; font-weight: 700; letter-spacing: .04em; color: #9fd8f5;
+  border: 1px solid rgba(56, 189, 248, .3); border-radius: 999px; padding: 1px 6px;
+}
+.dl-sp { flex: 1 1 auto; }
+.dl-x {
+  flex: 0 0 auto; width: 22px; height: 22px; min-height: 0; padding: 0;
+  display: grid; place-items: center; border-radius: 7px; cursor: pointer;
+  background: transparent; border: 1px solid rgba(126, 176, 220, .24);
+  color: #8299ae; font-size: 11px; line-height: 1;
+}
+.dl-x:hover { color: #e8f1fa; border-color: rgba(56, 189, 248, .5); }
+.dl-line { margin: 0; font-size: 11px; line-height: 1.4; color: #8fa7bb; }
+.dl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.dl-btn {
+  display: flex; flex-direction: column; gap: 1px; min-width: 0;
+  padding: 7px 9px; border-radius: 9px; text-decoration: none;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(126, 176, 220, .18);
+  color: #e8f1fa;
+}
+.dl-btn:hover { background: rgba(56, 189, 248, .12); border-color: rgba(56, 189, 248, .55); text-decoration: none; }
+.dl-btn:focus-visible { outline: 2px solid #38bdf8; outline-offset: 1px; }
+.dl-plat { font-size: 12px; font-weight: 700; letter-spacing: .01em; color: #e8f1fa; }
+.dl-note { font-size: 9.5px; letter-spacing: .02em; color: #8299ae; }
+.dl-btn-single { align-items: center; text-align: center; font-size: 12px; font-weight: 700; }
+.dl-warn { color: #f6c453; }
+.dl-foot { display: flex; align-items: center; gap: 8px; border-top: 1px solid rgba(126, 176, 220, .12); padding-top: 7px; }
+.dl-all { font-size: 10px; font-weight: 650; letter-spacing: .02em; color: #7fb8d6; text-decoration: none; }
+.dl-all:hover { color: #38bdf8; text-decoration: none; }
+.dl-ver-note { margin-left: auto; font-size: 9px; letter-spacing: .04em; color: #63788b; }
+/* After dismissal: one small control where the panel was. */
+.dl-chip {
+  position: absolute; left: 50%; transform: translateX(-50%); top: 10px; z-index: 6;
+  display: inline-flex; align-items: center; gap: 5px;
+  min-height: 0; padding: 5px 11px; border-radius: 999px; cursor: pointer;
+  font-family: var(--shell-font); font-size: 10.5px; font-weight: 700; letter-spacing: .03em;
+  background: rgba(7, 14, 23, .9); color: #a9c6da;
+  border: 1px solid rgba(56, 189, 248, .24);
+  box-shadow: 0 6px 18px rgba(3, 9, 16, .35);
+}
+.dl-chip:hover { color: #e8f1fa; border-color: rgba(56, 189, 248, .55); }
+.dl-chip:focus-visible { outline: 2px solid #38bdf8; outline-offset: 1px; }
+@media (max-width: 520px) {
+  .dl-offer { top: 8px; width: calc(100% - 16px); padding: 10px 11px 11px; }
+  .dl-grid { gap: 5px; }
+  .dl-btn { padding: 6px 8px; }
+  .dl-chip { top: 8px; }
+}
+/* The chart view is a full-screen document; the offer steps aside for it. */
+.chartmode .dl-offer, .chartmode .dl-chip { display: none !important; }

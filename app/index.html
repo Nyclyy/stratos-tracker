@@ -2366,7 +2366,11 @@ try{if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').t
 </script>
 <script type="module">
   import { mountShell } from './js/shell.js';
+  import { initDownloadPrompt } from './js/downloads.js';
   mountShell({ page: 'home' });
+  // The public website offers the packaged build. The module decides: it mounts
+  // on the https site only, never in the desktop app or on the bridge's page.
+  initDownloadPrompt().catch(() => {});
 </script>
 <script type="module">
   import * as FP from './js/flightpanel.js';
