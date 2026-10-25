@@ -83,7 +83,6 @@ footer a{color:var(--muted)}
     <a href="app/">Open app</a>
     <a class="hide" href="#features">Features</a>
     <a class="hide" href="#install">Install</a>
-    <a href="https://github.com/Nyclyy/stratos-tracker" target="_blank" rel="noopener">GitHub ↗</a>
   </nav>
 </header>
 
@@ -95,11 +94,10 @@ footer a{color:var(--muted)}
     <p class="lead">A lightweight map, career logbook, replay, landing analysis, briefing and route planner for X-Plane and Microsoft Flight Simulator — with secure access from your iPhone.</p>
     <div class="actions">
       <a class="btn primary" href="app/">Open Stratos <span aria-hidden="true">↗</span></a>
-      <a class="btn secondary" id="pc-download" href="https://github.com/Nyclyy/stratos-tracker/releases/latest" rel="noopener">↓ Download for Windows</a>
+      <a class="btn secondary" id="pc-download" href="/api/download?p=windows">↓ Download for Windows</a>
       <a class="btn secondary" href="#install">Use on iPhone</a>
     </div>
-    <p class="small" id="download-note">Windows installer · iPhone installs from Safari, no App Store needed · Free and open source</p>
-    <div class="notice" id="download-warning" style="display:none">The Windows installer is not published on this repository yet. The button opens the releases page; you can also run the app in your browser.</div>
+    <p class="small" id="download-note">Windows installer · macOS and Linux builds on the tracker · iPhone installs from Safari, no App Store needed</p>
   </div>
 
   <div class="panel" aria-label="Example of the live flight view">
@@ -148,8 +146,8 @@ footer a{color:var(--muted)}
         <li>Run the installer. SmartScreen may warn because the build is not code-signed — choose <b>More info → Run anyway</b>.</li>
         <li>Launch Stratos. The simulator bridge starts with the app.</li>
       </ol>
-      <a class="btn primary" href="https://github.com/Nyclyy/stratos-tracker/releases/latest" rel="noopener">Download installer</a>
-      <p class="small">All releases: <a href="https://github.com/Nyclyy/stratos-tracker/releases" target="_blank" rel="noopener">GitHub Releases ↗</a></p>
+      <a class="btn primary" href="/api/download?p=windows">Download installer</a>
+      <p class="small">Also for <a href="/api/download?p=mac-arm64">macOS (Apple silicon)</a>, <a href="/api/download?p=mac-x64">macOS (Intel)</a> and <a href="/api/download?p=linux-x64">Linux</a>.</p>
     </article>
     <article class="card">
       <span class="badge">iPhone</span>
@@ -193,28 +191,17 @@ footer a{color:var(--muted)}
 
 <script>
 (function () {
-  var repo = 'Nyclyy/stratos-tracker';
-  var asset = 'https://github.com/' + repo + '/releases/latest/download/Stratos-Setup.exe';
-  var button = document.getElementById('pc-download');
-  var warning = document.getElementById('download-warning');
+  // The site's own manifest names the current version; the download buttons
+  // point at /api/download, which resolves the newest installer server-side.
   var note = document.getElementById('download-note');
-  button.href = asset;
-  fetch('https://api.github.com/repos/' + repo + '/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
+  fetch('app/releases.json', { headers: { Accept: 'application/json' } })
     .then(function (response) { return response.ok ? response.json() : null; })
-    .then(function (release) {
-      if (!release) return;
-      var found = (release.assets || []).some(function (item) { return /^Stratos-Setup\.exe$/i.test(item.name); });
-      if (found) {
-        button.href = asset;
-        button.textContent = '↓ Download for Windows';
-        note.textContent = 'Windows installer · version ' + String(release.tag_name || '').replace(/^v/, '') + ' · iPhone installs from Safari';
-      } else {
-        button.href = 'https://github.com/' + repo + '/releases/latest';
-        button.textContent = '↓ Open latest release';
-        warning.style.display = 'block';
-      }
+    .then(function (manifest) {
+      var version = manifest && manifest.latest && manifest.latest.version;
+      if (!version) return;
+      note.textContent = 'Windows installer · version ' + version + ' · macOS and Linux builds on the tracker · iPhone installs from Safari';
     })
-    .catch(function () { /* offline: keep the direct asset link */ });
+    .catch(function () { /* keep the generic note */ });
 })();
 </script>
 </body>

@@ -461,7 +461,7 @@ export async function mountUpdateCenter({ root, installedVersion = APP_VERSION, 
         <span class="su-status ${statusTone}">${statusText()}</span>
       </div>
       ${state.result?.cached && state.result.error ? `<p class="su-centre-empty">The release server could not be reached (${esc(state.result.error)}). This panel is showing the saved answer from ${esc(formatChecked(state.result.checkedAt))}; nothing was invented.</p>` : ''}
-      ${!supported ? '<p class="su-centre-empty">This build cannot download updates itself. Installed Windows copies update from the official GitHub release.</p>' : ''}
+      ${!supported ? '<p class="su-centre-empty">This build cannot download updates itself. Installed Windows copies update from the official release download.</p>' : ''}
       <div class="su-history" aria-label="Release history">
         ${(state.result?.releases || []).slice(0, 8).map(item => `
           <button class="su-release ${item.version === latestVersion() ? 'is-latest' : ''}" data-release="${esc(item.version)}" type="button">
@@ -470,7 +470,7 @@ export async function mountUpdateCenter({ root, installedVersion = APP_VERSION, 
             <em>${esc(item.version === installedVersion ? 'Installed' : item.version === latestVersion() ? 'Latest' : formatDate(item.releasedAt))}</em>
           </button>`).join('') || '<p class="su-centre-empty">Release history appears after the first successful check.</p>'}
       </div>
-      <p class="su-centre-empty">Updates are published from the project's GitHub releases. Downloads use HTTPS and are verified before they run; flight logs and settings are never touched.</p>
+      <p class="su-centre-empty">Updates are published with each official release. Downloads use HTTPS and are verified before they run; flight logs and settings are never touched.</p>
     </div>`;
 
     root.querySelector('[data-check]')?.addEventListener('click', () => runCheck());

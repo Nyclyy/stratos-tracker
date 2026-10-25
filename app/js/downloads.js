@@ -7,10 +7,10 @@
    - it mounts only on an https page that is not loopback, so the desktop app
      (file://), the PC bridge page (http, usually on the LAN), a local dev
      server and the tablet EFB never show it;
-   - it offers only the installers the published manifest actually lists — the
-     release's own URLs, hashes and sizes — and asks GitHub for the release
-     itself when that manifest predates its own download table. It never
-     constructs an asset URL, so it cannot offer a file that does not exist;
+   - it lists only the installers the published manifest actually carries, with
+     that release's sizes, and links each one to this site's own
+     /api/download?p=… endpoint rather than to a third-party file host, so the
+     page exposes no external download address;
    - dismissing it leaves a small Downloads control in the same corner, so the
      panel can be reopened without reloading the map or interrupting a flight,
      and a later version may ask once more.
@@ -20,9 +20,9 @@
    tests/downloads.test.mjs exercises the decisions and the parsing directly. */
 
 const REPO = 'Nyclyy/stratos-tracker';
-const RELEASES_PAGE = `https://github.com/${REPO}/releases`;
 const LATEST_RELEASE_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 const MANIFEST_URL = 'releases.json';
+const DOWNLOAD_ENDPOINT = '/api/download';
 const DISMISS_KEY = 'stratos.downloads.dismissed';
 
 /* One row per installer that is genuinely published. `asset` is the name
@@ -34,6 +34,11 @@ export const PLATFORMS = [
   { key: 'mac-x64', label: 'macOS', note: 'Intel', asset: /mac-x64\.dmg$/i },
   { key: 'linux-x64', label: 'Linux', note: 'AppImage · x64', asset: /linux-x64\.AppImage$/i },
 ];
+
+/* The site's own link, resolved server-side to the current file. */
+export function downloadUrl(key) {
+  return `${DOWNLOAD_ENDPOINT}?p=${encodeURIComponent(key)}`;
+}
 
 /* A binary is worth its size on the button; an unknown size is simply left off
    rather than guessed. */
@@ -54,8 +59,8 @@ function isWebUrl(value) {
 }
 
 /* The manifest's own table: the release workflow writes it for every platform
-   it built, with the tag's URL, digest and size. An entry without a usable URL
-   is dropped, not shown as a dead button. */
+   it built, with the asset's URL, digest and size. The URL is only evidence
+   that the file exists — the button points at this site's endpoint. */
 export function installersFromManifest(manifest) {
   const latest = manifest && manifest.latest;
   const downloads = latest && latest.downloads;
@@ -69,18 +74,17 @@ export function installersFromManifest(manifest) {
         key: platform.key,
         label: platform.label,
         note: platform.note,
-        url: String(entry.url),
+        url: downloadUrl(platform.key),
         size: formatSize(entry.size),
       });
     }
   }
-  return { version, items, fallback: items.length ? '' : RELEASES_PAGE };
+  return { version, items };
 }
 
-/* The newest release as GitHub reports it. Used only when the manifest is
-   older than its download table, so a release that has just shipped is still
-   offered with the files that are really attached to it. Blockmaps, update
-   feeds and the zips electron-updater reads are not installers for a person. */
+/* The newest release as published, used only when the manifest predates its own
+   download table, so a release that has just shipped is still offered. Blockmaps,
+   update feeds and the zips the updater reads are not installers for a person. */
 export function installersFromRelease(release) {
   const version = String((release && release.tag_name) || '').replace(/^v/i, '');
   const assets = Array.isArray(release && release.assets) ? release.assets : [];
@@ -92,11 +96,11 @@ export function installersFromRelease(release) {
       key: platform.key,
       label: platform.label,
       note: platform.note,
-      url: String(asset.browser_download_url),
+      url: downloadUrl(platform.key),
       size: formatSize(asset.size),
     });
   }
-  return { version, items, fallback: items.length ? '' : RELEASES_PAGE };
+  return { version, items };
 }
 
 /* Website only. The desktop build loads its pages over file:// and exposes
@@ -126,15 +130,15 @@ async function readInstallers(fetchImpl) {
       const result = installersFromManifest(await response.json());
       if (result.items.length) return result;
     }
-  } catch (_) { /* fall through to the release itself */ }
+  } catch (_) { /* fall through to the published release */ }
   try {
     const response = await fetchImpl(LATEST_RELEASE_API, { headers: { Accept: 'application/vnd.github+json' } });
     if (response && response.ok) {
       const result = installersFromRelease(await response.json());
       if (result.items.length) return result;
     }
-  } catch (_) { /* the releases page is still a real link */ }
-  return { version: '', items: [], fallback: RELEASES_PAGE };
+  } catch (_) { /* the panel says so and offers a retry */ }
+  return { version: '', items: [] };
 }
 
 function safeStorage(win) {
@@ -156,7 +160,7 @@ function element(doc, tag, className, text) {
   return node;
 }
 
-function buildOffer(doc, state, handlers) {
+function buildPanel(doc, state, handlers) {
   const panel = element(doc, 'aside', 'dl-offer');
   panel.id = 'dlOffer';
   panel.setAttribute('role', 'complementary');
@@ -165,13 +169,12 @@ function buildOffer(doc, state, handlers) {
   const top = element(doc, 'div', 'dl-top');
   top.append(element(doc, 'span', 'dl-eyebrow', 'Download Stratos'));
   if (state.version) top.append(element(doc, 'b', 'dl-ver', `v${state.version}`));
-  const spacer = element(doc, 'span', 'dl-sp');
   const close = element(doc, 'button', 'dl-x', '✕');
   close.type = 'button';
   close.setAttribute('aria-label', 'Hide the download options');
   close.title = 'Hide — Downloads brings it back';
   close.addEventListener('click', handlers.hide);
-  top.append(spacer, close);
+  top.append(element(doc, 'span', 'dl-sp'), close);
   panel.append(top);
 
   panel.append(element(doc, 'p', 'dl-line',
@@ -183,7 +186,6 @@ function buildOffer(doc, state, handlers) {
       const link = element(doc, 'a', 'dl-btn');
       link.href = item.url;
       link.setAttribute('download', '');
-      link.rel = 'noopener';
       link.setAttribute('aria-label', `Download Stratos for ${item.label} (${item.note})`);
       link.append(element(doc, 'span', 'dl-plat', item.label));
       link.append(element(doc, 'small', 'dl-note', item.size ? `${item.note} · ${item.size}` : item.note));
@@ -191,33 +193,31 @@ function buildOffer(doc, state, handlers) {
     }
     panel.append(grid);
   } else {
-    const note = element(doc, 'p', 'dl-line dl-warn',
-      'The installer list could not be read here. The releases page always has the current files.');
-    const link = element(doc, 'a', 'dl-btn dl-btn-single', 'Open the latest release ↗');
-    link.href = state.fallback || RELEASES_PAGE;
-    link.rel = 'noopener';
-    panel.append(note, link);
+    panel.append(element(doc, 'p', 'dl-line dl-warn',
+      state.busy ? 'Looking for the current installers…' : 'The installer list could not be read just now.'));
+    const retry = element(doc, 'button', 'dl-retry', state.busy ? 'Trying…' : 'Try again');
+    retry.type = 'button';
+    retry.disabled = Boolean(state.busy);
+    retry.addEventListener('click', handlers.retry);
+    panel.append(retry);
   }
 
   const foot = element(doc, 'div', 'dl-foot');
-  const all = element(doc, 'a', 'dl-all', 'All releases and checksums ↗');
-  all.href = RELEASES_PAGE;
-  all.target = '_blank';
-  all.rel = 'noopener';
-  foot.append(all);
-  if (state.version) foot.append(element(doc, 'span', 'dl-ver-note', `x64 · Windows, macOS, Linux`));
+  foot.append(element(doc, 'span', 'dl-ver-note', 'Windows · macOS · Linux · verified installers'));
   panel.append(foot);
+  panel.hidden = Boolean(state.hidden);
+  return panel;
+}
 
-  // The way back in after a dismissal. It is a control, not a banner: one
-  // small pill in the corner the panel used.
+function buildChip(doc, handlers) {
   const chip = element(doc, 'button', 'dl-chip', '↓ Downloads');
   chip.id = 'dlChip';
   chip.type = 'button';
+  chip.hidden = true;
   chip.setAttribute('aria-label', 'Show the Stratos download options');
   chip.title = 'Download Stratos for your PC';
   chip.addEventListener('click', handlers.show);
-  panel.chip = chip;
-  return panel;
+  return chip;
 }
 
 export async function initDownloadPrompt(options = {}) {
@@ -228,54 +228,89 @@ export async function initDownloadPrompt(options = {}) {
   if (doc.getElementById('dlOffer')) return null;
 
   const host = doc.getElementById('app') || doc.body;
-  const state = { version: '', items: [], fallback: RELEASES_PAGE, hidden: false };
+  const storage = options.storage || safeStorage(win);
+  const fetchImpl = options.fetch || (typeof win.fetch === 'function' ? win.fetch.bind(win) : null);
+  const read = options.readInstallers || (fetchImpl ? () => readInstallers(fetchImpl) : async () => ({ version: '', items: [] }));
+  const state = { version: '', items: [], hidden: false, busy: false };
   let panel = null;
+  let chip = null;
+
+  const paint = () => {
+    const next = buildPanel(doc, state, { hide, retry });
+    if (panel) panel.replaceWith(next);
+    else host.append(next);
+    panel = next;
+    if (chip) chip.hidden = !state.hidden;
+  };
+
+  const hide = () => {
+    state.hidden = true;
+    if (panel) panel.hidden = true;
+    if (chip) chip.hidden = false;
+    try {
+      storage.setItem(DISMISS_KEY, state.version || 'any');
+    } catch (_) { /* private mode: the panel simply comes back next visit */ }
+  };
 
   const show = () => {
     state.hidden = false;
     if (panel) panel.hidden = false;
-    if (panel && panel.chip) panel.chip.hidden = true;
-  };
-  const hide = () => {
-    state.hidden = true;
-    if (panel) panel.hidden = true;
-    if (panel && panel.chip) panel.chip.hidden = false;
-    try {
-      (options.storage || safeStorage(win)).setItem(DISMISS_KEY, state.version || 'any');
-    } catch (_) { /* private mode: the panel simply comes back next visit */ }
+    if (chip) chip.hidden = true;
   };
 
-  const read = options.readInstallers || (() => readInstallers(options.fetch || win.fetch.bind(win)));
+  const retry = async () => {
+    if (state.busy) return;
+    state.busy = true;
+    paint();
+    try {
+      const installers = await read();
+      if (installers && Array.isArray(installers.items) && installers.items.length) {
+        state.version = installers.version || '';
+        state.items = installers.items;
+      }
+    } catch (_) { /* stays on the retry state */ }
+    state.busy = false;
+    paint();
+  };
+
   let installers;
   try {
     installers = await read();
   } catch (_) {
-    installers = { version: '', items: [], fallback: RELEASES_PAGE };
+    installers = { version: '', items: [] };
   }
-  if (!installers || !Array.isArray(installers.items)) {
-    installers = { version: '', items: [], fallback: RELEASES_PAGE };
-  }
+  if (!installers || !Array.isArray(installers.items)) installers = { version: '', items: [] };
   state.version = installers.version || '';
   state.items = installers.items;
-  state.fallback = installers.fallback || RELEASES_PAGE;
-
-  panel = buildOffer(doc, state, { show, hide });
-  host.append(panel);
-  host.append(panel.chip);
 
   let dismissed = null;
   try {
-    dismissed = (options.storage || safeStorage(win)).getItem(DISMISS_KEY);
+    dismissed = storage.getItem(DISMISS_KEY);
   } catch (_) { dismissed = null; }
   // A dismissal applies to the build it was given for: a newer installer may
   // ask once, and an unreadable manifest keeps the quiet state.
-  const stayHidden = Boolean(dismissed) && (!state.version || dismissed === state.version || dismissed === 'any');
-  if (stayHidden) hide();
-  else show();
+  state.hidden = Boolean(dismissed) && (!state.version || dismissed === state.version || dismissed === 'any');
+
+  chip = buildChip(doc, { show });
+  paint();
+  host.append(chip);
+  chip.hidden = !state.hidden;
 
   const onKey = event => {
     if (event.key === 'Escape' && !state.hidden) hide();
   };
   win.addEventListener('keydown', onKey);
-  return { panel, chip: panel.chip, state, show, hide, destroy() { win.removeEventListener('keydown', onKey); panel.remove(); panel.chip.remove(); } };
+  return {
+    panel,
+    chip,
+    state,
+    show,
+    hide,
+    retry,
+    destroy() {
+      win.removeEventListener('keydown', onKey);
+      if (panel) panel.remove();
+      if (chip) chip.remove();
+    },
+  };
 }

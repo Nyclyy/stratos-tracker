@@ -5,11 +5,13 @@ import { parseHTML } from 'linkedom';
 import {
   PLATFORMS,
   downloadPromptEligible,
+  downloadUrl,
   formatSize,
   initDownloadPrompt,
   installersFromManifest,
   installersFromRelease,
 } from '../app/js/downloads.js';
+import handler, { resolveAsset, resolveDownload } from '../api/download.js';
 
 const manifest = JSON.parse(fs.readFileSync(new URL('../app/releases.json', import.meta.url), 'utf8'));
 
@@ -26,6 +28,23 @@ function memoryStorage() {
 function mountable() {
   const { window } = parseHTML('<!doctype html><html><body><div id="app"></div></body></html>');
   return { window, document: window.document };
+}
+
+function fakeResponse(body, ok = true) {
+  return { ok, status: ok ? 200 : 500, json: async () => body };
+}
+
+function fakeRes() {
+  const res = {
+    headers: {},
+    statusCode: 0,
+    ended: false,
+    setHeader(name, value) { this.headers[String(name).toLowerCase()] = value; },
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; },
+    end(body) { this.ended = true; if (typeof body === 'string') this.body = JSON.parse(body); return this; },
+  };
+  return res;
 }
 
 test('the download offer is website-only, never the app or the bridge page', () => {
@@ -49,22 +68,23 @@ test('the offer lists exactly the installers the published manifest carries', ()
   assert.deepEqual(result.items.map(item => item.key), PLATFORMS.filter(platform => downloads[platform.key]).map(platform => platform.key));
   assert.equal(result.items.length, 4, 'Windows, both macOS builds and Linux');
   for (const item of result.items) {
-    assert.equal(item.url, downloads[item.key].url, `${item.key} uses the release's own URL`);
-    assert.match(item.url, /^https:\/\/github\.com\/Nyclyy\/stratos-tracker\/releases\/download\//);
+    assert.equal(item.url, downloadUrl(item.key), `${item.key} uses the site's own link`);
+    assert.equal(item.url, `/api/download?p=${item.key}`);
     assert.ok(item.size.endsWith('MB'), 'the published size is shown');
     assert.ok(item.label && item.note, 'each installer states its platform');
   }
-  const windows = result.items.find(item => item.key === 'windows');
-  assert.match(windows.url, /Stratos-Setup\.exe$/);
-  assert.match(result.items.find(item => item.key === 'mac-arm64').url, /mac-arm64\.dmg$/);
+  // The page must not expose a third-party download address, in a link or in
+  // the text a visitor reads.
+  const serialised = JSON.stringify(result);
+  assert.equal(/github|githubusercontent/i.test(serialised), false, 'no external download host is shown');
 });
 
-test('a manifest with no table offers the release page instead of inventing links', () => {
+test('a manifest with no table offers a retry instead of inventing links', () => {
   const result = installersFromManifest({ latest: { version: '9.9.9', downloads: null } });
   assert.equal(result.items.length, 0);
-  assert.equal(result.fallback, 'https://github.com/Nyclyy/stratos-tracker/releases');
   assert.equal(installersFromManifest(null).items.length, 0);
-  // A row whose URL is not a web address is dropped, not rendered dead.
+  assert.equal(/github/i.test(JSON.stringify(result)), false);
+  // A row whose asset URL is not a web address is dropped, not rendered dead.
   const partial = installersFromManifest({
     latest: { version: '1.0.0', downloads: { windows: { url: 'javascript:alert(1)', size: 10 }, 'linux-x64': { url: 'https://example.com/a.AppImage', size: 2048 } } },
   });
@@ -88,7 +108,7 @@ test('a freshly published release fills the gap from its own attached assets', (
   assert.equal(result.version, '2.1.26');
   assert.deepEqual(result.items.map(item => item.key), ['windows', 'mac-arm64', 'mac-x64', 'linux-x64']);
   for (const item of result.items) {
-    assert.doesNotMatch(item.url, /\.(zip|blockmap|yml)$/, 'only installers are offered');
+    assert.equal(item.url, `/api/download?p=${item.key}`, 'the site link, not the asset URL');
   }
   assert.equal(formatSize(107334063), '102 MB');
   assert.equal(formatSize(undefined), '');
@@ -115,6 +135,7 @@ test('the panel reads the manifest, closes to a Downloads control and reopens', 
   assert.match(panel.textContent, /Download Stratos/, 'the offer says what it is');
   assert.match(panel.textContent, /Windows/);
   assert.match(panel.textContent, /Linux/);
+  assert.equal(panel.innerHTML.includes('github'), false, 'no third-party link in the markup');
   assert.ok(panel.querySelector('.dl-x'), 'there is a close control');
   assert.equal(chip.hidden, true, 'the way back in stays out of the way while the panel is open');
 
@@ -155,19 +176,80 @@ test('no panel is mounted inside the app or on the bridge page', async () => {
   }
 });
 
-test('an unreadable manifest still leaves a real way to the releases page', async () => {
+test('a manifest that cannot be read offers a retry that works', async () => {
   const { window, document } = mountable();
+  let calls = 0;
   await initDownloadPrompt({
     window, document, storage: memoryStorage(), protocol: 'https:', hostname: 'stratos-tracker.com', desktop: null,
-    readInstallers: async () => ({ version: '', items: [], fallback: 'https://github.com/Nyclyy/stratos-tracker/releases' }),
+    readInstallers: async () => {
+      calls += 1;
+      return calls === 1 ? { version: '', items: [] } : installersFromManifest(manifest);
+    },
   });
-  const panel = document.getElementById('dlOffer');
-  assert.equal(panel.querySelectorAll('a.dl-btn').length, 1);
+  let panel = document.getElementById('dlOffer');
+  assert.equal(panel.querySelectorAll('a.dl-btn').length, 0, 'no invented installer');
   assert.match(panel.textContent, /could not be read/);
-  assert.equal(panel.querySelector('a.dl-btn').href, 'https://github.com/Nyclyy/stratos-tracker/releases');
+  const retry = panel.querySelector('.dl-retry');
+  assert.ok(retry, 'the panel offers a retry');
+  retry.dispatchEvent(new window.Event('click'));
+  await new Promise(resolve => setTimeout(resolve, 20));
+  panel = document.getElementById('dlOffer');
+  assert.equal(panel.querySelectorAll('a.dl-btn').length, 4, 'the retry reads the real installers');
+  assert.equal(panel.hidden, false);
 });
 
-test('every website page can reach the offer, and the app page wires it up', () => {
+test('the site endpoint resolves a platform to the published installer', async () => {
+  const asset = manifest.latest.downloads.windows.url;
+  assert.equal(resolveDownload(manifest, 'windows'), asset);
+  assert.equal(resolveDownload(manifest, 'linux-x64'), manifest.latest.downloads['linux-x64'].url);
+  assert.equal(resolveDownload({ latest: { downloads: null } }, 'windows'), null);
+  assert.equal(resolveDownload(manifest, 'amiga'), null);
+  assert.equal(resolveDownload({ latest: { downloads: { windows: { url: 'ftp://x/y' } } } }, 'windows'), null);
+
+  const release = { assets: [{ name: 'Stratos-Setup.exe', browser_download_url: 'https://example.test/Setup.exe' }] };
+  assert.equal(resolveAsset(release, 'windows'), 'https://example.test/Setup.exe');
+  assert.equal(resolveAsset(release, 'linux-x64'), null);
+
+  // The handler answers with the manifest's own file, cached briefly at the edge.
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => fakeResponse(manifest);
+    const res = fakeRes();
+    await handler({ query: { p: 'windows' }, headers: { host: 'www.stratos-tracker.com' } }, res);
+    assert.equal(res.statusCode, 302);
+    assert.equal(res.headers.location, asset);
+    assert.match(res.headers['cache-control'], /s-maxage=300/);
+    assert.equal(res.ended, true);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('the endpoint rejects what it cannot resolve without inventing a file', async () => {
+  const res = fakeRes();
+  await handler({ query: { p: 'amiga' }, headers: { host: 'x.test' } }, res);
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.headers['cache-control'], 'no-store');
+
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => fakeResponse(manifest);
+    const missing = fakeRes();
+    await handler({ query: { p: 'mac-arm64' }, headers: { host: 'x.test' } }, missing);
+    // The manifest does carry it, so this one resolves rather than 404s.
+    assert.equal(missing.statusCode, 302);
+
+    globalThis.fetch = async () => fakeResponse({ message: 'rate limited' }, false);
+    const failed = fakeRes();
+    await handler({ query: { p: 'windows' }, headers: { host: 'x.test' } }, failed);
+    assert.equal(failed.statusCode, 404);
+    assert.match(failed.body.error, /No installer is published/);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('the website carries no third-party download link anywhere', () => {
   const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
   assert.match(page, /import \{ initDownloadPrompt \} from '\.\/js\/downloads\.js'/, 'the map page loads it');
   assert.match(page, /initDownloadPrompt\(\)/, 'and initialises it');
@@ -175,8 +257,13 @@ test('every website page can reach the offer, and the app page wires it up', () 
     const html = fs.readFileSync(new URL(`../app/${name}`, import.meta.url), 'utf8');
     assert.equal(html.includes('initDownloadPrompt'), false, `${name} does not add the website offer`);
   }
+  const landing = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.equal(/github/i.test(landing), false, 'the landing page shows no GitHub link or address');
+  assert.match(landing, /href="\/api\/download\?p=windows"/, 'its Windows buttons use the site endpoint');
+  for (const key of ['mac-arm64', 'mac-x64', 'linux-x64']) {
+    assert.match(landing, new RegExp(`/api/download\\?p=${key}`), `${key} is offered from the site too`);
+  }
   const module = fs.readFileSync(new URL('../app/js/downloads.js', import.meta.url), 'utf8');
   assert.match(module, /releases\.json/, 'the installers come from the published manifest');
-  assert.match(module, /api\.github\.com\/repos\/\$\{REPO\}\/releases\/latest/, 'with the release as the fallback');
-  assert.equal(/href\s*=\s*['"][^'"]*Setup\.exe/.test(module), false, 'no asset URL is constructed by hand');
+  assert.match(module, /DOWNLOAD_ENDPOINT = '\/api\/download'/, 'and link through the site endpoint');
 });

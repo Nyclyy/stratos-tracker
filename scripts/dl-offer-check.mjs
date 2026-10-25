@@ -100,15 +100,18 @@ try {
       close: Boolean(offer.querySelector('.dl-x')),
       chipHidden: document.getElementById('dlChip').hidden,
       mapRunning: Boolean(document.getElementById('map')),
+      html: offer.innerHTML,
     };
   });
 
   record('the offer appears on the https website', Boolean(panel.version), panel.version);
   record('it lists Windows, both macOS builds and Linux', panel.links.length === 4,
     panel.links.map(l => `${l.label} ${l.note}`).join(' | '));
-  record('every button is a real release asset',
-    panel.links.every(l => /^https:\/\/github\.com\/Nyclyy\/stratos-tracker\/releases\/download\/v\d+\.\d+\.\d+\//.test(l.href)),
-    panel.links.map(l => l.href.split('/').pop()).join(', '));
+  record('every button uses the site’s own download link',
+    panel.links.every(l => /\/api\/download\?p=(windows|mac-arm64|mac-x64|linux-x64)$/.test(l.href)),
+    panel.links.map(l => l.href.replace(/^https:\/\/[^/]+/, '')).join(', '));
+  record('no third-party download address appears on the page',
+    !/github/i.test(panel.html), panel.html.includes('github') ? 'github found in the panel markup' : 'panel markup is clean');
   record('the panel is compact and clear of the map controls',
     panel.box.height <= 240 && panel.controls.every(c => !c.overlaps),
     `${panel.box.width}×${panel.box.height} at ${panel.box.left},${panel.box.top}; controls ${JSON.stringify(panel.controls)}`);
