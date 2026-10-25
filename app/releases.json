@@ -9,7 +9,7 @@
     "summary": "The phone opens the same map as the PC with your aircraft on it, the flown trail eases through turns, and the flight-plan card shows the cruise level and opens your SimBrief OFP.",
     "changelog": {
       "features": [
-        "Opening Stratos on a phone now hands it to the map your PC serves, which pairs itself and shows live telemetry: no code, no address to type, no settings, and a fleet of one aircraft already on the map.",
+        "Opening Stratos on a phone now hands it to the map your PC serves, which pairs itself and shows live telemetry: no code, no address to type and no settings.",
         "The flight-plan card has an OFP action that opens the SimBrief document for the imported plan. When SimBrief publishes no PDF for a plan, its OFP text is shown in the Flight summary instead of a dead button.",
         "The compact flight-plan card states the planned cruise level (CRZ FL350) and the distance remaining, so neither needs the card expanded."
       ],
@@ -26,6 +26,28 @@
       "ui": [],
       "compatibility": [],
       "other": []
+    },
+    "downloads": {
+      "windows": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.23/Stratos-Setup.exe",
+        "sha256": "b9e05919d93c940751b4471acfcb791acf57d3066d04868f4c93b63300690689",
+        "size": 107105001
+      },
+      "mac-arm64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.23/Stratos-2.1.23-mac-arm64.dmg",
+        "sha256": "73607b2910acf77c2bec251f1916fa551ef59ddb9adf528450c5827f040be638",
+        "size": 122882347
+      },
+      "mac-x64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.23/Stratos-2.1.23-mac-x64.dmg",
+        "sha256": "9a66b7e18cad5ff8a15de8a67aed639b903a2661d65e7a0c95ef7972fd9ec421",
+        "size": 128245604
+      },
+      "linux-x64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.23/Stratos-2.1.23-linux-x64.AppImage",
+        "sha256": "95cf211e1bb430bebdcfe59ce00a31d26661aed0a9b2942bc07d1fb9867d2e0e",
+        "size": 143768227
+      }
     }
   },
   "releases": [
@@ -36,7 +58,7 @@
       "summary": "The phone opens the same map as the PC with your aircraft on it, the flown trail eases through turns, and the flight-plan card shows the cruise level and opens your SimBrief OFP.",
       "changelog": {
         "features": [
-          "Opening Stratos on a phone now hands it to the map your PC serves, which pairs itself and shows live telemetry: no code, no address to type, no settings, and a fleet of one aircraft already on the map.",
+          "Opening Stratos on a phone now hands it to the map your PC serves, which pairs itself and shows live telemetry: no code, no address to type and no settings.",
           "The flight-plan card has an OFP action that opens the SimBrief document for the imported plan. When SimBrief publishes no PDF for a plan, its OFP text is shown in the Flight summary instead of a dead button.",
           "The compact flight-plan card states the planned cruise level (CRZ FL350) and the distance remaining, so neither needs the card expanded."
         ],
@@ -53,6 +75,28 @@
         "ui": [],
         "compatibility": [],
         "other": []
+      },
+      "downloads": {
+        "windows": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.23/Stratos-Setup.exe",
+          "sha256": "b9e05919d93c940751b4471acfcb791acf57d3066d04868f4c93b63300690689",
+          "size": 107105001
+        },
+        "mac-arm64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.23/Stratos-2.1.23-mac-arm64.dmg",
+          "sha256": "73607b2910acf77c2bec251f1916fa551ef59ddb9adf528450c5827f040be638",
+          "size": 122882347
+        },
+        "mac-x64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.23/Stratos-2.1.23-mac-x64.dmg",
+          "sha256": "9a66b7e18cad5ff8a15de8a67aed639b903a2661d65e7a0c95ef7972fd9ec421",
+          "size": 128245604
+        },
+        "linux-x64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.23/Stratos-2.1.23-linux-x64.AppImage",
+          "sha256": "95cf211e1bb430bebdcfe59ce00a31d26661aed0a9b2942bc07d1fb9867d2e0e",
+          "size": 143768227
+        }
       }
     },
     {
