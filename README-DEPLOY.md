@@ -127,6 +127,36 @@ Severity is a published fact, not a nag screen:
 
 Do not hand-edit `app/releases.json` into an inconsistent state: `--check` enforces valid semantic versions, unique releases, a `latest` that really is the newest stable release, ISO dates and a reason on critical entries, and validates every curated entry. The release workflow regenerates the manifest at release time, so notes reflect what is actually committed. Once the release is live, the publish job commits that generated manifest back to `main` as `app/releases.json`, because the website serves that copy rather than the release asset; the new version's installer URL, SHA-256 and size are on the site as soon as it redeploys, instead of waiting for the next release to carry them. The GitHub Action needs only the default `GITHUB_TOKEN` with `contents: write`; no extra secrets are required for the manifest.
 
+### Downloads from our own domain
+
+The site must never send a visitor to a third-party file host, so the installers are mirrored to a Cloudflare R2 bucket served from **`https://downloads.stratos-tracker.com`** (the zone is already on Cloudflare, and R2 charges no egress). Objects are versioned and immutable:
+
+```
+v2.1.25/Stratos-Setup.exe
+v2.1.25/Stratos-2.1.25-mac-arm64.dmg
+v2.1.25/Stratos-2.1.25-mac-x64.dmg
+v2.1.25/Stratos-2.1.25-linux-x64.AppImage
+```
+
+`scripts/publish-installers.mjs` uploads them, signs its own SigV4 requests (no dependencies), skips an object that already has the same size, and then fetches every file again **from the public host** so a bucket that is not actually served fails there instead of on a visitor's click:
+
+```bash
+R2_ACCOUNT_ID=… R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… \
+R2_BUCKET=stratos-downloads R2_PUBLIC_BASE=https://downloads.stratos-tracker.com \
+  node scripts/publish-installers.mjs --dir dist --tag v2.1.25
+```
+
+One-time setup in the Cloudflare dashboard:
+
+1. **R2 → Create bucket**, e.g. `stratos-downloads` (Standard class).
+2. Bucket → **Settings → Custom domains → Connect domain**: `downloads.stratos-tracker.com`. Cloudflare creates the DNS record; the bucket becomes public for reads at that host only.
+3. **R2 → Manage R2 API Tokens → Create API token**, permission **Object Read & Write**, scoped to that bucket. The token shows an Access Key ID, a Secret Access Key and the account ID.
+4. Add `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_BUCKET` as repository **secrets**, and (optionally) `R2_PUBLIC_BASE` as a repository **variable** if you serve a different host.
+
+With those secrets present the release workflow mirrors every installer before it writes the download table, so `app/releases.json` carries our URLs; without them it skips the step and the release still publishes with the release's own URLs. `scripts/check-release.mjs` accepts either source, and when the manifest names our host it fetches that URL and compares the byte count, so a manifest can never point at a file the host does not serve.
+
+`/api/download?p=<platform>` is what the site's buttons use: it reads the published manifest and answers `302` to whatever URL that entry carries, so moving the files is a manifest change, not a site change.
+
 ### Automatic updates
 
 A packaged Windows build checks the newest stable release eight seconds after the window appears, again twenty minutes later, and every six hours after that (`electron-main.cjs`). The second launch-time check matters because the six-hourly cycle would otherwise leave an app that was already running when a release went live on the old build until the next cycle. Development runs and unpacked builds never check (`app.isPackaged`). A newer installer downloads in the background; `electron-updater` verifies it against the SHA-512 in `latest.yml` before emitting `update-downloaded`, and Stratos installs it when it quits.

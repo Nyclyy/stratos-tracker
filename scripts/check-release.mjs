@@ -24,6 +24,10 @@ const positional = args.filter(arg => !arg.startsWith('--'));
 
 const REPO = 'Nyclyy/stratos-tracker';
 const MIN_INSTALLER_BYTES = 30 * 1000 * 1000;
+// The installers are also mirrored to our own host (scripts/publish-installers.mjs),
+// and the manifest the site serves then points there. Both are legitimate; any
+// other address would offer a file nobody published.
+const MIRROR_BASE = (process.env.R2_PUBLIC_BASE || 'https://downloads.stratos-tracker.com').replace(/\/+$/, '');
 
 const root = path.resolve(import.meta.dirname, '..');
 const version = (positional[0] || JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version).replace(/^v/, '');
@@ -163,11 +167,19 @@ if (!latest) {
       continue;
     }
     if (!asset) continue;
-    const expectedUrl = `https://github.com/${REPO}/releases/download/${tag}/${platform.installer}`;
-    if (entry.url !== expectedUrl) fail(`manifest ${platform.key} download points at ${entry.url}`);
+    const releaseUrl = `https://github.com/${REPO}/releases/download/${tag}/${platform.installer}`;
+    const mirrorUrl = `${MIRROR_BASE}/${tag}/${platform.installer}`;
+    if (entry.url !== releaseUrl && entry.url !== mirrorUrl) fail(`manifest ${platform.key} download points at ${entry.url}`);
     else if (entry.sha256 !== digestOf(asset)) fail(`manifest ${platform.key} checksum ${entry.sha256 || '(none)'} does not match the published ${digestOf(asset)}`);
     else if (entry.size !== asset.size) fail(`manifest ${platform.key} size ${entry.size} does not match the published ${asset.size}`);
-    else pass(`manifest ${platform.key} download is ${platform.installer} with the published digest and size`);
+    else if (entry.url === mirrorUrl) {
+      // Our own host is only useful if it really serves the same bytes.
+      const answered = await fetch(mirrorUrl, { method: 'HEAD', redirect: 'follow' }).catch(() => null);
+      const served = answered ? Number(answered.headers.get('content-length') || 0) : 0;
+      if (!answered || answered.status !== 200) fail(`manifest ${platform.key} download ${mirrorUrl} answers ${answered ? answered.status : 'nothing'}`);
+      else if (served && served !== asset.size) fail(`manifest ${platform.key} download ${mirrorUrl} serves ${served} bytes, expected ${asset.size}`);
+      else pass(`manifest ${platform.key} download is ${platform.installer} on our own host, with the published digest and size`);
+    } else pass(`manifest ${platform.key} download is ${platform.installer} with the published digest and size`);
   }
 }
 

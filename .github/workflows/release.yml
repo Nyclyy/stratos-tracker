@@ -378,16 +378,38 @@ jobs:
       - name: Merge the macOS update feeds
         run: node scripts/merge-update-feeds.mjs dist/latest-mac.yml dist/latest-mac-arm64.yml dist/latest-mac-x64.yml
 
+      # The installers also go to our own download host, so the manifest the site
+      # serves names a URL we control instead of a third-party file host. The
+      # script fails the release if the bucket is configured but does not serve
+      # the file, and it is skipped when the secrets are absent: a release still
+      # publishes, with the release's own URLs.
+      - name: Mirror the installers to our download host
+        id: mirror
+        if: ${{ secrets.R2_ACCOUNT_ID != '' && secrets.R2_ACCESS_KEY_ID != '' && secrets.R2_SECRET_ACCESS_KEY != '' && secrets.R2_BUCKET != '' }}
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PUBLIC_BASE: ${{ vars.R2_PUBLIC_BASE || 'https://downloads.stratos-tracker.com' }}
+        run: |
+          set -euo pipefail
+          node scripts/publish-installers.mjs --dir dist --tag "$TAG"
+          echo "base=${R2_PUBLIC_BASE%/}/$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Write the checksum and the download table
+        env:
+          MIRROR_BASE: ${{ steps.mirror.outputs.base }}
         run: |
           set -euo pipefail
           for name in Stratos-Setup.exe "Stratos-${VERSION}-mac-arm64.dmg" "Stratos-${VERSION}-mac-x64.dmg" "Stratos-${VERSION}-linux-x64.AppImage"; do
             test -s "dist/$name" || { echo "::error::$name is missing from the build output"; exit 1; }
           done
           (cd dist && sha256sum Stratos-Setup.exe > Stratos-Setup.exe.sha256)
+          BASE="${MIRROR_BASE:-https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}}"
           add() {
             jq -n --arg key "$1" \
-              --arg url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/$2" \
+              --arg url "${BASE}/$2" \
               --arg sha "$(sha256sum "dist/$2" | cut -d' ' -f1)" \
               --argjson size "$(stat -c%s "dist/$2")" \
               '{($key): {url: $url, sha256: $sha, size: $size}}' >> dist/downloads.jsonl
@@ -434,6 +456,8 @@ jobs:
             dist/*.dmg dist/*.zip dist/*.AppImage dist/*.blockmap
 
       - name: Check the draft against every platform
+        env:
+          R2_PUBLIC_BASE: ${{ vars.R2_PUBLIC_BASE || 'https://downloads.stratos-tracker.com' }}
         run: node scripts/check-release.mjs "$VERSION" --draft
 
       - name: Publish and confirm the live release
