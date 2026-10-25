@@ -1,4 +1,23 @@
 {
+  "2.1.23": {
+    "summary": "The phone opens the same map as the PC with your aircraft on it, the flown trail eases through turns, and the flight-plan card shows the cruise level and opens your SimBrief OFP.",
+    "changelog": {
+      "features": [
+        "Opening Stratos on a phone now hands it to the map your PC serves, which pairs itself and shows live telemetry: no code, no address to type and no settings.",
+        "The flight-plan card has an OFP action that opens the SimBrief document for the imported plan. When SimBrief publishes no PDF for a plan, its OFP text is shown in the Flight summary instead of a dead button.",
+        "The compact flight-plan card states the planned cruise level (CRZ FL350) and the distance remaining, so neither needs the card expanded."
+      ],
+      "improvements": [
+        "A flown trail is drawn through rounded corners: a turn curves instead of kinking at the sample rate. The recorded positions are not moved, and the phone's map uses the same curve."
+      ],
+      "fixes": [
+        "The bridge the desktop app starts now listens on the local network, so a phone can reach it; one-tap pairing previously answered that the bridge was reachable only on this PC.",
+        "The packaged bridge now carries the pages it serves, so a phone opening the page the PC provides no longer lands on a 404.",
+        "The phone no longer claims live simulator data while none is arriving: it says which part it is waiting for.",
+        "SimBrief responses that state the planned level as an initial cruise altitude now supply the cruise level instead of leaving it blank."
+      ]
+    }
+  },
   "2.1.22": {
     "summary": "A calmer, more professional Stratos: five destinations on every page, a real flight-plan card in place of the pencil, and SimBrief SID and STAR that finally import.",
     "changelog": {

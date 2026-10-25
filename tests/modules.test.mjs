@@ -147,6 +147,21 @@ test('a packaged build can update itself from the GitHub releases', () => {
   assert.match(workflow, /--notes-file dist\/release-notes\.md/, 'the release page uses the categorised changelog');
 });
 
+test('the desktop app gives its bridge a network bind a phone can reach', () => {
+  const root = path.resolve(import.meta.dirname, '..');
+  const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+  const main = read('electron-main.cjs');
+  // A loopback bind answers "The bridge is reachable only on this PC" to every
+  // phone and never starts multicast discovery, which is exactly the state a
+  // phone cannot connect from. The desktop still talks to it over loopback.
+  assert.match(main, /const BRIDGE_BIND = process\.env\.STRATOS_HOST \|\| '0\.0\.0\.0'/, 'the bridge listens on the network unless a bind address is forced');
+  assert.match(main, /STRATOS_HOST: BRIDGE_BIND/, 'the child process is started with that bind');
+  assert.match(main, /const BRIDGE_HOST = '127\.0\.0\.1'/, 'the desktop still probes its own loopback address');
+  // The exe serves the phone's page itself, so the app files must be bundled.
+  const workflow = read('.github/workflows/release.yml');
+  assert.equal((workflow.match(/--add-data "\$GITHUB_WORKSPACE\/app[;:]app"/g) || []).length, 3, 'every packaged bridge build carries app/');
+});
+
 test('bridge runtime state cannot be committed again', () => {
   const root = path.resolve(import.meta.dirname, '..');
   const ignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8').split('\n').map(line => line.trim());

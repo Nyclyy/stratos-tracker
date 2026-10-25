@@ -3,64 +3,58 @@
   "product": "stratos",
   "source": "https://github.com/Nyclyy/stratos-tracker",
   "latest": {
-    "version": "2.1.22",
-    "releasedAt": "2026-10-24",
+    "version": "2.1.23",
+    "releasedAt": "2026-10-25",
     "severity": "normal",
-    "summary": "A calmer, more professional Stratos: five destinations on every page, a real flight-plan card in place of the pencil, and SimBrief SID and STAR that finally import.",
+    "summary": "The phone opens the same map as the PC with your aircraft on it, the flown trail eases through turns, and the flight-plan card shows the cruise level and opens your SimBrief OFP.",
     "changelog": {
       "features": [
-        "Five top-level destinations on every page — Flight Deck, Flight Planning, Logbook, Explore and Profile — with Live, Charts, Weather and the data pack one tap away in the map's tools menu.",
-        "The flight-plan card replaces the pencil control: callsign, aircraft, departure and arrival, SID and STAR with their planned runways, cruise, distance and time.",
-        "It expands in place for route, alternate, weather, weights, fuel, passengers, cargo and live progress, and remembers whether it is open.",
-        "Explore gathers Weather, Airports, Charts, Statistics and Live in one hub, linked from its own strip on the Explore page.",
-        "Settings documents the palette on an aviation colour board: cyan, violet, amber, white, charcoal, grey, red and green, each with its HEX and its job, beside real controls and map symbols.",
-        "SimBrief SID and STAR now import from the fields SimBrief actually writes, including plans with Detailed Navlog off, and a shortened ident is restored to the full published name when the plan's IFPS route confirms it."
+        "Opening Stratos on a phone now hands it to the map your PC serves, which pairs itself and shows live telemetry: no code, no address to type, no settings, and a fleet of one aircraft already on the map.",
+        "The flight-plan card has an OFP action that opens the SimBrief document for the imported plan. When SimBrief publishes no PDF for a plan, its OFP text is shown in the Flight summary instead of a dead button.",
+        "The compact flight-plan card states the planned cruise level (CRZ FL350) and the distance remaining, so neither needs the card expanded."
       ],
       "improvements": [
-        "The card keeps the SID above its departure runway and the STAR above its arrival runway, even while the rest of it is minimized.",
-        "The map rail and every page bar share one navigation list, with labels and tooltips shortened to match.",
-        "The flight summary prints ICAO codes instead of airport objects, and a detected callsign takes precedence over the plan's."
+        "A flown trail is drawn through rounded corners: a turn curves instead of kinking at the sample rate. The recorded positions are not moved, and the phone's map uses the same curve."
       ],
       "fixes": [
-        "A SimBrief plan no longer imports with no SID or STAR: they are read from `general`, where SimBrief writes them.",
-        "A plan without navlog fixes still imports its SID, STAR and runways and keeps the current route, instead of failing the whole import.",
-        "The weather search no longer pushes its Search button off a phone screen, and the toolbar no longer overflows at 390 px.",
-        "The Live page marks Explore as its section instead of leaving the bottom bar with no current item."
+        "The bridge the desktop app starts now listens on the local network, so a phone can reach it; one-tap pairing previously answered that the bridge was reachable only on this PC.",
+        "The packaged bridge now carries the pages it serves, so a phone opening the page the PC provides no longer lands on a 404.",
+        "The phone no longer claims live simulator data while none is arriving: it says which part it is waiting for.",
+        "SimBrief responses that state the planned level as an initial cruise altitude now supply the cruise level instead of leaving it blank."
       ],
       "performance": [],
-      "ui": [
-        "Selected waypoints and the night accent now use the exact violet and cyan the colour board documents.",
-        "The flight-plan card uses the shell's panel styling, with a compact summary line and a single control to expand or minimize it."
-      ],
-      "compatibility": [
-        "No storage format change: a plan stored by 2.1.21 gains its SID and STAR from its own route text the next time it is opened."
-      ],
+      "ui": [],
+      "compatibility": [],
       "other": []
-    },
-    "downloads": {
-      "windows": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.22/Stratos-Setup.exe",
-        "sha256": "2a21e09c718577edc0038d6c532f4921ce13a5e11164f209bd7ac6c26bd83e48",
-        "size": 105668980
-      },
-      "mac-arm64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.22/Stratos-2.1.22-mac-arm64.dmg",
-        "sha256": "9d2ed361dc497dfcc9d0fbe4ece42fa5f0482d72df84b76950b3bd3a10f36790",
-        "size": 121410681
-      },
-      "mac-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.22/Stratos-2.1.22-mac-x64.dmg",
-        "sha256": "6e96b2333439fac3f0dfa25bfe69d237233e0deb61f798e82424128f06ec15ea",
-        "size": 126745009
-      },
-      "linux-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.22/Stratos-2.1.22-linux-x64.AppImage",
-        "sha256": "6c0c4fde8e35f52ff59971223bc4b0804890927265b2e870a9d327a3ccc08a55",
-        "size": 142317538
-      }
     }
   },
   "releases": [
+    {
+      "version": "2.1.23",
+      "releasedAt": "2026-10-25",
+      "severity": "normal",
+      "summary": "The phone opens the same map as the PC with your aircraft on it, the flown trail eases through turns, and the flight-plan card shows the cruise level and opens your SimBrief OFP.",
+      "changelog": {
+        "features": [
+          "Opening Stratos on a phone now hands it to the map your PC serves, which pairs itself and shows live telemetry: no code, no address to type, no settings, and a fleet of one aircraft already on the map.",
+          "The flight-plan card has an OFP action that opens the SimBrief document for the imported plan. When SimBrief publishes no PDF for a plan, its OFP text is shown in the Flight summary instead of a dead button.",
+          "The compact flight-plan card states the planned cruise level (CRZ FL350) and the distance remaining, so neither needs the card expanded."
+        ],
+        "improvements": [
+          "A flown trail is drawn through rounded corners: a turn curves instead of kinking at the sample rate. The recorded positions are not moved, and the phone's map uses the same curve."
+        ],
+        "fixes": [
+          "The bridge the desktop app starts now listens on the local network, so a phone can reach it; one-tap pairing previously answered that the bridge was reachable only on this PC.",
+          "The packaged bridge now carries the pages it serves, so a phone opening the page the PC provides no longer lands on a 404.",
+          "The phone no longer claims live simulator data while none is arriving: it says which part it is waiting for.",
+          "SimBrief responses that state the planned level as an initial cruise altitude now supply the cruise level instead of leaving it blank."
+        ],
+        "performance": [],
+        "ui": [],
+        "compatibility": [],
+        "other": []
+      }
+    },
     {
       "version": "2.1.22",
       "releasedAt": "2026-10-24",

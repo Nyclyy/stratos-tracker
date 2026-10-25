@@ -1797,11 +1797,24 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def pair_landing(self):
+        """Where a paired phone lands: its own page, never another origin.
+
+        The phone's own map can be asked for with ?next=/index.html; anything that
+        is not a path on this bridge is ignored, so the parameter cannot send a
+        phone anywhere else.
+        """
+        query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        wanted = (query.get("next", [""])[0] or "").strip()
+        if re.match(r"^/[A-Za-z0-9._~%/\-]*$", wanted) and ".." not in wanted and not wanted.startswith("//"):
+            return wanted
+        return "/live.html"
+
     def handle_pair_connect(self):
         address = self.client_address[0] if self.client_address else "?"
         if self.authorized():
             self.send_response(303)
-            self.send_header("Location", "/live.html")
+            self.send_header("Location", self.pair_landing())
             self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Length", "0")
             self.end_headers()
@@ -1809,7 +1822,7 @@ class Handler(BaseHTTPRequestHandler):
         secret, detail = auto_pair(address)
         if secret:
             self.send_response(303)
-            self.send_header("Location", "/live.html")
+            self.send_header("Location", self.pair_landing())
             self.send_header("Set-Cookie", phone_cookie(secret))
             self.send_header("Set-Cookie", "stratos_token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0")
             self.send_header("Cache-Control", "no-store")

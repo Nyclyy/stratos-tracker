@@ -440,3 +440,28 @@ test('trail colours: white on the ground, a ramp in between, magenta at the top'
   }
   assert.match(trailGradient(), /^#ffffff 0%/, 'the legend starts at white');
 });
+
+test('a drawn trail rounds its corners without moving the recorded path', async () => {
+  const { smoothPath } = await import('../app/js/lib/trailpath.js');
+  // A right-angle turn: the drawn line must bend through it, not meet it in a point.
+  const corner = [[0, 0], [100, 0], [100, 100]];
+  const { points, heights } = smoothPath(corner, [0, 1000, 2000]);
+  assert.deepEqual(points[0], [0, 0], 'the first recorded point is where the line starts');
+  assert.deepEqual(points[points.length - 1], [100, 100], 'and the last one is where it ends');
+  assert.ok(points.length > corner.length, 'the corner is replaced with a curve');
+  assert.equal(heights.length, points.length, 'every drawn point keeps a height');
+  assert.equal(heights[0], 0);
+  assert.equal(heights[heights.length - 1], 2000);
+  // Nothing bulges away from the recorded legs: the midpoint of the turn stays
+  // inside the corner the samples make, a quarter-segment at most.
+  const mid = points[Math.floor(points.length / 2)];
+  assert.ok(mid[0] <= 100.001 && mid[1] <= 100.001 && mid[1] >= 0, 'the curve stays inside the turn');
+  assert.ok(points.every(([x, y]) => x >= 0 && x <= 100 && y >= 0 && y <= 100), 'and inside the recorded bounds');
+  // A short or empty trail is returned untouched instead of being reshaped.
+  assert.deepEqual(smoothPath([[1, 2], [3, 4]]).points, [[1, 2], [3, 4]]);
+  assert.deepEqual(smoothPath([]).points, []);
+  // A very long trail stops subdividing, so a full flight stays cheap to draw.
+  const long = Array.from({ length: 900 }, (_, i) => [i, Math.sin(i / 20) * 40]);
+  const bounded = smoothPath(long, null, { passes: 2, maxPoints: 1200 });
+  assert.ok(bounded.points.length <= 1300, 'the drawn path is capped');
+});

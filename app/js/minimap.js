@@ -17,6 +17,7 @@
 
 import { validLatLon } from './lib/geo.js';
 import { trailInk } from './lib/trailcolor.js';
+import { smoothPath } from './lib/trailpath.js';
 
 const TILE = 256;
 const TILE_LIMIT = 160;
@@ -524,28 +525,38 @@ export class MiniMap {
 
     const positions = this.layers.track ? this.track.map(p => this.project(p.lat, p.lon, view)) : [];
     if (positions.length > 1) {
+      /* The line is drawn through rounded corners so a turn looks like a turn
+         rather than a kink at the sample rate; the recorded points themselves
+         are unchanged and still marked below. */
+      const heights = this.trackHeights();
+      const line = smoothPath(
+        positions.map(p => [p.x, p.y]),
+        heights || null,
+        { passes: 2, maxPoints: 2400 },
+      );
+      const linePoints = line.points;
+      const lineHeights = heights ? (line.heights.length ? line.heights : heights) : null;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
       ctx.strokeStyle = 'rgba(0,0,0,.45)';
       ctx.lineWidth = 6;
       ctx.beginPath();
-      positions.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      linePoints.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
       ctx.stroke();
       /* A recorded flight is coloured by height above the ground, the same ramp
          the desktop map uses: white on the ground, then up through blue, green,
          yellow and orange to magenta. A track without altitudes — a route
          preview — keeps the plain accent line. */
-      const heights = this.trackHeights();
       ctx.lineWidth = 2.5;
-      if (heights) {
-        const inks = heights.map(trailInk);
+      if (lineHeights) {
+        const inks = lineHeights.map(trailInk);
         let start = 0;
         let ink = inks[0];
         const run = (from, to) => {
           ctx.beginPath();
           for (let i = from; i <= to; i += 1) {
-            const p = positions[i];
-            i === from ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+            const p = linePoints[i];
+            i === from ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1]);
           }
           ctx.strokeStyle = ink;
           ctx.stroke();
@@ -557,7 +568,7 @@ export class MiniMap {
       } else {
         ctx.strokeStyle = accent;
         ctx.beginPath();
-        positions.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        linePoints.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
         ctx.stroke();
       }
 

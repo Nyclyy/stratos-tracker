@@ -310,6 +310,25 @@ function rememberBridge(base) {
   try { if (base) localStorage.setItem(BRIDGE_STORAGE_KEY, base); } catch (_) {}
 }
 
+/** The PC origin this phone paired with, if it still has one. */
+function savedBridgeOrigin() {
+  const base = readBridgeBase();
+  return /^http:\/\/[^/]+$/.test(base) ? base.replace(/\/+$/, '') : '';
+}
+
+/* Opening the dashboard on a phone that has paired before is the whole
+   connection step: the page the PC serves is same-origin, so it needs neither
+   discovery nor a tap. A hosted HTTPS page cannot call the HTTP bridge
+   (mixed content), but it can navigate to it, which is what this does. */
+function openSavedBridge(base) {
+  const target = `${base}/live.html`;
+  let here = '';
+  try { here = new URL(location.href); } catch (_) { return false; }
+  if (`${here.origin}${here.pathname}` === target) return false;
+  location.replace(target);
+  return true;
+}
+
 /* One button, no code, no URL. On a page served over HTTPS the browser will
    not let us call an HTTP bridge, so the button opens the bridge's own page;
    the bridge enrolls this phone on arrival. On an HTTP page we probe the known
@@ -324,7 +343,7 @@ function pairingScreen(message = '', hint = '') {
   view.innerHTML = `
     <div class="card pair-card">
       <div class="card-head"><h1 style="font-size:22px">Connect to your simulator</h1></div>
-      <p class="muted small" style="margin-bottom:14px">Open Stratos on the PC, keep the simulator running, then tap the button. This phone finds the PC on your network and pairs itself — no code, no URL, no QR.</p>
+      <p class="muted small" style="margin-bottom:14px">Open Stratos on the PC and keep the simulator running. Tap once: this phone finds the PC on your network, pairs itself and opens live tracking. It remembers the PC afterwards, so the next time Stratos opens straight into the flight with nothing to tap.</p>
       ${message ? `<div class="notice bad" style="margin-bottom:12px">${esc(message)}</div>` : ''}
       <button class="btn primary" id="pair-connect" style="width:100%;min-height:48px">Connect to Simulator</button>
       <p class="help" id="pair-progress" style="margin-top:10px">${esc(hint || (hosted ? 'Opens the page your PC serves, and pairs on arrival.' : `Looking for Stratos near ${candidates[0] || 'this network'}.`))}</p>
@@ -339,6 +358,7 @@ function pairingScreen(message = '', hint = '') {
         <button class="btn" id="pair-code-connect" style="width:100%;margin-top:12px;min-height:44px">Connect through the relay</button>
       </details>
     </div>`;
+  startAutoScan();
   document.getElementById('pair-connect').addEventListener('click', connectLocal);
   document.getElementById('pair-code-connect')?.addEventListener('click', connectWithCode);
   document.getElementById('pair-forget')?.addEventListener('click', () => {
@@ -347,6 +367,29 @@ function pairingScreen(message = '', hint = '') {
   });
   setStatus('disconnected', 'Not connected');
   document.title = 'Live · Stratos';
+}
+
+/**
+ * On a page that can talk to a local bridge (plain HTTP), look for it on its
+ * own: the common case is the site being opened a few seconds before the PC
+ * bridge is up, and nothing should have to be tapped when it appears.
+ */
+let autoScan = null;
+function startAutoScan() {
+  if (autoScan || blocksLocalBridge(location) || location.protocol === 'file:') return;
+  autoScan = setInterval(async () => {
+    if (document.hidden || busy) return;
+    const candidates = bridgeCandidates({
+      protocol: location.protocol, hostname: location.hostname,
+      port: location.port, saved: readBridgeBase(),
+    });
+    const found = await findBridge(candidates, { timeout: 1200 });
+    if (!(found.ok || found.reason === 'unauthorized')) return;
+    clearInterval(autoScan);
+    autoScan = null;
+    rememberBridge(found.base);
+    location.href = `${found.base}/pair/connect`;
+  }, 6000);
 }
 
 async function connectLocal() {
@@ -359,6 +402,9 @@ async function connectLocal() {
   setStatus('connecting', 'Looking for your PC…');
   try {
     if (blocksLocalBridge(location)) {
+      // The hosted page cannot probe an HTTP bridge, but it can remember where
+      // the PC answers: from then on the dashboard opens there directly.
+      rememberBridge(phoneConnectUrl().replace(/\/pair\/connect$/, ''));
       say('Opening the page your PC serves…');
       location.href = phoneConnectUrl();
       return;
@@ -490,10 +536,13 @@ async function startBridge(base = defaultBridgeBase()) {
           stats: lastState?.snapshot?.stats || null,
         },
       };
+      if (message.telemetry) setStatus('connected', 'Simulator live');
       render();
     },
     onStatus: status => {
-      if (status.state === 'connected') setStatus('connected', 'Simulator live');
+      // An open stream is not a flying aircraft: "Simulator live" is claimed
+      // only when a position actually arrives (see onTelemetry above).
+      if (status.state === 'connected') setStatus('waiting', 'Bridge connected');
       else if (status.state === 'reconnecting' || status.state === 'connecting') setStatus('connecting', 'Connecting…');
       else setStatus('disconnected', status.state === 'paused' ? 'Paused' : 'Not connected');
     },
@@ -555,7 +604,8 @@ function ensureMap() {
     const canvas = document.createElement('canvas');
     canvas.setAttribute('aria-label', 'Aircraft position');
     map = new MiniMap(canvas, { padding: 22, onSelect: handleMapSelect });
-    map.setTrack(mapTrack.length ? mapTrack : [{ lat: 0, lon: 0 }]);
+    // Nothing is plotted until the simulator reports a position.
+    map.setTrack(mapTrack);
   }
   map.attach(host);
   return map;
@@ -631,7 +681,9 @@ function render() {
 
   const prog = progress(flight, telemetry);
   const latestLanding = recent.find(item => item && item.landing && item.landing.vsFpm != null);
-  const statusText = stale ? 'Telemetry is stale — the PC may be paused or offline.' : telemetry ? 'Receiving live telemetry' : 'Waiting for the simulator';
+  const statusText = !telemetry
+    ? 'Waiting for the simulator to send a position.'
+    : stale ? 'Telemetry is stale — the PC may be paused or offline.' : 'Receiving live telemetry';
 
   view.innerHTML = `
     <section class="live-hero" aria-label="Current flight">
@@ -802,6 +854,10 @@ window.addEventListener('offline', () => setStatus('offline'));
     await startBridge(location.origin);
     return;
   }
+  // A phone that has paired before goes straight to the PC's own page: no
+  // button, no discovery, no typing, and the stream is same-origin.
+  const bridge = savedBridgeOrigin();
+  if (bridge && openSavedBridge(bridge)) return;
   if (saved) { startRelay(); return; }
   if (query.get('code')) {
     const url = query.get('relay') || 'https://';

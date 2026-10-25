@@ -13,7 +13,14 @@ try {
 } catch (_) { /* updates stay unavailable */ }
 
 const BRIDGE_PORT = Number(process.env.STRATOS_HTTP_PORT || 8765);
+// The desktop app always talks to its bridge over loopback.
 const BRIDGE_HOST = '127.0.0.1';
+// The bridge itself must listen on the network, or no phone can ever reach it:
+// a loopback-only bind makes one-tap pairing answer "reachable only on this PC"
+// and leaves the phone with no route in. Requests from other hosts still need
+// the bridge token or a phone pairing cookie, so listening is not the same as
+// being open. STRATOS_HOST still forces a bind address when one is wanted.
+const BRIDGE_BIND = process.env.STRATOS_HOST || '0.0.0.0';
 const MAX_RESTARTS = 6;
 const LOG_LIMIT = 120;
 const UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -127,7 +134,7 @@ function candidates() {
   const dir = bridgeDir();
   const script = path.join(dir, 'stratos_bridge.py');
   const list = [];
-  const env = { ...process.env, STRATOS_HTTP_PORT: String(BRIDGE_PORT), STRATOS_HOST: BRIDGE_HOST, STRATOS_DATA_DIR: bridgeDataDir() };
+  const env = { ...process.env, STRATOS_HTTP_PORT: String(BRIDGE_PORT), STRATOS_HOST: BRIDGE_BIND, STRATOS_DATA_DIR: bridgeDataDir() };
 
   // Preferred packaged bridge: no Python installation required.
   if (process.platform === 'win32') {

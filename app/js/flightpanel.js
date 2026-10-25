@@ -205,8 +205,13 @@ export function renderFlightPanel(summary, tab = 'overview') {
   const current = activeTab(tab);
   const bar = `<div class="ov-tabs" role="tablist" aria-label="Flight overview sections">${OVERVIEW_TABS.map(t => `<button type="button" role="tab" class="ov-tab${t.key === current ? ' on' : ''}" data-ov-tab="${t.key}" aria-selected="${t.key === current}">${esc(t.label)}</button>`).join('')}</div>`;
   // Each tab keeps the same panel; it only changes which sections are shown.
+  // The OFP text is what SimBrief generated when it published no PDF; it is
+  // shown as text, in the panel the map already opens.
+  const ofpText = summary.ofpText
+    ? section('Operational flight plan (SimBrief text)', `<pre class="fs-ofp">${esc(summary.ofpText)}</pre>`, false)
+    : '';
   const sections = {
-    overview: [    summary.identity ? overviewBlockHtml(summary.identity) : '', section('Overview', overviewHtml(summary))],
+    overview: [    summary.identity ? overviewBlockHtml(summary.identity) : '', section('Overview', overviewHtml(summary)), ofpText],
     route: [section('Procedures', proceduresHtml(summary)), section('Route', routeHtml(summary))],
     data: [section('Weights', weightsHtml(summary), false), section('Fuel', fuelHtml(summary), false)],
     weather: [section('Weather', weatherHtml(summary), false)],

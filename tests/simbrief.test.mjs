@@ -49,6 +49,44 @@ test('simbrief: the plan carries the procedures and runways the card shows', asy
   }
 });
 
+test('simbrief: the OFP document SimBrief publishes is the one the card opens', () => {
+  const raw = payload();
+  raw.files = {
+    directory: 'https://www.simbrief.com/ofp/flightplans/',
+    pdf: { name: 'PDF Document', link: 'KSEAKPDX_PDF_1792876669.pdf' },
+  };
+  const ofp = parseOfp(raw);
+  assert.equal(ofp.documentUrl, 'https://www.simbrief.com/ofp/flightplans/KSEAKPDX_PDF_1792876669.pdf');
+  assert.equal(ofp.text, null, 'the PDF is the document, so no duplicate text is stored');
+
+  // A response without a published document keeps its OFP text instead, and it
+  // is text: markup never reaches the page.
+  const noPdf = payload();
+  noPdf.text = { plan_html: '<div><b>[ OFP ]</b><br>KSEA/KPDX<pre>CRZ FL350</pre></div><script>bad()</script>' };
+  const textOnly = parseOfp(noPdf);
+  assert.equal(textOnly.documentUrl, null);
+  assert.match(textOnly.text, /\[ OFP \]/);
+  assert.match(textOnly.text, /KSEA\/KPDX/);
+  assert.equal(/[<>]/.test(textOnly.text), false, 'the OFP text is plain, not HTML');
+
+  // A plan that names no document and no text answers null rather than a guess.
+  assert.equal(parseOfp(payload()).documentUrl, null);
+  assert.equal(parseOfp(payload()).text, null);
+});
+
+test('simbrief: cruise comes from the plan itself, including its initial level', () => {
+  // Real json=v2 responses carry `initial_altitude`; `cruise_altitude` is not
+  // guaranteed. Neither is invented when both are missing.
+  const real = payload();
+  delete real.general.cruise_altitude;
+  real.general.initial_altitude = '36000';
+  assert.equal(parseOfp(real).flight.cruiseFt, 36000);
+
+  const silent = payload();
+  delete silent.general.cruise_altitude;
+  assert.equal(parseOfp(silent).flight.cruiseFt, null);
+});
+
 test('simbrief: a username query and id validation stay strict', () => {
   assert.equal(simbriefQuery('pilot.name'), 'username=pilot.name');
   assert.equal(validateSimbriefId('abc def').ok, false);

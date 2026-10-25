@@ -1171,7 +1171,7 @@ test('a clicked aircraft shows its own recorded trail, from every traffic source
   const fs = await import('node:fs');
   const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
   // The selected target's trail is drawn whether or not the all-trails layer is on.
-  assert.match(page, /if\(sel&&sel\.k=='trf'\)\{const a=TRL\.get\(sel\.hx\|\|sel\.id\);if\(a\)drawTrail\(a,sel,false\)\}/, 'a selected aircraft is drawn with its own path');
+  assert.match(page, /if\(sel&&sel\.k=='trf'\)\{const a=TRL\.get\(sel\.hx\|\|sel\.id\);if\(a\)drawTrail\(a,sel,false,sel\.hx\|\|sel\.id\)\}/, 'a selected aircraft is drawn with its own path');
   // ADS-B traffic is recorded as it polls.
   assert.match(page, /trlAdd\(o\.hx\|\|o\.id,o\.lat,o\.lon,o\.alt,400\)/, 'every polled aircraft appends a position');
   // VATSIM used to replace its objects on each refresh and record nothing.
@@ -1203,7 +1203,7 @@ test('the flown trail is a continuous line coloured by height above the ground',
   assert.match(page, /own\?floor:0/, 'a recording without it falls back to height above the lowest point');
   assert.match(page, /for\(let i=1;i<m;i\+\+\)\{if\(inks\[i\]!==ink\)\{run\(start,i\)/, 'a run of one colour is stroked once, not per segment');
   // The trail is one solid line: no fading contrail, no gradient tail.
-  const draw = page.slice(page.indexOf('function drawTrail(a,cur,own)'), page.indexOf('function trails()'));
+  const draw = page.slice(page.indexOf('function drawTrail(a,cur,own,key)'), page.indexOf('function trails()'));
   assert.doesNotMatch(draw, /globalAlpha=\.[0-9]/, 'the drawn path is opaque');
   assert.doesNotMatch(draw, /f\*f|wmax/, 'there is no tapering width');
   assert.match(draw, /cx\.lineWidth=7;cx\.stroke\(\)[\s\S]*cx\.lineWidth=4/, 'a dark casing under a 4 px line');
@@ -1287,6 +1287,14 @@ test('the phone page reconnects on its own and retries when the network returns'
   assert.match(live, /function connectLocal\(\)/, 'one button drives the connection');
   assert.match(live, /blocksLocalBridge\(location\)/, 'an HTTPS page navigates instead of failing a mixed-content fetch');
   assert.match(live, /location\.href = phoneConnectUrl\(\)/, 'the bridge page is opened, with nothing to type');
+  // A phone that has paired before needs no button at all: it goes straight to
+  // the page the PC serves, which is same-origin and therefore live already.
+  assert.match(live, /function openSavedBridge\(base\)/, 'a paired phone can open the PC page directly');
+  assert.match(live, /const bridge = savedBridgeOrigin\(\);/, 'the saved PC is used on load');
+  assert.match(live, /if \(bridge && openSavedBridge\(bridge\)\) return;/, 'the last visit needs no tap');
+  assert.match(live, /rememberBridge\(phoneConnectUrl\(\)/, 'the hosted page remembers where the PC answers');
+  assert.match(live, /function startAutoScan\(\)/, 'a page that can reach the bridge looks for it by itself');
+  assert.match(live, /if \(autoScan \|\| blocksLocalBridge\(location\)/, 'a mixed-content page does not spin on a probe it cannot make');
 });
 
 test('the flight-plan card replaces the pencil and never invents a value', async () => {
@@ -1307,6 +1315,43 @@ test('the flight-plan card replaces the pencil and never invents a value', async
   assert.match(page, /getMetar\(a\)/, 'it reuses the existing METAR pipeline');
   assert.match(page, /This SimBrief plan carries no weight or fuel figures/, 'an OFP without weights is described, not filled in');
   assert.match(page, /fpstale/, 'stale data is marked');
+  // The OFP action opens the document SimBrief published for the imported plan,
+  // and states the reason when there is none instead of doing nothing.
+  assert.match(page, /data-fp-act="ofp" title="Open the Operational Flight Plan/, 'the card offers the OFP');
+  assert.match(page, /if\(act=='ofp'\)\{openOfpDoc\(\);return\}/, 'the action is wired to it');
+  assert.match(page, /async function openOfpDoc\(\)/, 'the OFP is opened from the card');
+  assert.match(page, /if\(ofp\.documentUrl\)\{open\(ofp\.documentUrl\);return\}/, 'the plan\'s own document link is used');
+  assert.match(page, /published no OFP document or text/, 'a plan with no OFP says why');
+  // Cruise level is part of the compact card, expanded or not.
+  assert.match(page, /<b>CRZ '\+\(cruise\?esc\(cruise\):'—'\)/, 'the minimized card shows CRZ, or a dash');
+  assert.match(page, /cruiseAltFt:\(planTocTod\(\)\|\|\{\}\)\.cruise\|\|null/, 'the planned profile supplies the level when the plan does not');
+  assert.match(page, /nm left/, 'progress is stated in the compact card');
+});
+
+test('the hosted page opens the PC map on a phone, so the aircraft is on the normal map', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  assert.match(page, /function bridgeOrigin\(\)/, 'the page remembers the PC it found');
+  assert.match(page, /location\.href=base\+'\/pair\/connect\?next=%2Findex\.html'/, 'the pairing page hands the phone to the map');
+  assert.match(page, /else if\(location\.protocol=='https:'&&phoneSized\(\)\)\{/, 'only a phone takes the hand-off');
+  assert.match(page, /if\(bridgeOrigin\(\)\)openBridgeMap\(\);/, 'a phone that knows the PC goes there at once');
+  assert.match(page, /setTimeout\(\(\)=>\{if\(!liveOk\(\)\)openBridgeMap\(\)\},1600\)/, 'a first visit tries the local name once');
+  assert.match(page, /sessionStorage\.setItem\('stratos\.bridgeAttempt','1'\)/, 'and does not loop when the PC is not there');
+  assert.match(page, /if\(location\.protocol=='http:'\)connect\(location\.origin\);/, 'the page served by the PC streams from it directly');
+});
+
+test('a drawn trail is smoothed for the map without moving the recorded path', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  const mini = fs.readFileSync(new URL('../app/js/minimap.js', import.meta.url), 'utf8');
+  assert.match(page, /import \* as TRAILP from '\.\/js\/lib\/trailpath\.js'/, 'the desktop map loads the shared smoothing');
+  assert.match(page, /window\.TRAILP = TRAILP/, 'and exposes it to the map script');
+  assert.match(page, /function smoothTrail\(key,pts,hs\)/, 'one trail is smoothed per trail, not per frame');
+  assert.match(page, /TRLSM\.set\(key,made\)/, 'the smoothed path is cached');
+  assert.match(page, /const sm=smoothTrail\(key\|\|'own',pts,hs\)/, 'the drawn line uses it');
+  assert.match(page, /const inks=shs\.map\(trailInk\)/, 'altitude colouring follows the smoothed path');
+  assert.match(mini, /import \{ smoothPath \} from '\.\/lib\/trailpath\.js'/, 'the phone map uses the same smoothing');
+  assert.match(mini, /const line = smoothPath\(/, 'its line is smoothed too');
 });
 
 test('the colour board documents the palette the interface really uses', async () => {

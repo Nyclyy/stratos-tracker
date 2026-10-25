@@ -158,6 +158,8 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 #fp .fpp-r{display:block;font-size:10.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #fp .fpstats{display:flex;flex-wrap:wrap;gap:5px 12px;margin-top:9px;font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums}
 #fp .fpstats b{color:var(--txt);font-weight:700}
+#fp .fpcrz{letter-spacing:.04em}
+#fp .fpcrz b{font-weight:800}
 #fp .fpcat{font-size:9px;font-weight:800;letter-spacing:.08em;border-radius:3px;padding:1px 5px;border:1px solid color-mix(in srgb,var(--coast) 55%,transparent)}
 #fp .fpcat.vfr{color:#4ade80;border-color:rgba(74,222,128,.4)}
 #fp .fpcat.mvfr{color:#60a5fa;border-color:rgba(96,165,250,.4)}
@@ -286,7 +288,7 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 #tabs .tab.act{box-shadow:none}
 #tabs .tab.act::before{left:-5px;top:8px;bottom:8px;width:2px;border-radius:0 2px 2px 0;background:var(--acc);box-shadow:none}
 }
-.fs-body{padding:4px 0 2px}.fs-sec{border-top:1px solid color-mix(in srgb,var(--coast) 30%,transparent);padding:4px 0}.fs-sec>summary{cursor:pointer;font-weight:700;padding:4px 0;list-style:none}.fs-sec>summary::-webkit-details-marker{display:none}.fs-sec>summary::before{content:'\25B8  '}.fs-sec[open]>summary::before{content:'\25BE  '}.fs-t{width:100%;border-collapse:collapse;font-size:13px}.fs-t td,.fs-t th{padding:3px 4px;text-align:left;vertical-align:top}.fs-route{font-size:12px}.fs-link{background:none;border:0;padding:0;color:inherit;text-decoration:underline;cursor:pointer;font:inherit}.fs-src{font-size:10px;opacity:.6;margin-left:4px}.fs-warn{color:#e0a030}.fs-on td{background:rgba(127,127,127,.15)}.fs-wx{border-top:1px solid rgba(127,127,127,.2);padding:6px 0;font-size:13px}.fs-metar{display:block;white-space:pre-wrap;font-size:11px;word-break:break-all}.ov-head{padding:6px 0;font-size:13px;display:grid;gap:3px}.ov-callsign{font-size:16px}.ov-route{font-size:15px}.ov-status{font-size:11px;padding:1px 6px;border-radius:999px;border:1px solid currentColor;margin-left:4px}.ov-on-time{color:#4caf7a}.ov-delayed{color:#e0a030}.ov-early{color:#5aa9e6}.ov-aircraft{display:flex;gap:10px;align-items:center;padding:6px 0;font-size:13px;border-top:1px solid rgba(127,127,127,.2)}.ov-aircraft-img{width:120px;height:auto;max-height:64px;flex:0 0 120px;color:var(--mut,#8a9bb0);object-fit:contain}.ov-aircraft-sprite{width:64px;height:64px;flex-basis:64px;image-rendering:auto}.ov-aircraft-none{display:flex;align-items:center;justify-content:center;font-size:11px;opacity:.6}@media (max-width:700px){.ov-aircraft-img{width:88px;flex-basis:88px}}
+.fs-body{padding:4px 0 2px}.fs-sec{border-top:1px solid color-mix(in srgb,var(--coast) 30%,transparent);padding:4px 0}.fs-sec>summary{cursor:pointer;font-weight:700;padding:4px 0;list-style:none}.fs-sec>summary::-webkit-details-marker{display:none}.fs-sec>summary::before{content:'\25B8  '}.fs-sec[open]>summary::before{content:'\25BE  '}.fs-t{width:100%;border-collapse:collapse;font-size:13px}.fs-t td,.fs-t th{padding:3px 4px;text-align:left;vertical-align:top}.fs-route{font-size:12px}.fs-link{background:none;border:0;padding:0;color:inherit;text-decoration:underline;cursor:pointer;font:inherit}.fs-src{font-size:10px;opacity:.6;margin-left:4px}.fs-warn{color:#e0a030}.fs-on td{background:rgba(127,127,127,.15)}.fs-wx{border-top:1px solid rgba(127,127,127,.2);padding:6px 0;font-size:13px}.fs-ofp{white-space:pre-wrap;font-family:var(--mono);font-size:11px;line-height:1.45;max-height:340px;overflow:auto;margin:6px 0 2px;color:var(--mut,#8a9bb0)}.fs-metar{display:block;white-space:pre-wrap;font-size:11px;word-break:break-all}.ov-head{padding:6px 0;font-size:13px;display:grid;gap:3px}.ov-callsign{font-size:16px}.ov-route{font-size:15px}.ov-status{font-size:11px;padding:1px 6px;border-radius:999px;border:1px solid currentColor;margin-left:4px}.ov-on-time{color:#4caf7a}.ov-delayed{color:#e0a030}.ov-early{color:#5aa9e6}.ov-aircraft{display:flex;gap:10px;align-items:center;padding:6px 0;font-size:13px;border-top:1px solid rgba(127,127,127,.2)}.ov-aircraft-img{width:120px;height:auto;max-height:64px;flex:0 0 120px;color:var(--mut,#8a9bb0);object-fit:contain}.ov-aircraft-sprite{width:64px;height:64px;flex-basis:64px;image-rendering:auto}.ov-aircraft-none{display:flex;align-items:center;justify-content:center;font-size:11px;opacity:.6}@media (max-width:700px){.ov-aircraft-img{width:88px;flex-basis:88px}}
 /* Floating route card: waypoint and leg details open next to the click, on the map. */
 #wpcard{position:absolute;z-index:7;width:330px;max-width:calc(100% - 20px);max-height:calc(100% - 20px);overflow:auto;padding:14px 16px;border-radius:16px;background:var(--surface);border:1px solid color-mix(in srgb,var(--coast) 45%,transparent);box-shadow:var(--sh-2);color:var(--txt);font-size:13px;line-height:1.45;text-align:left}
 #wpcard .wc-top{display:flex;align-items:center;gap:10px}
@@ -1595,7 +1597,7 @@ setInterval(()=>{
 },5000);
 addEventListener('online',()=>{if(live.on&&live.base)openStream(live.base)});
 function disc(){if(live.es)live.es.close();live.on=false;live.base='';live.d=null;live.seen=0;$('#bLive').classList.remove('on');if(panel=='live')render()}
-function liveHtml(){const web=location.protocol=='http:'||location.protocol=='file:',ok=liveOk(),lb=location.protocol=='http:'?location.origin:'http://127.0.0.1:8765';return `<h3>Live tracking</h3><div class="m"><b>Traffic:</b> ${wtTxt()}${WT.src?' via '+WT.src:''}. Live aircraft load automatically in Stratos; no Python process is needed for public traffic.</div><div class="m" style="margin-top:8px"><b>Simulator link (optional)</b></div><div class="m">${ok?'● Receiving live data from the simulator':live.on?'Connected to bridge, waiting for simulator data…':'Not connected'}</div>`+(web?'':'<div class="m" style="margin-top:6px">This hosted copy cannot reach your PC. Use the bridge address in step 4 instead.</div>')+'<div class="m">To see your own aircraft from X-Plane or MSFS 2020/2024, run the Stratos bridge on your PC.</div><ol class="m" style="padding-left:18px"><li>The Stratos desktop app starts the bridge for you. Manual start: <b>python stratos_bridge.py</b>. For MSFS 2020/2024, run it on the same Windows PC as the sim after a one-time <b>pip install SimConnect</b>, then start a flight. No other MSFS setup.</li><li>X-Plane only: Settings → Data Output: tick “Network via UDP” for rows 3, 17 and 20</li><li>X-Plane only: tick “Send network data output”, enter the IP the bridge prints, port 49003</li><li>On iPhone Safari open <b>http://PC-IP:8765</b>, then Share → Add to Home Screen</li></ol>'+(web?'<div class="row"><button onclick="connect(\''+lb+'\')">Reconnect</button><button onclick="disc()">Disconnect</button></div>':'')}
+function liveHtml(){const web=location.protocol=='http:'||location.protocol=='file:',ok=liveOk(),lb=location.protocol=='http:'?location.origin:'http://127.0.0.1:8765';return `<h3>Live tracking</h3><div class="m"><b>Traffic:</b> ${wtTxt()}${WT.src?' via '+WT.src:''}. Live aircraft load automatically in Stratos; no Python process is needed for public traffic.</div><div class="m" style="margin-top:8px"><b>Simulator link (optional)</b></div><div class="m">${ok?'● Receiving live data from the simulator':live.on?'Connected to bridge, waiting for simulator data…':'Not connected'}</div>`+(web?'':'<div class="m" style="margin-top:6px">This hosted page cannot call your PC directly, so it opens the same map from your PC instead.</div>')+'<div class="m">To see your own aircraft from X-Plane or MSFS 2020/2024, run the Stratos bridge on your PC.</div><ol class="m" style="padding-left:18px"><li>The Stratos desktop app starts the bridge for you. Manual start: <b>python stratos_bridge.py</b>. For MSFS 2020/2024, run it on the same Windows PC as the sim after a one-time <b>pip install SimConnect</b>, then start a flight. No other MSFS setup.</li><li>X-Plane only: Settings → Data Output: tick “Network via UDP” for rows 3, 17 and 20</li><li>X-Plane only: tick “Send network data output”, enter the IP the bridge prints, port 49003</li><li>On iPhone Safari open <b>http://PC-IP:8765</b>, then Share → Add to Home Screen</li></ol>'+(web?'<div class="row"><button onclick="connect(\''+lb+'\')">Reconnect</button><button onclick="disc()">Disconnect</button></div>':'<div class="m" style="margin-top:8px"><b>On a phone</b> this page shows your aircraft on the same Stratos map, opened from your PC. The phone remembers that address: one tap the first time, then it goes there by itself.</div><div class="row"><button class="on" onclick="openBridgeMap()">'+(bridgeOrigin()?'Open live map':'Open the live map on my PC')+'</button></div>')}
 $('#bLive').onclick=()=>{panel=panel=='live'?null:'live';render()};
 window.addSel=()=>{if(sel)addWp(sel)};window.rm=i=>{route.splice(i,1);save();trav=0;render()};window.defRoute=defRoute;
 const dms=(v,p,n)=>{const a=Math.abs(v),d=Math.floor(a),m=Math.floor((a-d)*60),s=((a-d)*60-m)*60;return(v<0?n:p)+d+'° '+m+"' "+s.toFixed(2)+'"'};
@@ -1654,8 +1656,46 @@ const AIP={Y:['Australia AIP','https://www.airservicesaustralia.com/aip/aip.asp'
 if(TRS=='vatsim')startVatsimTraffic();else wtPoll();
 setInterval(()=>{if(TRS=='adsb')wtPoll()},RP.wt);document.addEventListener('visibilitychange',()=>{if(!document.hidden&&TRS=='adsb')wtPoll()});
 loadOA();
+/* The PC's own address, remembered once this phone has found it. */
+function bridgeOrigin(){
+  try{
+    const saved=localStorage.getItem('stratos.bridgeUrl')||localStorage.getItem('stratos.bridgeBase')||'';
+    return /^http:\/\/[^/]+$/.test(saved)?saved.replace(/\/+$/,''):''
+  }catch(_){return ''}
+}
+/* Open the same map from the PC. The pairing page enrolls this phone and hands
+   it straight to the map, so even a first visit needs no code and no tap; a
+   phone that is already paired is redirected there without a word. */
+function openBridgeMap(){
+  const base=(bridgeOrigin()||'http://stratos.local:8765');
+  try{localStorage.setItem('stratos.bridgeUrl',base)}catch(_){}
+  location.href=base+'/pair/connect?next=%2Findex.html'
+}
+/* A phone is a touch device with a small viewport; a desktop browser on the
+   hosted site is left exactly where it is. */
+function phoneSized(){
+  try{
+    const touch=navigator.maxTouchPoints>0||'ontouchstart' in window||matchMedia('(pointer:coarse)').matches;
+    return touch&&Math.min(innerWidth,innerHeight)<=1024
+  }catch(_){return false}
+}
 if(location.protocol=='http:')connect(location.origin);
 else if(location.protocol=='file:')connect('http://127.0.0.1:8765');
+/* A hosted HTTPS page cannot call an HTTP bridge (mixed content), so on a phone
+   it opens the page the PC serves: the normal map, with the aircraft on it and
+   the live stream already open. A phone that has found the PC before goes there
+   at once; one that has not tries the fixed local name once per session. */
+else if(location.protocol=='https:'&&phoneSized()){
+  if(bridgeOrigin())openBridgeMap();
+  else if(!/[?&]nobridge=1/.test(location.search)){
+    let tried=false;
+    try{tried=Boolean(sessionStorage.getItem('stratos.bridgeAttempt'))}catch(_){}
+    if(!tried){
+      try{sessionStorage.setItem('stratos.bridgeAttempt','1')}catch(_){}
+      setTimeout(()=>{if(!liveOk())openBridgeMap()},1600)
+    }
+  }
+}
 
 /* Location and live-aircraft badge, bottom right over the map. The place name
    is the nearest labelled feature to the view centre (country, continent or
@@ -1712,28 +1752,44 @@ const TRAIL_EDGE='rgba(6,18,10,.55)';
 /* The ramp itself lives in the shared module so the phone's map and this one
    cannot drift apart; this wrapper is only the page-scope name it is used by. */
 function trailInk(h){return window.TRAILC?window.TRAILC.trailInk(h):'#ffffff'}
-function drawTrail(a,cur,own){const n=a.length,st=Math.max(1,Math.ceil(n/700)),pts=[],hs=[];
+/* One smoothed copy per trail, rebuilt only when the trail grows. Corner cutting
+   through the recorded points is what makes a turn look like a turn instead of
+   a kink at the sample rate; the recorded positions themselves are unchanged. */
+const TRLSM=new Map();
+function smoothTrail(key,pts,hs){
+  const tail=pts[pts.length-1],sig=pts.length+'|'+Math.round(tail[0])+'|'+Math.round(tail[1])+'|'+Math.round(hs[hs.length-1]);
+  const hit=TRLSM.get(key);
+  if(hit&&hit.signature===sig)return hit;
+  let made;
+  if(window.TRAILP&&window.TRAILP.smoothPathCache)made=window.TRAILP.smoothPathCache(sig,pts,hs,{passes:2,maxPoints:3000});
+  else made={signature:sig,points:pts,heights:hs};
+  TRLSM.set(key,made);
+  return made
+}
+function drawTrail(a,cur,own,key){const n=a.length,st=Math.max(1,Math.ceil(n/700)),pts=[],hs=[];
 let floor=Infinity;
 for(let i=0;i<n;i+=st){const alt=Number(a[i][2]);if(Number.isFinite(alt)&&alt<floor)floor=alt}
 if(!Number.isFinite(floor))floor=0;
 const height=(p,alt)=>{const agl=Number(p&&p[4]);if(p&&p[4]!=null&&Number.isFinite(agl))return Math.max(0,agl);const v=Number(alt);return Math.max(0,(Number.isFinite(v)?v:0)-(own?floor:0))};
 for(let i=0;i<n;i+=st){const p=a[i];pts.push(sc(p[1],p[0]));hs.push(height(p,p[2]))}
 if(cur){pts.push(sc(cur.lon,cur.lat));hs.push(height([null,null,null,null,(own&&live.d&&live.d.agl!=null)?live.d.agl:null],cur.alt))}
-const m=pts.length;if(m<2)return;
+if(pts.length<2)return;
+const sm=smoothTrail(key||'own',pts,hs),spts=sm.points,shs=sm.heights;
+const m=spts.length;if(m<2)return;
 cx.lineCap='round';cx.lineJoin='round';cx.globalAlpha=1;
-cx.beginPath();cx.moveTo(pts[0][0],pts[0][1]);for(let i=1;i<m;i++)cx.lineTo(pts[i][0],pts[i][1]);
+cx.beginPath();cx.moveTo(spts[0][0],spts[0][1]);for(let i=1;i<m;i++)cx.lineTo(spts[i][0],spts[i][1]);
 cx.strokeStyle=TRAIL_EDGE;cx.lineWidth=7;cx.stroke();
 /* One stroke per run of points that share a colour: a climb changes colour in
    small steps instead of one stroke per segment, so the cost stays flat. */
-const inks=hs.map(trailInk);let start=0,ink=inks[0];
-const run=(from,to)=>{cx.beginPath();cx.moveTo(pts[from][0],pts[from][1]);for(let i=from+1;i<=to;i++)cx.lineTo(pts[i][0],pts[i][1]);cx.strokeStyle=ink;cx.lineWidth=4;cx.stroke()};
+const inks=shs.map(trailInk);let start=0,ink=inks[0];
+const run=(from,to)=>{cx.beginPath();cx.moveTo(spts[from][0],spts[from][1]);for(let i=from+1;i<=to;i++)cx.lineTo(spts[i][0],spts[i][1]);cx.strokeStyle=ink;cx.lineWidth=4;cx.stroke()};
 for(let i=1;i<m;i++){if(inks[i]!==ink){run(start,i);start=i;ink=inks[i]}}
 run(start,m-1);
 cx.lineCap='butt'}
 function trails(){if(CH.on||RP.trail<=0)return;const col=trailCol();
-if(L.trl){cx.strokeStyle=col;cx.lineWidth=1.2;cx.globalAlpha=.35;TRL.forEach((a,k)=>{if(k=='own'||a.length<3)return;cx.beginPath();a.slice(-60).forEach((p,i)=>{const q=sc(p[1],p[0]);i?cx.lineTo(q[0],q[1]):cx.moveTo(q[0],q[1])});cx.stroke()});cx.globalAlpha=1}
-if(sel&&sel.k=='trf'){const a=TRL.get(sel.hx||sel.id);if(a)drawTrail(a,sel,false)}
-if(liveOk()){const a=TRL.get('own');if(a)drawTrail(a,own,true)}}
+if(L.trl){cx.strokeStyle=col;cx.lineWidth=1.2;cx.globalAlpha=.35;TRL.forEach((a,k)=>{if(k=='own'||a.length<3)return;const p=[];a.slice(-60).forEach(q=>p.push([q[1],q[0]]));const sm=window.TRAILP?window.TRAILP.smoothPath(p,null,{passes:1}):{points:p};cx.beginPath();sm.points.forEach((q,i)=>{const t=sc(q[0],q[1]);i?cx.lineTo(t[0],t[1]):cx.moveTo(t[0],t[1])});cx.stroke()});cx.globalAlpha=1}
+if(sel&&sel.k=='trf'){const a=TRL.get(sel.hx||sel.id);if(a)drawTrail(a,sel,false,sel.hx||sel.id)}
+if(liveOk()){const a=TRL.get('own');if(a)drawTrail(a,own,true,'own')}}
 function trCenter(){if(!sel)return;setFol(false);const q=sel.k=='own'?own:sel;V.lon=q.lon;V.lat=q.lat;V.in=null}
 function trClear(){if(!sel)return;TRL.delete(sel.k=='own'?'own':(sel.hx||sel.id));fCard()}
 function spark(tr){if(tr.length<3)return '<div class="m">The altitude profile appears as the trail builds.</div>';const W2=300,H2=56,al=tr.map(p=>p[2]||0),mn=Math.min(...al),mx=Math.max(...al),r=Math.max(mx-mn,500),pts=al.map((v,i)=>(i/(al.length-1)*W2).toFixed(1)+','+(H2-4-(v-mn)/r*(H2-8)).toFixed(1)).join(' ');
@@ -2055,6 +2111,35 @@ function fcRender(ok){
 var fpExp=(()=>{try{return localStorage.getItem('stratos.fpExpanded')=='1'}catch(_){return false}})();
 var fpS='',fpSumCache=null,fpSumKey='',fpWxAt=0,fpTickAt=0;
 function fpOfp(){try{const s=window.FP&&FP.loadOfp(localStorage);return s&&s.ofp?s.ofp:null}catch(_){return null}}
+/* The OFP action opens SimBrief's own document for the plan that was imported.
+   The link is the one the plan published; a plan stored before the link was
+   read is looked up again once, so the button never sits there doing nothing.
+   With no document and no OFP text the reason is stated instead of a guess. */
+let ofpBusy=false;
+async function openOfpDoc(){
+  const stored=window.FP?FP.loadOfp(localStorage):null;
+  if(!stored||!stored.ofp){alert('The OFP is the document SimBrief generates for your flight. Import a SimBrief flight plan first.');importSB();return}
+  if(ofpBusy)return;
+  const open=url=>{if(/^https?:\/\//i.test(url)&&window.open)window.open(url,'_blank','noopener');else if(/^https?:\/\//i.test(url))location.href=url;else alert('SimBrief published an OFP link that is not a web address, so it cannot be opened here.')};
+  let ofp=stored.ofp;
+  if(ofp.documentUrl){open(ofp.documentUrl);return}
+  const id=stored.simbriefId||(localStorage.getItem('stratos.simbriefId')||'').trim();
+  if(!id){if(ofp.text){panel='fsum';fsTab='overview';render();alert('This plan has no stored document link and no SimBrief ID is saved. The OFP text SimBrief returned is shown in the Flight summary.');return}alert('No SimBrief ID is saved, so the OFP document cannot be fetched. Import the plan again with Import SimBrief.');return}
+  ofpBusy=true;
+  let failure='';
+  try{
+    const q=/^\d+$/.test(id)?`userid=${encodeURIComponent(id)}`:`username=${encodeURIComponent(id)}`;
+    const r=await fetch(`https://www.simbrief.com/api/xml.fetcher.php?${q}&json=v2`);
+    if(!r.ok)throw new Error('SimBrief returned HTTP '+r.status+'.');
+    const fresh=FP.parseOfp(await r.json());
+    if(fresh){try{FP.saveOfp(localStorage,fresh,id)}catch(_){};ofp=fresh;fpSumKey='';fpRender()}
+  }catch(e){failure=e&&e.message?e.message:'SimBrief could not be reached.'}
+  finally{ofpBusy=false}
+  if(ofp.documentUrl){open(ofp.documentUrl);return}
+  if(failure){alert('The OFP could not be fetched: '+failure+' Check your connection, then press OFP again.');return}
+  if(ofp.text){panel='fsum';fsTab='overview';render();alert('SimBrief published no PDF for this plan. The OFP text it returned is shown in the Flight summary.');return}
+  alert('SimBrief published no OFP document or text for this plan. Generate the plan again in SimBrief, then press Refresh OFP.')
+}
 function fpRow(sum,key){const list=sum&&sum.overview?sum.overview:[];return list.find(r=>r.key==key)||null}
 function fpProcRow(sum,key){const list=sum&&sum.procedures?sum.procedures:[];return list.find(r=>r.key==key)||null}
 function fpWind(w){if(!w)return'–';const d=w.direction==null?'VRB':String(Math.round(w.direction)).padStart(3,'0')+'°';return d+' '+Math.round(w.speedKt||0)+' kt'+(w.gustKt?' G'+Math.round(w.gustKt):'')}
@@ -2063,7 +2148,10 @@ function fpBuild(force){
   const metars={};A.forEach(a=>{if(a.metar&&a.mt)metars[a.id]={metar:a.metar,fetchedAt:a.mt,source:'METAR'}});
   const key=route.map(p=>p.id+':'+Number(p.lat).toFixed(3)+':'+Number(p.lon).toFixed(3)).join(',')+'|'+(localStorage.getItem('stratos.ofp')||'')+'|'+Object.keys(metars).map(k=>k+metars[k].fetchedAt).join(',');
   if(!force&&key===fpSumKey&&fpSumCache)return fpSumCache;
-  try{fpSumCache=FS.buildSummary({route,ofp:fpOfp(),cruiseKts:CRUISE,weightUnit:'kg',metars,position:liveOk()?{lat:own.lat,lon:own.lon}:null});fpSumKey=key}catch(e){fpSumCache=null;if(window.console)console.warn('Flight-plan summary:',e)}
+  /* The planned cruise level comes from the vertical profile of the route the
+     plan carries, so the compact card can state it even when the imported
+     SimBrief plan does not carry one itself. */
+  try{fpSumCache=FS.buildSummary({route,ofp:fpOfp(),cruiseKts:CRUISE,cruiseAltFt:(planTocTod()||{}).cruise||null,weightUnit:'kg',metars,position:liveOk()?{lat:own.lat,lon:own.lon}:null});fpSumKey=key}catch(e){fpSumCache=null;if(window.console)console.warn('Flight-plan summary:',e)}
   return fpSumCache;
 }
 /* Fetch the departure and arrival METARs once a plan exists, then no more than
@@ -2123,10 +2211,13 @@ function fpRender(){
       const rwy=rwyRow&&rwyRow.rwy?'RWY '+esc(rwyRow.rwy):(ofpOn?'runway not in plan':'no procedure claimed');
       return '<div class="fpp"><span class="fpp-k">'+label+'</span><b>'+value+'</b><span class="fpp-r">'+rwy+'</span></div>';
     };
+    // The compact card keeps its most important planned number — cruise level —
+    // in view whether it is expanded or not. A plan without one says so.
     const stats='<div class="fpstats">'
-      +(cruise?'<span><b>'+esc(cruise)+'</b> cruise</span>':'')
+      +'<span class="fpcrz" title="'+(cruise?'Cruise level from the flight plan':'The flight plan carries no cruise level')+'"><b>CRZ '+(cruise?esc(cruise):'—')+'</b></span>'
       +(dist?'<span><b>'+esc(dist)+'</b></span>':'')
       +(ete?'<span><b>'+esc(ete)+'</b></span>':'')
+      +(prog?'<span title="Distance remaining on the planned route"><b>'+Math.round(prog.remainingNm)+'</b> nm left</span>':'')
       +fpCat(sum,depId)+fpCat(sum,arrId)
       +'</div>';
     const header='<div class="fptop">'+(liveOk()?'<span class="dot"></span>':'')+'<b>'+esc(callsign||'Flight plan')+'</b><span class="sp"></span>'+(aircraft?'<span>'+esc(aircraft)+'</span>':'')+fpToggleBtn()+'</div>';
@@ -2174,6 +2265,7 @@ function fpRender(){
     s=header+routeLine+procs+stats+extra
       +'<div class="fpacts">'
       +(fpExp?'<button type="button" data-fp-act="toggle">Minimize</button>':'<button type="button" data-fp-act="toggle">Details</button>')
+      +'<button type="button" data-fp-act="ofp" title="Open the Operational Flight Plan SimBrief generated for this plan">OFP</button>'
       +'<button type="button" data-fp-act="edit">Edit route</button>'
       +'<button type="button" data-fp-act="summary">Flight summary</button>'
       +'<button type="button" data-fp-act="refresh">Refresh OFP</button></div>';
@@ -2190,6 +2282,7 @@ function fpTick(){const n=performance.now();if(n-fpTickAt<900)return;fpTickAt=n;
     const act=t.dataset.fpAct;
     if(act=='import'){importSB();return}
     if(act=='refresh'){importSB();return}
+    if(act=='ofp'){openOfpDoc();return}
     if(act=='plan'){plan=true;panel='route';render();return}
     if(act=='toggle'){fpExp=!fpExp;try{localStorage.setItem('stratos.fpExpanded',fpExp?'1':'0')}catch(_){}fpRender();return}
     if(act=='edit'){panel='route';render();return}
@@ -2241,9 +2334,11 @@ try{if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').t
   import * as PROFILE from './js/lib/profile.js';
   import * as PROC from './js/lib/procedures.js';
   import * as TRAILC from './js/lib/trailcolor.js';
+  import * as TRAILP from './js/lib/trailpath.js';
   window.PROFILE = PROFILE;
   window.PROC = PROC;
   window.TRAILC = TRAILC;
+  window.TRAILP = TRAILP;
   window.VATSIM = VATSIM;
   window.AC = AC;
   window.FP = FP;

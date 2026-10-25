@@ -73,7 +73,8 @@ What gets packaged:
 - `electron-main.cjs`, `electron-preload.cjs`, and `app/**/*` inside the asar.
 - `stratos_bridge.py` and `bridge_logbook_addon.py` in `resources/bridge/`.
 - A complete copy of `app/` in `resources/bridge/app/`, so the packaged bridge can serve the same UI on `127.0.0.1:8765`.
-- `bridge-dist/stratos-bridge.exe` when it exists. The release workflow builds this with PyInstaller, so the installed app does **not** require Python. A local build without that file falls back to a system `py`/`python3`.
+- `bridge-dist/stratos-bridge.exe` when it exists. The release workflow builds this with PyInstaller, so the installed app does **not** require Python. That executable carries `app/` inside it (`--add-data app:app`), because the bridge is what serves the phone's page; a bundle without it answers 404 for every static route. A local build without the executable falls back to a system `py`/`python3`.
+- The desktop app starts that bridge listening on the network (`STRATOS_HOST=0.0.0.0`), not on loopback: a loopback-only bridge cannot be reached by any phone, and its one-tap pairing answers "The bridge is reachable only on this PC". Requests from other hosts still need the bridge token or a phone pairing cookie. Set `STRATOS_HOST=127.0.0.1` to keep the bridge on this PC only.
 
 ### GitHub Actions release
 

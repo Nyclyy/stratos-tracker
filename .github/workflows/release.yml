@@ -187,7 +187,9 @@ jobs:
           # --specpath moves the spec file, and PyInstaller resolves --add-data
           # sources relative to that spec, so the dataset is given as an
           # absolute path.
-          pyinstaller --noconfirm --clean --onefile --name stratos-bridge --distpath bridge-dist --workpath build/pyinstaller --specpath build --add-data "$GITHUB_WORKSPACE/navdata/cifp;navdata/cifp" stratos_bridge.py
+          # app/ must travel with the exe: the bridge is what serves the phone's
+          # live page, and without these files every static route answers 404.
+          pyinstaller --noconfirm --clean --onefile --name stratos-bridge --distpath bridge-dist --workpath build/pyinstaller --specpath build --add-data "$GITHUB_WORKSPACE/navdata/cifp;navdata/cifp" --add-data "$GITHUB_WORKSPACE/app;app" stratos_bridge.py
           test -f bridge-dist/stratos-bridge.exe || { echo "::error::PyInstaller did not produce stratos-bridge.exe"; exit 1; }
 
       - name: Build Windows installer
@@ -249,7 +251,9 @@ jobs:
       - name: Build standalone simulator bridge
         run: |
           python -m pip install --disable-pip-version-check pyinstaller
-          pyinstaller --noconfirm --clean --onefile --name stratos-bridge --distpath bridge-dist --workpath build/pyinstaller --specpath build --add-data "$GITHUB_WORKSPACE/navdata/cifp:navdata/cifp" stratos_bridge.py
+          # app/ must travel with the binary: the bridge serves the phone's live
+          # page, so a bundle without it answers 404 for every static route.
+          pyinstaller --noconfirm --clean --onefile --name stratos-bridge --distpath bridge-dist --workpath build/pyinstaller --specpath build --add-data "$GITHUB_WORKSPACE/navdata/cifp:navdata/cifp" --add-data "$GITHUB_WORKSPACE/app:app" stratos_bridge.py
           test -f bridge-dist/stratos-bridge || { echo "::error::PyInstaller did not produce stratos-bridge"; exit 1; }
 
       - name: Build macOS app
@@ -307,7 +311,9 @@ jobs:
       - name: Build standalone simulator bridge
         run: |
           python -m pip install --disable-pip-version-check pyinstaller
-          pyinstaller --noconfirm --clean --onefile --name stratos-bridge --distpath bridge-dist --workpath build/pyinstaller --specpath build --add-data "$GITHUB_WORKSPACE/navdata/cifp:navdata/cifp" stratos_bridge.py
+          # app/ must travel with the binary: the bridge serves the phone's live
+          # page, so a bundle without it answers 404 for every static route.
+          pyinstaller --noconfirm --clean --onefile --name stratos-bridge --distpath bridge-dist --workpath build/pyinstaller --specpath build --add-data "$GITHUB_WORKSPACE/navdata/cifp:navdata/cifp" --add-data "$GITHUB_WORKSPACE/app:app" stratos_bridge.py
           test -f bridge-dist/stratos-bridge || { echo "::error::PyInstaller did not produce stratos-bridge"; exit 1; }
 
       - name: Build Linux AppImage

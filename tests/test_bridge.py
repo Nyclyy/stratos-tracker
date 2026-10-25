@@ -272,6 +272,29 @@ import unittest.mock  # noqa: E402  (imported after env setup for clarity)
 import stratos_bridge as bridge  # noqa: E402
 
 
+class PairLandingTests(unittest.TestCase):
+    """One-tap pairing lands on the page the phone asked for, and only on this bridge."""
+
+    @staticmethod
+    def handler(path):
+        instance = bridge.Handler.__new__(bridge.Handler)
+        instance.path = path
+        return instance
+
+    def test_a_phone_lands_on_the_live_dashboard_by_default(self):
+        self.assertEqual(self.handler("/pair/connect").pair_landing(), "/live.html")
+
+    def test_a_phone_can_ask_for_the_map_instead(self):
+        self.assertEqual(self.handler("/pair/connect?next=%2Findex.html").pair_landing(), "/index.html")
+
+    def test_the_landing_page_cannot_be_sent_off_this_bridge(self):
+        for bad in ("/pair/connect?next=https://example.com",
+                    "/pair/connect?next=//example.com",
+                    "/pair/connect?next=/../bridge_token.txt",
+                    "/pair/connect?next=index.html"):
+            self.assertEqual(self.handler(bad).pair_landing(), "/live.html", bad)
+
+
 class PairingTests(unittest.TestCase):
     def setUp(self):
         bridge.revoke_pairs()

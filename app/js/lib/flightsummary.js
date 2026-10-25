@@ -144,6 +144,39 @@ export function planProcedures(ofp) {
   };
 }
 
+/* The published OFP is a PDF SimBrief lists under `files`; its `link` is a file
+   name relative to `files.directory`. Both are needed, and neither is guessed. */
+function ofpDocument(files) {
+  const directory = str(files && files.directory);
+  const pdf = files && files.pdf && typeof files.pdf === 'object' ? files.pdf : null;
+  const link = pdf ? str(pdf.link) : null;
+  if (!link || /^javascript:/i.test(link)) return null;
+  if (/^https?:\/\//i.test(link)) return link;
+  if (!directory) return null;
+  return `${directory.replace(/\/?$/, '/')}${link.replace(/^\//, '')}`;
+}
+
+/* SimBrief also returns the OFP as formatted HTML. When no PDF is published it
+   is the only real document there is, so it is kept as text (never rendered as
+   HTML) and capped so a stored plan stays small. */
+function ofpTextOf(text) {
+  const html = text && typeof text === 'object' ? str(text.plan_html) : null;
+  if (!html) return null;
+  const plain = html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(?:pre|div|p|tr|li)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return plain ? plain.slice(0, 20000) : null;
+}
+
 /**
  * Normalise a raw SimBrief OFP (the json=v2 response) into a compact, JSON-safe
  * record. Missing fields come back null; nothing is derived to fill them.
@@ -163,6 +196,7 @@ export function parseOfp(json, fetchedAt = Date.now()) {
   const units = /lb/i.test(String(params.units || general.units || '')) ? 'lb' : 'kg';
   const airline = upper(general.icao_airline);
   const flightNumber = str(general.flight_number);
+  const documentUrl = ofpDocument(json.files);
 
   const ofp = {
     fetchedAt,
@@ -171,7 +205,9 @@ export function parseOfp(json, fetchedAt = Date.now()) {
       callsign: airline && flightNumber ? `${airline}${flightNumber}` : null,
       flightNumber,
       airline,
-      cruiseFt: firstNum(general.cruise_altitude),
+      // `cruise_altitude` is not in every response; the initial cruise level
+      // (`initial_altitude`, e.g. 36000) is what SimBrief always plans with.
+      cruiseFt: firstNum(general.cruise_altitude, general.initial_altitude),
       cruiseMach: str(general.cruise_mach),
       cruiseTasKt: firstNum(general.cruise_tas),
       costIndex: firstNum(general.costindex),
@@ -210,6 +246,10 @@ export function parseOfp(json, fetchedAt = Date.now()) {
       enrouteMin: firstNum(times.est_time_enroute) != null ? firstNum(times.est_time_enroute) / 60 : null,
     },
     distanceNm: firstNum(general.route_distance),
+    // The real Operational Flight Plan SimBrief generated for this plan: a PDF
+    // link when it published one, and the OFP text when it did not.
+    documentUrl,
+    text: documentUrl ? null : ofpTextOf(json.text),
     fuel: {
       block: firstNum(fuel.plan_ramp),
       taxi: firstNum(fuel.taxi),
@@ -496,6 +536,8 @@ export function buildSummary(input = {}) {
     hasOfp: Boolean(ofp),
     ofpStatus,
     ofpFetchedAt: ofp ? ofp.fetchedAt : null,
+    ofpDocumentUrl: useOfp ? ofp.documentUrl || null : null,
+    ofpText: useOfp ? ofp.text || null : null,
     units: { weight: unit },
     overview,
     procedures,
