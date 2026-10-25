@@ -80,6 +80,15 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 .fg b{display:block;font-size:15px;font-variant-numeric:tabular-nums}.fg span{font-size:9px;color:var(--mut);letter-spacing:.1em}
 /* Location and live-aircraft badge, bottom right over the map. */
 #online{position:absolute;right:12px;bottom:12px;z-index:2;padding:7px 12px;border-radius:12px;text-align:right;background:color-mix(in srgb,var(--surface) 84%,transparent);border:1px solid color-mix(in srgb,var(--coast) 34%,transparent);box-shadow:var(--sh-1)}
+/* The phone's offer to open the map the PC serves. One tap and dismissible, and
+   never automatic: a navigation to a PC that is off would replace Stratos with
+   the browser's error page, which the app cannot undo. */
+#pcmap{left:12px;right:12px;bottom:84px;z-index:4;padding:12px 14px;border-radius:14px;display:flex;flex-direction:column;gap:6px;background:color-mix(in srgb,var(--surface) 96%,transparent);border:1px solid color-mix(in srgb,var(--coast) 46%,transparent);box-shadow:var(--sh-2)}
+#pcmap b{font-size:13.5px}
+#pcmap .m{font-size:11.5px;line-height:1.4}
+#pcmap .row{margin-top:2px}
+#pcmap button{flex:1}
+@media(min-width:768px){#pcmap{display:none}}
 #online b{display:block;font-size:12px;font-weight:700;letter-spacing:.02em}
 #online span{font-size:10.5px;color:var(--mut);letter-spacing:.04em}
 @media(max-width:767px){#online{display:none}}
@@ -1610,7 +1619,7 @@ setInterval(()=>{
 },5000);
 addEventListener('online',()=>{if(live.on&&live.base)openStream(live.base)});
 function disc(){if(live.es)live.es.close();live.on=false;live.base='';live.d=null;live.seen=0;$('#bLive').classList.remove('on');if(panel=='live')render()}
-function liveHtml(){const web=location.protocol=='http:'||location.protocol=='file:',ok=liveOk(),lb=location.protocol=='http:'?location.origin:'http://127.0.0.1:8765';return `<h3>Live tracking</h3><div class="m"><b>Traffic:</b> ${wtTxt()}${WT.src?' via '+WT.src:''}. Live aircraft load automatically in Stratos; no Python process is needed for public traffic.</div><div class="m" style="margin-top:8px"><b>Simulator link (optional)</b></div><div class="m">${ok?'● Receiving live data from the simulator':live.on?'Connected to bridge, waiting for simulator data…':'Not connected'}</div>`+(web?'':'<div class="m" style="margin-top:6px">This hosted page cannot call your PC directly, so it opens the same map from your PC instead.</div>')+'<div class="m">To see your own aircraft from X-Plane or MSFS 2020/2024, run the Stratos bridge on your PC.</div><ol class="m" style="padding-left:18px"><li>The Stratos desktop app starts the bridge for you. Manual start: <b>python stratos_bridge.py</b>. For MSFS 2020/2024, run it on the same Windows PC as the sim after a one-time <b>pip install SimConnect</b>, then start a flight. No other MSFS setup.</li><li>X-Plane only: Settings → Data Output: tick “Network via UDP” for rows 3, 17 and 20</li><li>X-Plane only: tick “Send network data output”, enter the IP the bridge prints, port 49003</li><li>On iPhone Safari open <b>http://PC-IP:8765</b>, then Share → Add to Home Screen</li></ol>'+(web?'<div class="row"><button onclick="connect(\''+lb+'\')">Reconnect</button><button onclick="disc()">Disconnect</button></div>':'<div class="m" style="margin-top:8px"><b>On a phone</b> this page shows your aircraft on the same Stratos map, opened from your PC. The phone remembers that address: one tap the first time, then it goes there by itself.</div><div class="row"><button class="on" onclick="openBridgeMap()">'+(bridgeOrigin()?'Open live map':'Open the live map on my PC')+'</button></div>')}
+function liveHtml(){const web=location.protocol=='http:'||location.protocol=='file:',ok=liveOk(),lb=location.protocol=='http:'?location.origin:'http://127.0.0.1:8765';return `<h3>Live tracking</h3><div class="m"><b>Traffic:</b> ${wtTxt()}${WT.src?' via '+WT.src:''}. Live aircraft load automatically in Stratos; no Python process is needed for public traffic.</div><div class="m" style="margin-top:8px"><b>Simulator link (optional)</b></div><div class="m">${ok?'● Receiving live data from the simulator':live.on?'Connected to bridge, waiting for simulator data…':'Not connected'}</div>`+(web?'':'<div class="m" style="margin-top:6px">This hosted page cannot call your PC directly. The button below opens the map your PC serves — the same Stratos, with your aircraft on it — once the PC is running.</div>')+'<div class="m">To see your own aircraft from X-Plane or MSFS 2020/2024, run the Stratos bridge on your PC.</div><ol class="m" style="padding-left:18px"><li>The Stratos desktop app starts the bridge for you. Manual start: <b>python stratos_bridge.py</b>. For MSFS 2020/2024, run it on the same Windows PC as the sim after a one-time <b>pip install SimConnect</b>, then start a flight. No other MSFS setup.</li><li>X-Plane only: Settings → Data Output: tick “Network via UDP” for rows 3, 17 and 20</li><li>X-Plane only: tick “Send network data output”, enter the IP the bridge prints, port 49003</li><li>On iPhone Safari open <b>http://PC-IP:8765</b>, then Share → Add to Home Screen</li></ol>'+(web?'<div class="row"><button onclick="connect(\''+lb+'\')">Reconnect</button><button onclick="disc()">Disconnect</button></div>':'<div class="m" style="margin-top:8px"><b>On a phone</b> this page shows your aircraft on the same Stratos map, opened from your PC. The phone remembers that address: one tap the first time, then it goes there by itself.</div><div class="row"><button class="on" onclick="openBridgeMap()">'+(bridgeOrigin()?'Open live map':'Open the live map on my PC')+'</button></div>')}
 $('#bLive').onclick=()=>{panel=panel=='live'?null:'live';render()};
 window.addSel=()=>{if(sel)addWp(sel)};window.rm=i=>{route.splice(i,1);save();trav=0;render()};window.defRoute=defRoute;
 const dms=(v,p,n)=>{const a=Math.abs(v),d=Math.floor(a),m=Math.floor((a-d)*60),s=((a-d)*60-m)*60;return(v<0?n:p)+d+'° '+m+"' "+s.toFixed(2)+'"'};
@@ -1684,6 +1693,22 @@ function openBridgeMap(){
   try{localStorage.setItem('stratos.bridgeUrl',base)}catch(_){}
   location.href=base+'/pair/connect?next=%2Findex.html'
 }
+/* The hand-off leaves Stratos for the page the PC serves, and a browser cannot
+   undo a navigation that fails: if the PC is off, that address replaces the app
+   with "this site can't be reached". So the offer waits for a tap, says which
+   machine it opens, and can be put aside for this session. The Flight Deck it
+   sits on works without the PC, so a phone with the sim off is never stranded. */
+function pcMapOffer(){
+  try{if(sessionStorage.getItem('stratos.pcMapDismissed')==='1')return}catch(_){}
+  if(document.getElementById('pcmap'))return;
+  const known=bridgeOrigin();
+  const el=document.createElement('div');
+  el.id='pcmap';el.className='box';el.setAttribute('role','region');el.setAttribute('aria-label','Live map from your PC');
+  el.innerHTML='<b>Live map from your PC</b><div class="m">'+(known?'Your PC was last at '+esc(known)+'.':'It opens the map your PC serves, with your aircraft on it.')+' Stratos must be running on the PC.</div><div class="row"><button type="button" id="pcmap-go">Open PC map</button><button type="button" id="pcmap-no">Not now</button></div>';
+  (document.getElementById('app')||document.body).appendChild(el);
+  el.querySelector('#pcmap-go').onclick=()=>openBridgeMap();
+  el.querySelector('#pcmap-no').onclick=()=>{try{sessionStorage.setItem('stratos.pcMapDismissed','1')}catch(_){}el.remove()};
+}
 /* A phone is a touch device with a small viewport; a desktop browser on the
    hosted site is left exactly where it is. */
 function phoneSized(){
@@ -1694,21 +1719,12 @@ function phoneSized(){
 }
 if(location.protocol=='http:')connect(location.origin);
 else if(location.protocol=='file:')connect('http://127.0.0.1:8765');
-/* A hosted HTTPS page cannot call an HTTP bridge (mixed content), so on a phone
-   it opens the page the PC serves: the normal map, with the aircraft on it and
-   the live stream already open. A phone that has found the PC before goes there
-   at once; one that has not tries the fixed local name once per session. */
-else if(location.protocol=='https:'&&phoneSized()){
-  if(bridgeOrigin())openBridgeMap();
-  else if(!/[?&]nobridge=1/.test(location.search)){
-    let tried=false;
-    try{tried=Boolean(sessionStorage.getItem('stratos.bridgeAttempt'))}catch(_){}
-    if(!tried){
-      try{sessionStorage.setItem('stratos.bridgeAttempt','1')}catch(_){}
-      setTimeout(()=>{if(!liveOk())openBridgeMap()},1600)
-    }
-  }
-}
+/* A hosted HTTPS page cannot call an HTTP bridge (mixed content), so the map
+   with the aircraft on it is the page the PC serves, one top-level navigation
+   away. That navigation is offered, never taken on load: a PC that is switched
+   off would replace Stratos with the browser's error page, which is exactly the
+   dead end this card exists to avoid. The page underneath is the Flight Deck. */
+else if(location.protocol=='https:'&&phoneSized()&&!liveOk())pcMapOffer();
 
 /* Location and live-aircraft badge, bottom right over the map. The place name
    is the nearest labelled feature to the view centre (country, continent or

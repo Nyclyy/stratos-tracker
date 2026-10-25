@@ -3,62 +3,58 @@
   "product": "stratos",
   "source": "https://github.com/Nyclyy/stratos-tracker",
   "latest": {
-    "version": "2.1.24",
+    "version": "2.1.25",
     "releasedAt": "2026-10-25",
     "severity": "normal",
-    "summary": "Stratos EFB arrives: an iPad-style flight bag beside the tracker, and a flown trail that no longer disappears when the wheels touch down.",
+    "summary": "The bag stands on its own on a tablet, and opening Stratos on a phone no longer strands you on a browser error page when the PC is off.",
     "changelog": {
       "features": [
-        "Stratos EFB is a second product at efb.html: an aviation tablet with a home screen of app icons, a dock, a status bar and a Home control, opened from the Flight Deck rail and the top bar.",
-        "Eleven apps, each with its own layout: Briefing reads the stored SimBrief plan with procedures, runways, times, weights, fuel and the published OFP PDF, and labels where every value came from.",
-        "Charts uses the same FAA d-TPP catalogue, viewer, validity window and Premium rule as the tracker; Weather decodes NOAA METAR and TAF, with runway wind components and the observation time.",
-        "Performance computes pressure and density altitude, ISA deviation and wind components, and reads V-speeds and field lengths only from a validated dataset you import, without extrapolation.",
-        "Weight & Balance, Fuel, Documents, Airports, Live Flight, Logbook and Settings complete the bag over the tracker's own plan, weather, charts, telemetry and logbook."
+        "Stratos EFB installs to a tablet home screen as its own app: efb.html has its own manifest, a standalone window, its own id and icons, so an iPad keeps the Flight Deck icon too."
       ],
       "improvements": [
-        "Fuel keeps each category separate, reconciles it against the filed block, unit-checks every value and names a component the plan does not state instead of treating it as zero.",
-        "Weight & Balance checks the plan's weights against the plan's own limits and refuses a centre of gravity without station data: a wrong trim figure is worse than a blank one.",
-        "EFB settings remember the default aircraft, weight unit, wallpaper, motion, SimBrief ID, weather refresh and chart source, and write each change as it is made."
+        "Opening Stratos on a phone while the PC is idle now leaves you on the hosted Flight Deck, which works without a simulator, and offers one tap to the map the PC serves instead of claiming the address cannot be reached."
       ],
       "fixes": [
-        "A flown trail no longer resets on landing: the rollout record the bridge opens is appended to the flight already drawn, on the Flight Deck, the phone and the EFB. A flight elsewhere still clears it.",
-        "The EFB chart catalogue loads again: the endpoint returns the records themselves, and the app read them as a field of a wrapper, so every airport said its catalogue was empty. KEWR lists 52 documents.",
-        "The EFB no longer draws a tablet inside a tablet: on an iPad, a touch screen or a tight window the screen fills the viewport, and the status bar and dock keep clear of the safe-area insets."
+        "The hop to the PC is a deliberate tap, never a navigation on load: an address the browser cannot answer can no longer replace the app with an error page it could not undo.",
+        "Connect on the hosted page opens the PC this phone already knows, or the fixed local name on a first visit, so the pairing page is not looked for again.",
+        "The phone keeps tracking once it is on the PC page: the live stream is same-origin there, reconnects after a suspend, and asks for no code, no URL and no button."
       ],
       "performance": [],
       "ui": [
-        "The EFB home grid is sized like a tablet: six columns in landscape, five in tablet portrait and four on a phone, instead of eleven tiny tiles in a wide frame.",
-        "Every EFB app has its own icon and identity in one dark aviation language, with restrained transitions, a dock, clear empty states and a Home control in each view."
+        "The offer names the machine it opens, is dismissible for the session, and appears only on a touch screen with a small viewport."
       ],
       "compatibility": [],
-      "other": [
-        "Sources and licensing record where each EFB figure comes from, including that no aircraft performance dataset is bundled or licensed and that the app is a simulator planning aid, not certified performance."
-      ]
+      "other": []
     },
-    "downloads": {
-      "windows": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.24/Stratos-Setup.exe",
-        "sha256": "a353f056da97e38a0a3662e3d1df5eac98581b42db176892db30e699fc2fd806",
-        "size": 107327476
-      },
-      "mac-arm64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.24/Stratos-2.1.24-mac-arm64.dmg",
-        "sha256": "646c6560f0b4cc63ee9a408abe986fab0cdf82699593f6c0f0d74cf647b40bb6",
-        "size": 123123906
-      },
-      "mac-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.24/Stratos-2.1.24-mac-x64.dmg",
-        "sha256": "ac2fcdeb6d200278ac2a2fb1d633390f00f491fb11aa122f67c6123e2ac438d8",
-        "size": 128438232
-      },
-      "linux-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.24/Stratos-2.1.24-linux-x64.AppImage",
-        "sha256": "2f1a82f19faf3b2d94a2b6c4412d30b02489f7efc3132d6225456d89a8cf7367",
-        "size": 144022355
-      }
-    }
+    "downloads": null
   },
   "releases": [
+    {
+      "version": "2.1.25",
+      "releasedAt": "2026-10-25",
+      "severity": "normal",
+      "summary": "The bag stands on its own on a tablet, and opening Stratos on a phone no longer strands you on a browser error page when the PC is off.",
+      "changelog": {
+        "features": [
+          "Stratos EFB installs to a tablet home screen as its own app: efb.html has its own manifest, a standalone window, its own id and icons, so an iPad keeps the Flight Deck icon too."
+        ],
+        "improvements": [
+          "Opening Stratos on a phone while the PC is idle now leaves you on the hosted Flight Deck, which works without a simulator, and offers one tap to the map the PC serves instead of claiming the address cannot be reached."
+        ],
+        "fixes": [
+          "The hop to the PC is a deliberate tap, never a navigation on load: an address the browser cannot answer can no longer replace the app with an error page it could not undo.",
+          "Connect on the hosted page opens the PC this phone already knows, or the fixed local name on a first visit, so the pairing page is not looked for again.",
+          "The phone keeps tracking once it is on the PC page: the live stream is same-origin there, reconnects after a suspend, and asks for no code, no URL and no button."
+        ],
+        "performance": [],
+        "ui": [
+          "The offer names the machine it opens, is dismissible for the session, and appears only on a touch screen with a small viewport."
+        ],
+        "compatibility": [],
+        "other": []
+      },
+      "downloads": null
+    },
     {
       "version": "2.1.24",
       "releasedAt": "2026-10-25",

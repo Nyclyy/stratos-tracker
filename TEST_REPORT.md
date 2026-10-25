@@ -2,6 +2,23 @@
 
 Date: 2026-10-19. Environment: Linux x64 cloud VM, Node v24.21.0, Python 3 (FreeStyle build), Chromium 156 via Playwright (headless, software rasterisation, private library prefix). No simulator, iPhone, Windows host or Vercel account was available.
 
+## 2026-10-25 — A phone opens Stratos with the PC switched off (Windows 11 x64)
+
+Environment: Windows 11 x64, Playwright Chromium with an emulated **iPhone 13** (390×844, touch, `pointer: coarse`) against a throwaway HTTPS server on 127.0.0.1:8443 with a self-signed certificate, so the mixed-content branch runs exactly as it does on the deployed site; a stub bridge on 127.0.0.1:8765 stood in for the PC in the second half. No real iPhone, no simulator and no real `stratos_bridge.py` were used for this path.
+
+| Check | Method | Result |
+| --- | --- | --- |
+| **The reported failure** | hosted HTTPS page, iPhone emulation, bridge off, PC address known | **failed, fixed** — the page navigated itself to the PC's address on load, so a phone with the sim off landed on the browser's *this site can't be reached*, a navigation no script can undo. The navigation is now a card that waits for a tap; the page stays on `https://…/index.html` with the full Flight Deck (map canvas, all six tabs) and no page error |
+| The offer says what it opens | DOM | pass — `Live map from your PC · Your PC was last at http://192.168.1.50:8765. Stratos must be running on the PC.` with **Open PC map** and **Not now**, 331×129 at the bottom of a 390 px viewport, inside the app bounds |
+| It can be put aside | click **Not now**, then reload | pass — the card is removed, `stratos.pcMapDismissed=1` is set for the session and the reload does not bring it back; a new session offers it again |
+| The tap is the only navigation | click **Open PC map** | pass — one top-level request to `http://192.168.1.50:8765/pair/connect?next=%2Findex.html`; before the tap the page made no request to the PC at all |
+| PC on: the tap lands on the PC's map | stub bridge (302 `/pair/connect` → `/index.html`, SSE `/stream`) | pass — landed on `http://127.0.0.1:8765/index.html`, the stream opened by itself with no tap or setting, `liveOk()` true, status **● Live from X-Plane**, `Simulator online` badge, no page error; a second frame was accepted and the aircraft stayed live |
+| A phone that already knows the PC needs no discovery | stored `stratos.bridgeUrl` | pass — `bridgeOrigin()` supplies it, so the card names the machine and the tap goes straight there; a first visit falls back to `http://stratos.local:8765`, the name the bridge answers over multicast DNS |
+| The desktop is untouched | `phoneSized()`, 1309×818 | pass — a non-touch or large viewport never sees the card, and the hosted desktop page still loads live traffic as before |
+| Suites | `npm test`, `npm run test:py` | 314 JavaScript tests, the relay worker smoke and 72 Python tests pass |
+
+Limitations: the stub bridge proves the phone's hand-off, the stream opening by itself and the live state; it does not prove the real bridge's frames, a real aircraft drawn over a flown route, a real iPhone's Safari, or the Add to Home Screen launch. A browser cannot call an HTTP LAN bridge from an HTTPS page, so the one tap cannot be removed — only made safe, which is what changed here.
+
 ## 2026-10-25 — Stratos EFB, and a trail that survives touchdown (Windows 11 x64)
 
 Environment: Windows 11 x64, the project's `npm run dev` server on 127.0.0.1:8231, Chromium in the preview panel at 1309×818 and 390×844, with the stored KEWR→LEBL SimBrief plan (UAL828, B772, FL370, SID/RWY 22R, STAR GRAUS2W/RWY 24R) already in local storage. No simulator, no bridge and no iPhone were available, so live telemetry, a real touchdown and a real phone session are **not** claimed below.

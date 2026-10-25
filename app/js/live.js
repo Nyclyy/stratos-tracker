@@ -317,18 +317,11 @@ function savedBridgeOrigin() {
   return /^http:\/\/[^/]+$/.test(base) ? base.replace(/\/+$/, '') : '';
 }
 
-/* Opening the dashboard on a phone that has paired before is the whole
-   connection step: the page the PC serves is same-origin, so it needs neither
-   discovery nor a tap. A hosted HTTPS page cannot call the HTTP bridge
-   (mixed content), but it can navigate to it, which is what this does. */
-function openSavedBridge(base) {
-  const target = `${base}/live.html`;
-  let here = '';
-  try { here = new URL(location.href); } catch (_) { return false; }
-  if (`${here.origin}${here.pathname}` === target) return false;
-  location.replace(target);
-  return true;
-}
+/* A hosted HTTPS page cannot call the HTTP bridge (mixed content), so reaching
+   the PC is a navigation — and a navigation to a PC that is switched off cannot
+   be undone: the browser replaces this page with its error page. The dashboard
+   therefore never leaves on its own; it shows the connection state and the one
+   control that does the hop, and everything else here keeps working. */
 
 /* One button, no code, no URL. On a page served over HTTPS the browser will
    not let us call an HTTP bridge, so the button opens the bridge's own page;
@@ -405,11 +398,13 @@ async function connectLocal() {
   setStatus('connecting', 'Looking for your PC…');
   try {
     if (blocksLocalBridge(location)) {
-      // The hosted page cannot probe an HTTP bridge, but it can remember where
-      // the PC answers: from then on the dashboard opens there directly.
-      rememberBridge(phoneConnectUrl().replace(/\/pair\/connect$/, ''));
-      say('Opening the page your PC serves…');
-      location.href = phoneConnectUrl();
+      // The hosted page cannot probe an HTTP bridge. It opens the PC this phone
+      // already knows, or the fixed local name on a first visit; the bridge
+      // confirms it is running by answering that page.
+      const base = savedBridgeOrigin() || phoneConnectUrl().replace(/\/pair\/connect$/, '');
+      rememberBridge(base);
+      say(`Opening ${base}…`);
+      location.href = `${base}/pair/connect`;
       return;
     }
     const candidates = bridgeCandidates({
@@ -871,10 +866,6 @@ window.addEventListener('offline', () => setStatus('offline'));
     await startBridge(location.origin);
     return;
   }
-  // A phone that has paired before goes straight to the PC's own page: no
-  // button, no discovery, no typing, and the stream is same-origin.
-  const bridge = savedBridgeOrigin();
-  if (bridge && openSavedBridge(bridge)) return;
   if (saved) { startRelay(); return; }
   if (query.get('code')) {
     const url = query.get('relay') || 'https://';

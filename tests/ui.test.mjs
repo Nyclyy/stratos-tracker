@@ -1292,13 +1292,13 @@ test('the phone page reconnects on its own and retries when the network returns'
   assert.match(live, /setStatus\('connecting', 'Looking for your PC…'\)/, 'searching is its own state');
   assert.match(live, /function connectLocal\(\)/, 'one button drives the connection');
   assert.match(live, /blocksLocalBridge\(location\)/, 'an HTTPS page navigates instead of failing a mixed-content fetch');
-  assert.match(live, /location\.href = phoneConnectUrl\(\)/, 'the bridge page is opened, with nothing to type');
-  // A phone that has paired before needs no button at all: it goes straight to
-  // the page the PC serves, which is same-origin and therefore live already.
-  assert.match(live, /function openSavedBridge\(base\)/, 'a paired phone can open the PC page directly');
-  assert.match(live, /const bridge = savedBridgeOrigin\(\);/, 'the saved PC is used on load');
-  assert.match(live, /if \(bridge && openSavedBridge\(bridge\)\) return;/, 'the last visit needs no tap');
-  assert.match(live, /rememberBridge\(phoneConnectUrl\(\)/, 'the hosted page remembers where the PC answers');
+  // The connection is a navigation, so it is never automatic: a PC that is off
+  // would replace the dashboard with the browser's error page.
+  assert.equal(live.includes('function openSavedBridge'), false, 'the page no longer leaves on its own');
+  assert.equal(/if \(bridge && openSavedBridge/.test(live), false, 'and never redirects on load');
+  assert.match(live, /const base = savedBridgeOrigin\(\) \|\| phoneConnectUrl\(\)/, 'the button opens the PC this phone already knows');
+  assert.match(live, /location\.href = `\$\{base\}\/pair\/connect`/, 'the bridge page enrolls the phone on arrival');
+  assert.match(live, /rememberBridge\(base\)/, 'the hosted page remembers where the PC answers');
   assert.match(live, /function startAutoScan\(\)/, 'a page that can reach the bridge looks for it by itself');
   assert.match(live, /if \(autoScan \|\| blocksLocalBridge\(location\)/, 'a mixed-content page does not spin on a probe it cannot make');
 });
@@ -1334,15 +1334,26 @@ test('the flight-plan card replaces the pencil and never invents a value', async
   assert.match(page, /nm left/, 'progress is stated in the compact card');
 });
 
-test('the hosted page opens the PC map on a phone, so the aircraft is on the normal map', async () => {
+test('a phone reaches the PC map in one tap and never loses Stratos when the PC is off', async () => {
   const fs = await import('node:fs');
   const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
   assert.match(page, /function bridgeOrigin\(\)/, 'the page remembers the PC it found');
   assert.match(page, /location\.href=base\+'\/pair\/connect\?next=%2Findex\.html'/, 'the pairing page hands the phone to the map');
-  assert.match(page, /else if\(location\.protocol=='https:'&&phoneSized\(\)\)\{/, 'only a phone takes the hand-off');
-  assert.match(page, /if\(bridgeOrigin\(\)\)openBridgeMap\(\);/, 'a phone that knows the PC goes there at once');
-  assert.match(page, /setTimeout\(\(\)=>\{if\(!liveOk\(\)\)openBridgeMap\(\)\},1600\)/, 'a first visit tries the local name once');
-  assert.match(page, /sessionStorage\.setItem\('stratos\.bridgeAttempt','1'\)/, 'and does not loop when the PC is not there');
+  // A failed navigation cannot be undone by the page, so the hand-off is a tap
+  // and the Flight Deck itself works with no PC at all.
+  assert.match(page, /else if\(location\.protocol=='https:'&&phoneSized\(\)&&!liveOk\(\)\)pcMapOffer\(\);/, 'only a phone is offered the hand-off');
+  // The offer is a card, never a navigation on load: a PC that is off would
+  // replace the app with the browser error page, which is the dead end it exists
+  // to avoid.
+  assert.match(page, /function pcMapOffer\(\)\{/, 'the hand-off is a card');
+  assert.match(page, /id="pcmap-no"/, 'and it can be put aside');
+  assert.match(page, /sessionStorage\.setItem\('stratos\.pcMapDismissed','1'\)/, 'for the session, not forever');
+  assert.equal(page.includes("if(bridgeOrigin())openBridgeMap();"), false, 'a paired phone is not thrown at the PC on load');
+  assert.equal(page.includes('setTimeout(()=>{if(!liveOk())openBridgeMap()},1600)'), false, 'a first visit does not try the local name by itself');
+  assert.match(page, /function pcMapOffer\(\)/, 'the offer is its own control');
+  assert.match(page, /id="pcmap-go">Open PC map</, 'one button opens the PC map');
+  assert.match(page, /querySelector\('#pcmap-go'\)\.onclick=\(\)=>openBridgeMap\(\)/, 'and it does what it says');
+  assert.match(page, /stratos\.pcMapDismissed/, 'the offer can be put aside for the session');
   assert.match(page, /if\(location\.protocol=='http:'\)connect\(location\.origin\);/, 'the page served by the PC streams from it directly');
 });
 

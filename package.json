@@ -1,6 +1,6 @@
 {
   "name": "stratos-desktop",
-  "version": "2.1.24",
+  "version": "2.1.25",
   "description": "Stratos flight simulation companion: map, logbook, replay, landing analytics and secure phone access",
   "main": "electron-main.cjs",
   "author": "Stratos",
