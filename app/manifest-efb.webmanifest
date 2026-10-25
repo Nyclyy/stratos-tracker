@@ -1,0 +1,59 @@
+{
+ "name": "Stratos EFB",
+ "short_name": "Stratos EFB",
+ "description": "Electronic flight bag for flight simulation: briefing, charts, weather, performance, weight and balance, fuel, documents, airports, live progress and logbook.",
+ "start_url": "./efb.html",
+ "scope": "./",
+ "display": "standalone",
+ "display_override": ["standalone", "minimal-ui"],
+ "orientation": "any",
+ "background_color": "#060a11",
+ "theme_color": "#060a11",
+ "id": "./efb.html",
+ "icons": [
+  {
+   "src": "icon-180.png",
+   "sizes": "180x180",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icon-maskable-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ],
+ "shortcuts": [
+  {
+   "name": "Flight Briefing",
+   "short_name": "Briefing",
+   "url": "./efb.html#/briefing"
+  },
+  {
+   "name": "Charts",
+   "short_name": "Charts",
+   "url": "./efb.html#/charts"
+  },
+  {
+   "name": "Live Flight",
+   "short_name": "Live",
+   "url": "./efb.html#/live"
+  }
+ ],
+ "categories": ["navigation", "travel", "productivity"],
+ "lang": "en",
+ "dir": "ltr"
+}

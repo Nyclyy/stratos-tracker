@@ -14,6 +14,12 @@ const SHELL = [
   'icon-512.png',
   'icon-maskable-512.png',
   'vendor/qrcode.js',
+  // The bag has its own entry point and manifest, so an installed EFB opens
+  // offline on itself rather than on the tracker.
+  'efb.html',
+  'efb.css',
+  'manifest-efb.webmanifest',
+  'js/efb.js',
 ];
 
 self.addEventListener('install', event => {
@@ -80,6 +86,9 @@ self.addEventListener('fetch', event => {
         const cached = await caches.match(request);
         if (cached) return cached;
         if (request.mode === 'navigate') {
+          /* An installed bag must open the bag, not the Flight Deck. */
+          const wantsEfb = /\/efb\.html$/.test(new URL(request.url).pathname);
+          if (wantsEfb) return (await caches.match('efb.html')) || Response.error();
           return (await caches.match('index.html')) || (await caches.match('./')) || Response.error();
         }
         return Response.error();

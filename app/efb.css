@@ -791,6 +791,13 @@ a { color: var(--efb-accent); }
   .e-kv dd { text-align: left; margin-bottom: 6px; }
 }
 
+/* Launched from a home screen the operating system already shows the time in
+   its own status bar, so the bag does not print a second clock beside it. */
+@media (display-mode: standalone), (display-mode: minimal-ui) {
+  .esb-clock { display: none; }
+}
+body.efb-standalone .esb-clock { display: none; }
+
 /* The bezel is decoration for a desktop window. On a real tablet it would be a
    tablet inside a tablet, and on any touch screen Stratos is already the device:
    the screen becomes the viewport, with no frame, corners or outer shadow, and

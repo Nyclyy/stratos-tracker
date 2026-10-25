@@ -278,3 +278,36 @@ test('EFB live map keeps the flight it drew when the rollout opens a new record'
   assert.match(page, /drawnTrack = track\.slice\(\);/, 'a flight from somewhere else replaces the path');
   assert.match(page, /if \(drawnTrack\.length > 6000\) drawnTrack\.splice/, 'the joined path stays bounded');
 });
+
+test('the EFB installs as its own app on a tablet or phone home screen', async () => {
+  const fs = await import('node:fs');
+  const root = new URL('../', import.meta.url);
+  const read = file => fs.readFileSync(new URL(file, root), 'utf8');
+  const manifest = JSON.parse(read('app/manifest-efb.webmanifest'));
+  assert.equal(manifest.name, 'Stratos EFB');
+  assert.equal(manifest.start_url, './efb.html', 'an installed bag starts on the bag, never on the tracker');
+  assert.equal(manifest.display, 'standalone', 'it launches without browser chrome');
+  assert.notEqual(manifest.id, './', 'the bag is a separate install from the Flight Deck, which uses ./');
+  const sizes = manifest.icons.map(icon => icon.sizes);
+  assert.ok(sizes.includes('192x192') && sizes.includes('512x512'), 'the sizes an installable app needs');
+  assert.ok(manifest.icons.some(icon => icon.purpose === 'maskable'), 'a maskable icon for a shaped home screen');
+
+  const page = read('app/efb.html');
+  assert.match(page, /<link rel="manifest" href="manifest-efb\.webmanifest">/, 'the page names its own manifest');
+  assert.match(page, /<meta name="apple-mobile-web-app-capable" content="yes">/, 'iOS launches it standalone');
+  assert.match(page, /<meta name="apple-mobile-web-app-title" content="Stratos EFB">/, 'the home-screen label');
+  assert.match(page, /navigator\.serviceWorker\.register\('sw\.js'\)/, 'the bag registers the same shell worker');
+  assert.match(page, /display-mode: standalone/, 'it knows when it is running from a home screen');
+
+  const sw = read('app/sw.js');
+  for (const file of ['efb.html', 'efb.css', 'manifest-efb.webmanifest', 'js/efb.js']) {
+    assert.ok(sw.includes(`'${file}'`), `${file} is part of the offline shell`);
+  }
+  assert.match(sw, /wantsEfb/, 'an offline launch of the bag returns the bag, not the Flight Deck');
+  assert.match(read('vercel.json'), /manifest-efb\.webmanifest/, 'the deployment serves it as a manifest');
+
+  // Same origin, so the tracker's manifest and the bag's must stay different apps.
+  const tracker = JSON.parse(read('app/manifest.webmanifest'));
+  assert.notEqual(tracker.start_url, manifest.start_url);
+  assert.notEqual(tracker.id, manifest.id);
+});

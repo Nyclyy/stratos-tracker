@@ -8,6 +8,13 @@
 <meta name="description" content="Stratos EFB — an electronic flight bag for flight simulation: briefing, charts, weather, performance, weight and balance, fuel, documents, airports, live progress and logbook.">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
+<!-- Its own manifest: installing this page puts the bag on a home screen and
+     launches it standalone on the bag, not on the tracker. -->
+<link rel="manifest" href="manifest-efb.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Stratos EFB">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Stratos EFB</title>
 <link rel="stylesheet" href="efb.css">
 </head>
@@ -63,6 +70,21 @@
   import { displayVersion } from './js/lib/version.js';
   const tag = document.getElementById('efb-version');
   if (tag) tag.textContent = displayVersion();
+
+  /* Opened from a home screen the bag has no browser chrome, and the operating
+     system's own status bar carries the clock, so the EFB's clock steps aside
+     instead of showing the same time twice. */
+  try {
+    if (navigator.standalone === true || matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: minimal-ui)').matches) {
+      document.body.classList.add('efb-standalone');
+    }
+  } catch (_) { /* older browser: the clock stays */ }
+
+  /* The same shell worker the tracker registers, so an installed bag opens
+     offline and updates through the path the rest of Stratos already uses. */
+  try {
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  } catch (_) { /* no service worker support */ }
 </script>
 <script type="module" src="js/efb.js"></script>
 </body>
