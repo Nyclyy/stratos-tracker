@@ -34,6 +34,28 @@
       "other": [
         "Sources and licensing record where each EFB figure comes from, including that no aircraft performance dataset is bundled or licensed and that the app is a simulator planning aid, not certified performance."
       ]
+    },
+    "downloads": {
+      "windows": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.24/Stratos-Setup.exe",
+        "sha256": "a353f056da97e38a0a3662e3d1df5eac98581b42db176892db30e699fc2fd806",
+        "size": 107327476
+      },
+      "mac-arm64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.24/Stratos-2.1.24-mac-arm64.dmg",
+        "sha256": "646c6560f0b4cc63ee9a408abe986fab0cdf82699593f6c0f0d74cf647b40bb6",
+        "size": 123123906
+      },
+      "mac-x64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.24/Stratos-2.1.24-mac-x64.dmg",
+        "sha256": "ac2fcdeb6d200278ac2a2fb1d633390f00f491fb11aa122f67c6123e2ac438d8",
+        "size": 128438232
+      },
+      "linux-x64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.24/Stratos-2.1.24-linux-x64.AppImage",
+        "sha256": "2f1a82f19faf3b2d94a2b6c4412d30b02489f7efc3132d6225456d89a8cf7367",
+        "size": 144022355
+      }
     }
   },
   "releases": [
@@ -69,6 +91,28 @@
         "other": [
           "Sources and licensing record where each EFB figure comes from, including that no aircraft performance dataset is bundled or licensed and that the app is a simulator planning aid, not certified performance."
         ]
+      },
+      "downloads": {
+        "windows": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.24/Stratos-Setup.exe",
+          "sha256": "a353f056da97e38a0a3662e3d1df5eac98581b42db176892db30e699fc2fd806",
+          "size": 107327476
+        },
+        "mac-arm64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.24/Stratos-2.1.24-mac-arm64.dmg",
+          "sha256": "646c6560f0b4cc63ee9a408abe986fab0cdf82699593f6c0f0d74cf647b40bb6",
+          "size": 123123906
+        },
+        "mac-x64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.24/Stratos-2.1.24-mac-x64.dmg",
+          "sha256": "ac2fcdeb6d200278ac2a2fb1d633390f00f491fb11aa122f67c6123e2ac438d8",
+          "size": 128438232
+        },
+        "linux-x64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.24/Stratos-2.1.24-linux-x64.AppImage",
+          "sha256": "2f1a82f19faf3b2d94a2b6c4412d30b02489f7efc3132d6225456d89a8cf7367",
+          "size": 144022355
+        }
       }
     },
     {
