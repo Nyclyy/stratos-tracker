@@ -16,6 +16,10 @@ export const MDNS_HOST = 'stratos.local';
 export const BRIDGE_PORT = 8765;
 export const PAIR_PATH = '/pair/connect';
 export const BRIDGE_STORAGE_KEY = 'stratos.bridgeUrl';
+// The relay this project deploys (relay/worker). It is filled in for the phone so
+// that connecting from another network needs only the eight-character code the
+// PC shows; a saved pairing or a ?relay= link always wins.
+export const DEFAULT_RELAY = 'https://stratos-relay.jadhariri108.workers.dev';
 
 /** Normalise a host or URL to the bridge origin, or an empty string. */
 export function bridgeOrigin(value, port = BRIDGE_PORT) {

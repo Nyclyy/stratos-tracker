@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060a11">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Stratos EFB — an electronic flight bag for flight simulation: briefing, charts, weather, performance, weight and balance, fuel, documents, airports, live progress and logbook.">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Stratos EFB</title>
+<link rel="stylesheet" href="efb.css">
+</head>
+<body class="efb-body">
+<div class="efb-stage">
+  <div class="efb-tablet" role="application" aria-label="Stratos electronic flight bag">
+
+    <div class="efb-status">
+      <div class="esb-brand">Stratos <i>EFB</i></div>
+      <div class="esb-flight" id="esb-flight">No flight plan</div>
+      <div class="esb-right">
+        <span class="esb-conn" id="esb-conn" data-state="offline" title="Simulator connection"><i></i><span>Offline</span></span>
+        <span class="esb-clock" id="esb-clock">--:--<small>Z</small></span>
+        <span class="efb-battery" id="esb-battery" title="Battery level"><em style="font-style:normal;font-size:10.5px;letter-spacing:.04em">—</em><span><b style="width:0%"></b></span></span>
+      </div>
+    </div>
+
+    <div class="efb-screen" id="efb-screen" data-wall="aurora">
+
+      <section id="home" class="efb-home" aria-label="EFB home screen">
+        <div class="home-head">
+          <div>
+            <h1>Electronic Flight Bag</h1>
+            <p>Briefing, charts and aircraft tools · simulator use only</p>
+          </div>
+          <span class="home-tag" id="efb-version">Stratos</span>
+        </div>
+        <div id="home-flight" class="home-flight"></div>
+        <div id="app-grid" class="app-grid" role="list" aria-label="Applications"></div>
+        <div class="home-foot">
+          <span>Every figure names its source. Anything unavailable is shown as unavailable, never estimated silently.</span>
+          <a href="index.html">Flight Tracker →</a>
+        </div>
+      </section>
+
+      <section id="app-view" class="efb-app" hidden aria-live="polite"></section>
+
+      <div class="efb-dock" id="dock">
+        <div class="dock-apps" id="dock-apps" aria-label="Dock"></div>
+        <button class="home-btn" id="home-btn" type="button" title="Home" aria-label="Go to the EFB home screen">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10.4V19h11v-8.6"/></svg>
+          <span>Home</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<noscript><p style="padding:28px;color:#e9eff9;font-family:system-ui">Stratos EFB needs JavaScript, like the rest of Stratos.</p></noscript>
+
+<script type="module">
+  import { displayVersion } from './js/lib/version.js';
+  const tag = document.getElementById('efb-version');
+  if (tag) tag.textContent = displayVersion();
+</script>
+<script type="module" src="js/efb.js"></script>
+</body>
+</html>

@@ -67,7 +67,9 @@ function bytesLabel(bytes) {
 
 /* ── the viewer ───────────────────────────────────────────────────────── */
 
-class ChartViewer {
+/* Exported so the EFB can render a document with the same viewer the Charts
+   page uses: one PDF implementation, one set of gestures, one renderer. */
+export class ChartViewer {
   constructor(host, { onState } = {}) {
     this.host = host;
     this.onState = typeof onState === 'function' ? onState : () => {};

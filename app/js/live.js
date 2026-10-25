@@ -7,13 +7,14 @@
 import { initTheme, esc, fmtDate, fmtTime, num, setTheme, toast, tag } from './ui.js';
 import { defaultBridgeBase, claimRelay, RelayClient, TelemetryClient, bridgeHealth, forgetThisPhone } from './bridge.js';
 import {
-  BRIDGE_STORAGE_KEY, blocksLocalBridge, bridgeCandidates, connectionHelp,
+  BRIDGE_STORAGE_KEY, DEFAULT_RELAY, blocksLocalBridge, bridgeCandidates, connectionHelp,
   connectStatus, findBridge, phoneConnectUrl,
 } from './lib/connect.js';
 import { mergeFlights, getFlights } from './lib/store.js';
 import { detectResourceMode, formatAltitude, parseTelemetry } from './lib/telemetry.js';
 import { findAirport } from './data/airports.js';
 import { distanceNm } from './lib/geo.js';
+import { trailContinues } from './lib/trailpath.js';
 import { VATSIM_FEED_URL, parsePilots } from './lib/vatsim.js';
 import { MiniMap } from './minimap.js';
 
@@ -335,7 +336,9 @@ function openSavedBridge(base) {
    addresses first, so the phone lands on the one that actually answered. */
 function pairingScreen(message = '', hint = '') {
   const query = new URLSearchParams(location.search);
-  const suggestedUrl = query.get('relay') || (relayConfig && relayConfig.url) || 'https://';
+  // The relay URL is pre-filled from the deployed relay, so connecting from
+  // another network needs only the code shown on the PC.
+  const suggestedUrl = query.get('relay') || (relayConfig && relayConfig.url) || DEFAULT_RELAY;
   const suggestedCode = query.get('code') || '';
   const saved = readBridgeBase();
   const hosted = blocksLocalBridge(location);
@@ -653,10 +656,9 @@ function render() {
   const stale = lastState.stale || !telemetry || snapshot.ts < Date.now() - 15000;
   const routeKey = `${flight?.id || ''}:${flight?.depAirport || ''}:${flight?.arrAirport || ''}`;
   if (routeKey !== lastFlightKey) {
-    lastFlightKey = routeKey;
     // The bridge keeps the flight's recorded path, so a phone opened halfway
     // through starts from the real first point instead of an empty trail.
-    mapTrack = Array.isArray(flight?.track)
+    const recorded = Array.isArray(flight?.track)
       ? flight.track
         .filter(point => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]))
         .map(point => ({
@@ -665,9 +667,24 @@ function render() {
           agl: Number.isFinite(point[4]) ? point[4] : null,
         }))
       : [];
-    flownNm = 0;
-    lastPosition = null;
-    flightStartedAt = flight && flight.takeoffTime ? flight.takeoffTime : null;
+    // Landing closes the bridge's flight record and the rollout opens a new one.
+    // That is the same journey: the path already on the map stays and the new
+    // recording is appended to it, so touching down does not erase the flight.
+    const joins = recorded.length > 0 && mapTrack.length > 0 &&
+      trailContinues(mapTrack[mapTrack.length - 1], recorded[0]);
+    if (joins) {
+      for (const point of recorded) {
+        const tail = mapTrack[mapTrack.length - 1];
+        if (tail && Math.abs(tail.lat - point.lat) + Math.abs(tail.lon - point.lon) < 1e-5) continue;
+        mapTrack.push(point);
+      }
+    } else {
+      mapTrack = recorded;
+      flownNm = 0;
+      lastPosition = null;
+    }
+    if (!joins || !flightStartedAt) flightStartedAt = flight && flight.takeoffTime ? flight.takeoffTime : null;
+    lastFlightKey = routeKey;
   }
   if (telemetry) {
     if (lastPosition) flownNm += distanceNm(lastPosition, telemetry);

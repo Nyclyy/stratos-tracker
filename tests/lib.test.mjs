@@ -465,3 +465,38 @@ test('a drawn trail rounds its corners without moving the recorded path', async 
   const bounded = smoothPath(long, null, { passes: 2, maxPoints: 1200 });
   assert.ok(bounded.points.length <= 1300, 'the drawn path is capped');
 });
+
+test('a trail survives the landing that ends the bridge flight record', async () => {
+  const { trailContinues } = await import('../app/js/lib/trailpath.js');
+  const now = Date.now();
+  const touchdown = [51.4700, -0.4543, 83, now];
+  // The rollout starts a new flight record a second later at the same place.
+  assert.equal(trailContinues(touchdown, [51.4701, -0.4544, 83, now + 1000]), true,
+    'a new record where the old one stopped is the same journey');
+  // Same place after a long pause is a new session, not a continuation.
+  assert.equal(trailContinues(touchdown, [51.4700, -0.4543, 83, now + 3600000]), false,
+    'a stale start is not joined to the old line');
+  // A flight started at another airport must not draw a line across the world.
+  assert.equal(trailContinues(touchdown, [40.6413, -73.7781, 13, now + 1000]), false,
+    'a reposition clears the trail');
+  // Object points and missing timestamps are handled without throwing.
+  assert.equal(trailContinues({ lat: 1, lon: 1 }, { lat: 1.001, lon: 1.001 }), true);
+  assert.equal(trailContinues([1, 1], [2, 2]), false);
+  assert.equal(trailContinues(null, [1, 1]), false);
+});
+
+test('a rollout recording is appended to the flight instead of replacing it', async () => {
+  const { appendTrack } = await import('../app/js/lib/trailpath.js');
+  const now = Date.now();
+  const flown = [[51.46, -0.45, 4000, now - 60000], [51.47, -0.4543, 83, now]];
+  const rollout = [[51.47, -0.4543, 83, now + 1000], [51.472, -0.4520, 80, now + 9000]];
+  const joined = appendTrack(flown, rollout);
+  assert.equal(joined.length, 3, 'the repeated touchdown point is not drawn twice');
+  assert.deepEqual(joined[0], flown[0], 'the flight already flown keeps its departure end');
+  assert.deepEqual(joined[2], rollout[1], 'the rollout continues the line');
+  assert.equal(flown.length, 2, 'the recorded path passed in is not mutated');
+  // Nothing to append keeps the path as it is; malformed points are dropped.
+  assert.deepEqual(appendTrack(flown, []), flown);
+  assert.deepEqual(appendTrack(flown, [[null, null, 0, now]]), flown);
+  assert.equal(appendTrack(null, rollout).length, 2, 'a first recording needs no base');
+});

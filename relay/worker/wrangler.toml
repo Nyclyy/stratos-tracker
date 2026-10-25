@@ -1,0 +1,27 @@
+# Stratos phone relay on Cloudflare Workers.
+#
+# Deploy:  npx wrangler deploy --config relay/worker/wrangler.toml
+# Local:   npx wrangler dev    --config relay/worker/wrangler.toml
+#
+# A Worker plus one Durable Object, both inside the free plan: no card, no
+# sleeping process, and the pairing survives eviction because sessions are kept
+# in Durable Object storage.
+name = "stratos-relay"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[durable_objects]
+bindings = [{ name = "RELAY", class_name = "RelaySessions" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RelaySessions"]
+
+[vars]
+# Bearer tokens are required on every route that carries data, so a wide CORS
+# allow-list is not an exposure. Narrow it to your PWA origin if you prefer:
+#   ALLOWED_ORIGINS = "https://stratos-tracker.com,https://www.stratos-tracker.com"
+ALLOWED_ORIGINS = "*"
+
+[observability]
+enabled = true

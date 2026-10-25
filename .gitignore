@@ -8,6 +8,8 @@ __pycache__/
 *.pyc
 stratos_pack.json
 relay/data/
+# Wrangler's local dev state for the relay worker (miniflare databases and caches)
+relay/worker/.wrangler/
 .DS_Store
 Thumbs.db
 

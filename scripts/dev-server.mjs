@@ -17,6 +17,11 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import traffic from '../api/traffic.js';
 import photo from '../api/photo.js';
+import weather from '../api/weather.js';
+import winds from '../api/winds.js';
+import charts from '../api/charts.js';
+import chart from '../api/chart.js';
+import ourairports from '../api/ourairports.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..', 'app');
 const PORT = Number(process.env.PORT) || 8123;
@@ -58,6 +63,10 @@ function adapt(handler) {
             if (!res.hasHeader('Content-Type')) res.setHeader('Content-Type', 'application/json; charset=utf-8');
             res.end(JSON.stringify(body));
           },
+          send(body) {
+            if (!res.hasHeader('Content-Type')) res.setHeader('Content-Type', 'application/octet-stream');
+            res.end(body);
+          },
         };
       },
       setHeader(name, value) { res.setHeader(name, value); },
@@ -68,6 +77,17 @@ function adapt(handler) {
 
 const trafficApi = adapt(traffic);
 const photoApi = adapt(photo);
+/* The same serverless handlers the hosted site uses, so the EFB's weather,
+   charts and airport search work in a local browser too. */
+const ROUTES = {
+  '/api/traffic': trafficApi,
+  '/api/photo': photoApi,
+  '/api/weather': adapt(weather),
+  '/api/winds': adapt(winds),
+  '/api/charts': adapt(charts),
+  '/api/chart': adapt(chart),
+  '/api/ourairports': adapt(ourairports),
+};
 
 /** A path inside app/, or null when it escapes the root. */
 function resolveFile(pathname) {
@@ -90,7 +110,7 @@ function resolveFile(pathname) {
 const server = http.createServer(async (req, res) => {
   const { pathname } = new URL(req.url, 'http://localhost');
 
-  const route = pathname === '/api/traffic' ? trafficApi : pathname === '/api/photo' ? photoApi : null;
+  const route = ROUTES[pathname] || null;
   if (route) {
     try {
       await route(req, res);

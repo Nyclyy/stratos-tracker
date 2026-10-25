@@ -22,8 +22,10 @@ const BRIDGE_HOST = '127.0.0.1';
 // being open. STRATOS_HOST still forces a bind address when one is wanted.
 const BRIDGE_BIND = process.env.STRATOS_HOST || '0.0.0.0';
 const MAX_RESTARTS = 6;
-const LOG_LIMIT = 120;
-const UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const LOG_LIMIT = 120;const UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+// A release published while Stratos is already open would otherwise wait for the
+// six-hourly cycle; one extra look shortly after launch closes that gap.
+const LAUNCH_RECHECK_MS = 20 * 60 * 1000;
 // A verified update that was already downloaded is applied only during the first
 // minutes after launch, so a running session is never restarted by a later check.
 const LAUNCH_WINDOW_MS = 10 * 60 * 1000;
@@ -515,6 +517,7 @@ function startAutoUpdate() {
   };
   // Let the map and the bridge settle first; start-up never waits on GitHub.
   setTimeout(check, 8000).unref?.();
+  setTimeout(check, LAUNCH_RECHECK_MS).unref?.();
   setInterval(check, UPDATE_INTERVAL_MS).unref?.();
 }
 

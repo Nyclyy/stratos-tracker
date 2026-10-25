@@ -3,54 +3,74 @@
   "product": "stratos",
   "source": "https://github.com/Nyclyy/stratos-tracker",
   "latest": {
-    "version": "2.1.23",
+    "version": "2.1.24",
     "releasedAt": "2026-10-25",
     "severity": "normal",
-    "summary": "The phone opens the same map as the PC with your aircraft on it, the flown trail eases through turns, and the flight-plan card shows the cruise level and opens your SimBrief OFP.",
+    "summary": "Stratos EFB arrives: an iPad-style flight bag beside the tracker, and a flown trail that no longer disappears when the wheels touch down.",
     "changelog": {
       "features": [
-        "Opening Stratos on a phone now hands it to the map your PC serves, which pairs itself and shows live telemetry: no code, no address to type and no settings.",
-        "The flight-plan card has an OFP action that opens the SimBrief document for the imported plan. When SimBrief publishes no PDF for a plan, its OFP text is shown in the Flight summary instead of a dead button.",
-        "The compact flight-plan card states the planned cruise level (CRZ FL350) and the distance remaining, so neither needs the card expanded."
+        "Stratos EFB is a second product at efb.html: an aviation tablet with a home screen of app icons, a dock, a status bar and a Home control, opened from the Flight Deck rail and the top bar.",
+        "Eleven apps, each with its own layout: Briefing reads the stored SimBrief plan with procedures, runways, times, weights, fuel and the published OFP PDF, and labels where every value came from.",
+        "Charts uses the same FAA d-TPP catalogue, viewer, validity window and Premium rule as the tracker; Weather decodes NOAA METAR and TAF, with runway wind components and the observation time.",
+        "Performance computes pressure and density altitude, ISA deviation and wind components, and reads V-speeds and field lengths only from a validated dataset you import, without extrapolation.",
+        "Weight & Balance, Fuel, Documents, Airports, Live Flight, Logbook and Settings complete the bag over the tracker's own plan, weather, charts, telemetry and logbook."
       ],
       "improvements": [
-        "A flown trail is drawn through rounded corners: a turn curves instead of kinking at the sample rate. The recorded positions are not moved, and the phone's map uses the same curve."
+        "Fuel keeps each category separate, reconciles it against the filed block, unit-checks every value and names a component the plan does not state instead of treating it as zero.",
+        "Weight & Balance checks the plan's weights against the plan's own limits and refuses a centre of gravity without station data: a wrong trim figure is worse than a blank one.",
+        "EFB settings remember the default aircraft, weight unit, wallpaper, motion, SimBrief ID, weather refresh and chart source, and write each change as it is made."
       ],
       "fixes": [
-        "The bridge the desktop app starts now listens on the local network, so a phone can reach it; one-tap pairing previously answered that the bridge was reachable only on this PC.",
-        "The packaged bridge now carries the pages it serves, so a phone opening the page the PC provides no longer lands on a 404.",
-        "The phone no longer claims live simulator data while none is arriving: it says which part it is waiting for.",
-        "SimBrief responses that state the planned level as an initial cruise altitude now supply the cruise level instead of leaving it blank."
+        "A flown trail no longer resets on landing: the rollout record the bridge opens is appended to the flight already drawn, on the Flight Deck, the phone and the EFB. A flight elsewhere still clears it.",
+        "The EFB chart catalogue loads again: the endpoint returns the records themselves, and the app read them as a field of a wrapper, so every airport said its catalogue was empty. KEWR lists 52 documents.",
+        "The EFB no longer draws a tablet inside a tablet: on an iPad, a touch screen or a tight window the screen fills the viewport, and the status bar and dock keep clear of the safe-area insets."
       ],
       "performance": [],
-      "ui": [],
+      "ui": [
+        "The EFB home grid is sized like a tablet: six columns in landscape, five in tablet portrait and four on a phone, instead of eleven tiny tiles in a wide frame.",
+        "Every EFB app has its own icon and identity in one dark aviation language, with restrained transitions, a dock, clear empty states and a Home control in each view."
+      ],
       "compatibility": [],
-      "other": []
-    },
-    "downloads": {
-      "windows": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.23/Stratos-Setup.exe",
-        "sha256": "b9e05919d93c940751b4471acfcb791acf57d3066d04868f4c93b63300690689",
-        "size": 107105001
-      },
-      "mac-arm64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.23/Stratos-2.1.23-mac-arm64.dmg",
-        "sha256": "73607b2910acf77c2bec251f1916fa551ef59ddb9adf528450c5827f040be638",
-        "size": 122882347
-      },
-      "mac-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.23/Stratos-2.1.23-mac-x64.dmg",
-        "sha256": "9a66b7e18cad5ff8a15de8a67aed639b903a2661d65e7a0c95ef7972fd9ec421",
-        "size": 128245604
-      },
-      "linux-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.23/Stratos-2.1.23-linux-x64.AppImage",
-        "sha256": "95cf211e1bb430bebdcfe59ce00a31d26661aed0a9b2942bc07d1fb9867d2e0e",
-        "size": 143768227
-      }
+      "other": [
+        "Sources and licensing record where each EFB figure comes from, including that no aircraft performance dataset is bundled or licensed and that the app is a simulator planning aid, not certified performance."
+      ]
     }
   },
   "releases": [
+    {
+      "version": "2.1.24",
+      "releasedAt": "2026-10-25",
+      "severity": "normal",
+      "summary": "Stratos EFB arrives: an iPad-style flight bag beside the tracker, and a flown trail that no longer disappears when the wheels touch down.",
+      "changelog": {
+        "features": [
+          "Stratos EFB is a second product at efb.html: an aviation tablet with a home screen of app icons, a dock, a status bar and a Home control, opened from the Flight Deck rail and the top bar.",
+          "Eleven apps, each with its own layout: Briefing reads the stored SimBrief plan with procedures, runways, times, weights, fuel and the published OFP PDF, and labels where every value came from.",
+          "Charts uses the same FAA d-TPP catalogue, viewer, validity window and Premium rule as the tracker; Weather decodes NOAA METAR and TAF, with runway wind components and the observation time.",
+          "Performance computes pressure and density altitude, ISA deviation and wind components, and reads V-speeds and field lengths only from a validated dataset you import, without extrapolation.",
+          "Weight & Balance, Fuel, Documents, Airports, Live Flight, Logbook and Settings complete the bag over the tracker's own plan, weather, charts, telemetry and logbook."
+        ],
+        "improvements": [
+          "Fuel keeps each category separate, reconciles it against the filed block, unit-checks every value and names a component the plan does not state instead of treating it as zero.",
+          "Weight & Balance checks the plan's weights against the plan's own limits and refuses a centre of gravity without station data: a wrong trim figure is worse than a blank one.",
+          "EFB settings remember the default aircraft, weight unit, wallpaper, motion, SimBrief ID, weather refresh and chart source, and write each change as it is made."
+        ],
+        "fixes": [
+          "A flown trail no longer resets on landing: the rollout record the bridge opens is appended to the flight already drawn, on the Flight Deck, the phone and the EFB. A flight elsewhere still clears it.",
+          "The EFB chart catalogue loads again: the endpoint returns the records themselves, and the app read them as a field of a wrapper, so every airport said its catalogue was empty. KEWR lists 52 documents.",
+          "The EFB no longer draws a tablet inside a tablet: on an iPad, a touch screen or a tight window the screen fills the viewport, and the status bar and dock keep clear of the safe-area insets."
+        ],
+        "performance": [],
+        "ui": [
+          "The EFB home grid is sized like a tablet: six columns in landscape, five in tablet portrait and four on a phone, instead of eleven tiny tiles in a wide frame.",
+          "Every EFB app has its own icon and identity in one dark aviation language, with restrained transitions, a dock, clear empty states and a Home control in each view."
+        ],
+        "compatibility": [],
+        "other": [
+          "Sources and licensing record where each EFB figure comes from, including that no aircraft performance dataset is bundled or licensed and that the app is a simulator planning aid, not certified performance."
+        ]
+      }
+    },
     {
       "version": "2.1.23",
       "releasedAt": "2026-10-25",

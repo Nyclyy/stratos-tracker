@@ -129,7 +129,7 @@ Do not hand-edit `app/releases.json` into an inconsistent state: `--check` enfor
 
 ### Automatic updates
 
-A packaged Windows build checks the newest stable release eight seconds after the window appears and every six hours after that (`electron-main.cjs`). Development runs and unpacked builds never check (`app.isPackaged`). A newer installer downloads in the background; `electron-updater` verifies it against the SHA-512 in `latest.yml` before emitting `update-downloaded`, and Stratos installs it when it quits.
+A packaged Windows build checks the newest stable release eight seconds after the window appears, again twenty minutes later, and every six hours after that (`electron-main.cjs`). The second launch-time check matters because the six-hourly cycle would otherwise leave an app that was already running when a release went live on the old build until the next cycle. Development runs and unpacked builds never check (`app.isPackaged`). A newer installer downloads in the background; `electron-updater` verifies it against the SHA-512 in `latest.yml` before emitting `update-downloaded`, and Stratos installs it when it quits.
 
 **Settings → Updates** is the Update centre. It shows the installed version, the latest published version and date, the last successful check, a Check for updates button, live download progress, errors and a retry, every published release with its notes, and a **Restart to update** action once a download is verified. The preload exposes `getUpdateStatus`, `checkForUpdates`, `installUpdate` and `onUpdateProgress`; the main process answers on `updater:status`, `updater:check`, `updater:install` and pushes `updater:event`. The first time a release is offered, the same notes appear in a modal with **Update now**, **Remind me later** and **View full changelog**. Dismissing writes the release version, its severity and a fingerprint of its notes, so the same build is not raised again — but a changed release or a higher severity is.
 
@@ -207,6 +207,27 @@ Useful variables:
 | `STRATOS_BRIDGE_TOKEN` | generated | Fixed LAN access token (optional) |
 
 ## 4. Phone relay
+
+There are two implementations of the same relay and the same HTTP contract: the Node server below for a VPS or any always-on host, and a Cloudflare Worker for the free plan.
+
+### Cloudflare Worker (free, always on) — the deployed one
+
+`relay/worker/` is that same relay as a Worker plus one Durable Object. Nothing in the bridge or the phone changes; only the URL does.
+
+```bash
+npx wrangler@4 login                                        # once, in a browser
+npx wrangler@4 dev    --config relay/worker/wrangler.toml   # local miniflare: /health on :8787
+npx wrangler@4 deploy --config relay/worker/wrangler.toml   # prints https://<name>.<subdomain>.workers.dev
+node relay/worker/test/smoke.mjs                            # contract test in plain Node
+```
+
+Why a Worker: no free host keeps a Node process awake any more (Fly, Heroku and Railway dropped their free tiers; Render and Koyeb sleep, and a sleeping host loses the pairing). A Worker has no meaningful cold start, and Durable Object storage keeps sessions across eviction, so a paired phone stays paired. The free plan is 100,000 requests a day; a bridge pushing every second plus a phone polling every two seconds is roughly 90,000 over a full flight, so a very long session can reach the cap on that plan.
+
+State lives in one Durable Object named `stratos-relay`. Sessions are written on pair, claim and revoke; ingest snapshots are coalesced to one write every five seconds and traffic is memory-only, as in the Node relay. `ALLOWED_ORIGINS` is a plain variable in `wrangler.toml`.
+
+Pairing is unchanged and still one-time: the PC posts `POST /relay/pair` to its own bridge with the Worker URL, gets an eight-character code, and the phone enters it once under **Live → Relay URL + pairing code**. After that the phone only needs its stored read token.
+
+### Node server (VPS or another always-on host)
 
 `relay/server.mjs` has no npm dependencies.
 

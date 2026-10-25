@@ -1158,13 +1158,19 @@ test('the flight trail starts from the track the bridge recorded', async () => {
   const live = fs.readFileSync(new URL('../app/js/live.js', import.meta.url), 'utf8');
   assert.match(page, /function seedTrail\(flight\)/, 'the map seeds the trail from the recorded flight');
   assert.match(page, /seedTrail\(live\.d\.currentFlight\)/, 'each snapshot offers the recorded track');
-  assert.match(page, /if\(id!==trailFlightId\)\{trailFlightId=id;trailSeeded='';TRL\.delete\('own'\)\}/, 'a new flight never joins the previous trail');
-  assert.match(page, /TRL\.set\('own',seeded\.slice\(-cap\)\)/, 'the recorded points replace an empty trail');
+  // A landing ends the bridge's record and the rollout opens a new one; the line
+  // must not break under the aircraft when it touches down.
+  assert.match(page, /if\(join\)trailBase=prev\.slice\(\)/, 'a record that begins where the trail stopped keeps the drawn path');
+  assert.match(page, /else\{TRL\.delete\('own'\);trailBase=null\}/, 'a flight starting elsewhere clears the trail instead of joining it');
+  assert.match(page, /const joined=trailBase&&window\.TRAILP\?window\.TRAILP\.appendTrack\(trailBase,seeded\):seeded/, 'the new recording is appended to the drawn path');
+  assert.match(page, /TRL\.set\('own',joined\.slice\(-cap\)\)/, 'the recorded points replace an empty trail');
   assert.match(page, /const stamp=id\+':'\+flight\.track\.length/, 'the seed is refreshed when the recording grows');
   assert.match(page, /if\(trailSeeded===stamp\)return/, 'an unchanged recording is not re-read every frame');
   assert.match(page, /trailSeeded=stamp/, 'the refreshed recording is the trail, so its departure end cannot erode');
-  assert.match(live, /mapTrack = Array\.isArray\(flight\?\.track\)/, 'the phone seeds its map from the same track');
+  assert.match(live, /const recorded = Array\.isArray\(flight\?\.track\)/, 'the phone seeds its map from the same track');
   assert.match(live, /if \(moved\) mapTrack\.push/, 'the live point continues the trail instead of duplicating it');
+  assert.match(live, /trailContinues\(mapTrack\[mapTrack\.length - 1\], recorded\[0\]\)/, 'a rollout record continues the phone trail');
+  assert.match(live, /if \(joins\) \{/, 'the phone keeps the flight it already drew when the aircraft lands');
 });
 
 test('a clicked aircraft shows its own recorded trail, from every traffic source', async () => {

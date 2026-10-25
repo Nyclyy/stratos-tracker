@@ -253,6 +253,18 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 .app-shell[data-collapsed="1"]{--rail:58px}
 .app-shell[data-collapsed="1"] .tab span,.app-shell[data-collapsed="1"] #tabs .rail-toggle span{display:none}
 @media(max-width:767px){#tabs .rail-toggle{display:none}}
+/* Stratos EFB is the second product, not a sixth destination: it gets its own
+   launch card at the foot of the rail, so the five-tab navigation stays intact
+   and the EFB is one press from the Flight Deck. */
+#tabs .rail-product{margin-top:auto;display:flex;align-items:center;gap:8px;width:100%;padding:9px 10px;border-radius:11px;text-decoration:none;color:var(--txt);background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 20%,transparent),color-mix(in srgb,var(--acc) 4%,transparent));border:1px solid color-mix(in srgb,var(--acc) 34%,transparent)}
+#tabs .rail-product:hover{border-color:color-mix(in srgb,var(--acc) 60%,transparent)}
+#tabs .rail-product b{font-size:15px;line-height:1;color:var(--acc)}
+#tabs .rail-product span{font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;font-weight:750;line-height:1.25}
+#tabs .rail-product small{display:block;font-weight:600;font-size:8.5px;letter-spacing:.02em;text-transform:none;color:var(--mut)}
+#tabs .rail-toggle{margin-top:6px}
+.app-shell[data-collapsed="1"] #tabs .rail-product span{display:none}
+.app-shell[data-collapsed="1"] #tabs .rail-product{justify-content:center;padding:9px 0}
+@media(max-width:767px){#tabs .rail-product{display:none}}
 @media(max-width:767px){
 /* The tab bar is a shell row now, so these overlays no longer clear it. */
 #sheet{bottom:12px}.live #sheet{bottom:12px}#attr{bottom:10px}#tel{bottom:12px}
@@ -316,7 +328,7 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 <meta property="og:site_name" content="Stratos">
 </head><body><div class="app-shell">
 <header id="appbar" class="tb" data-title="Flight Deck" data-context="Live Map"></header>
-<nav id="tabs" aria-label="Sections"><button class="tab act" id="bMap" data-group="Fly" data-label="Flight Deck"><b>&#8982;</b><span>Flight Deck</span></button><button class="tab" id="bRoute" data-group="Fly" data-label="Flight Planning"><b>&#8599;</b><span>Flight Planning</span></button><a class="tab" href="logbook.html" data-group="Fly" data-label="Logbook"><b>&#9776;</b><span>Logbook</span></a><a class="tab" href="discover.html" data-group="Explore" data-label="Explore"><b>&#10022;</b><span>Explore</span></a><a class="tab" href="pilot.html#settings" data-group="Account" data-label="Profile &amp; Settings"><b>&#9881;</b><span>Profile</span></a><button class="tab rail-toggle" data-rail-toggle type="button" title="Collapse sidebar" aria-label="Collapse sidebar"><b>&#8249;</b><span>Collapse</span></button></nav>
+<nav id="tabs" aria-label="Sections"><button class="tab act" id="bMap" data-group="Fly" data-label="Flight Deck"><b>&#8982;</b><span>Flight Deck</span></button><button class="tab" id="bRoute" data-group="Fly" data-label="Flight Planning"><b>&#8599;</b><span>Flight Planning</span></button><a class="tab" href="logbook.html" data-group="Fly" data-label="Logbook"><b>&#9776;</b><span>Logbook</span></a><a class="tab" href="discover.html" data-group="Explore" data-label="Explore"><b>&#10022;</b><span>Explore</span></a><a class="tab" href="pilot.html#settings" data-group="Account" data-label="Profile &amp; Settings"><b>&#9881;</b><span>Profile</span></a><a class="rail-product" href="efb.html" title="Stratos EFB — electronic flight bag" aria-label="Open Stratos EFB"><b>&#9635;</b><span>Stratos EFB<small>Briefing · charts</small></span></a><button class="tab rail-toggle" data-rail-toggle type="button" title="Collapse sidebar" aria-label="Collapse sidebar"><b>&#8249;</b><span>Collapse</span></button></nav>
 <div class="app-main">
 <div id="app">
 <canvas id="map" aria-label="Aviation chart map"></canvas>
@@ -332,7 +344,7 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 <div id="online" class="box"><b id="olPlace">–</b><span id="olCount">–</span></div>
 <div id="fab"><button id="bTheme" class="fab" title="Theme">Day</button>
 <button id="bLay" class="fab" title="Layers and tools">&#9776;</button><button id="bFol" class="fab" title="Follow aircraft">&#9992;</button><button id="bZi" class="fab" title="Zoom in">+</button><button id="bZo" class="fab" title="Zoom out">−</button>
-</div><div id="lay"><b>Map layers</b><button data-l="apt" class="on">Airports</button><button data-l="nav" class="on">Navaids</button><button data-l="trf" class="on">Traffic</button><button data-l="trl">All trails</button><button data-l="rte" class="on">Route</button><button data-l="grid">Grid</button><b>Traffic source</b><select id="trs" aria-label="Traffic source"><option value="vatsim">VATSIM — live pilots</option><option value="adsb">ADS-B — community feeds</option></select><div class="m" id="trsnote" style="max-width:220px;margin-top:2px">Both sources are keyless and free.</div><b>Map style</b><div id="ms"></div><b>Workspaces</b><div id="mwtools"><button id="bLive" type="button">Live tracking</button><button id="bCh" type="button">Charts</button><button id="bWx" type="button">Weather</button><button id="bData" type="button">Data</button></div></div>
+</div><div id="lay"><b>Map layers</b><button data-l="apt" class="on">Airports</button><button data-l="nav" class="on">Navaids</button><button data-l="trf" class="on">Traffic</button><button data-l="trl">All trails</button><button data-l="rte" class="on">Route</button><button data-l="grid">Grid</button><b>Traffic source</b><select id="trs" aria-label="Traffic source"><option value="vatsim">VATSIM — live pilots</option><option value="adsb">ADS-B — community feeds</option></select><div class="m" id="trsnote" style="max-width:220px;margin-top:2px">Both sources are keyless and free.</div><b>Map style</b><div id="ms"></div><b>Workspaces</b><div id="mwtools"><button id="bLive" type="button">Live tracking</button><button id="bCh" type="button">Charts</button><button id="bWx" type="button">Weather</button><button id="bData" type="button">Data</button><button id="bEfb" type="button" title="Electronic flight bag">Stratos EFB</button></div></div>
 
 <div id="cv"><div class="cvh"><button id="cvx" aria-label="Back">&#8592;</button><div class="cvt"><b id="cvi"></b><span id="cvn"></span><span id="cvm"></span></div><button id="cvf">Fit</button></div><div class="seg" id="cvs"></div></div><div id="ci"></div>
 <div id="chart"></div>
@@ -1271,6 +1283,7 @@ pk.info='Pack built '+p.built+' (FAA cycle '+p.cycle+'): '+(p.airports||[]).leng
 async function importPack(f){if(!f)return;pk.info='Reading '+Math.round(f.size/1e5)/10+' MB...';render();try{const t=await f.text();applyPack(JSON.parse(t));try{await idb('put',t)}catch(_){pk.info+=' Could not save it for next time.'}}catch(e){pk.info='That file could not be read.'}render()}
 function dataHtml(){return '<h3>Offline data pack</h3><div class="m">'+(pk.info||'No pack imported yet.')+'</div><ol class="m" style="padding-left:18px"><li>On a computer with internet run <b>python3 stratos_bridge.py --pack</b>. It builds stratos_pack.json with real runways, taxiways, aprons, terminals, navaids, frequencies and the current FAA chart list.</li><li>Send that file to your iPhone (AirDrop or Files).</li><li>Choose it here. It is saved on this device and works with no bridge.</li></ol><input type="file" accept=".json,application/json" onchange="importPack(this.files[0])"><div class="m" style="margin-top:8px">Add more airports: <b>--pack KSFO EGLL CYYZ</b></div>'}
 function getFaa(){/* the Charts workspace owns chart data now */}
+$('#bEfb').onclick=()=>{location.href='efb.html'};
 $('#bData').onclick=()=>{panel=panel=='data'?null:'data';render()};
 idb('get').then(t=>{if(t)applyPack(JSON.parse(t))}).catch(()=>{});
 function tabHi(){
@@ -1716,18 +1729,30 @@ function trlAdd(k,lat,lon,alt,mx,agl){if(RP.trail<=0)return;const cap=Math.min(m
 /* The bridge records the flight from the moment it starts, so a page opened
    halfway through can draw the real path instead of a contrail from the moment
    it was opened. The seed is that recorded track, once per flight; the live
-   frames then continue it. A new flight id replaces the trail, so two flights
-   are never joined by a line. */
-let trailFlightId='',trailSeeded='';
+   frames then continue it. A flight that starts somewhere else replaces the
+   trail, so two unrelated flights are never joined by a line. */
+let trailFlightId='',trailSeeded='',trailBase=null;
 function seedTrail(flight){
   if(!flight)return;
   const id=String(flight.id||'');
-  if(id!==trailFlightId){trailFlightId=id;trailSeeded='';TRL.delete('own')}
+  if(id!==trailFlightId){
+    /* Landing completes the bridge's flight and the rollout starts a new one, so
+       a new id is not a new journey. Keep the line when the new record begins
+       where the drawn trail stopped; drop it when the flight starts elsewhere. */
+    const prev=TRL.get('own')||[],first=Array.isArray(flight.track)&&flight.track[0]?flight.track[0]:null;
+    const join=prev.length&&first&&window.TRAILP&&window.TRAILP.trailContinues?window.TRAILP.trailContinues(prev[prev.length-1],first):false;
+    /* The path drawn so far becomes the base the new recording is appended to,
+       so a touchdown cannot erase the flight that just ended. */
+    if(join)trailBase=prev.slice();
+    else{TRL.delete('own');trailBase=null}
+    trailFlightId=id;trailSeeded=''
+  }
   if(!Array.isArray(flight.track)||flight.track.length<2)return;
   /* The bridge's recording is the authority on the flown path: it starts at the
      first movement and is re-sampled to the whole flight on every snapshot. It
      replaces the local trail when it grows, so the departure end cannot be eaten
-     away by the live points appended between snapshots. */
+     away by the live points appended between snapshots; after an arrival it is
+     appended to the flight already drawn instead of replacing it. */
   const last=flight.track[flight.track.length-1];
   const stamp=id+':'+flight.track.length+':'+((last&&last[3])||'');
   if(trailSeeded===stamp)return;
@@ -1735,7 +1760,10 @@ function seedTrail(flight){
     .map(p=>[p[0],p[1],Number(p[2])||0,Number(p[3])||0,Number.isFinite(p[4])?p[4]:null]);
   if(seeded.length<2)return;
   const cap=Math.min(8000,Math.max(400,RP.trail||8000));
-  TRL.set('own',seeded.slice(-cap));
+  /* appendTrack skips a repeated position, so the join is one line and not a
+     doubling back on itself. */
+  const joined=trailBase&&window.TRAILP?window.TRAILP.appendTrack(trailBase,seeded):seeded;
+  TRL.set('own',joined.slice(-cap));
   trailSeeded=stamp
 }
 function trlGC(){const now=Date.now();TRL.forEach((a,k)=>{if(k!='own'&&now-a[a.length-1][3]>1200000)TRL.delete(k)})}

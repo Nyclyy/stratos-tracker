@@ -90,6 +90,19 @@
 }
 .tb-btn:hover { color: var(--shell-ink); background: var(--shell-soft); border-color: var(--shell-line); text-decoration: none; }
 .tb-btn svg { width: 16px; height: 16px; }
+/* The EFB sits beside the account controls with a tinted edge so the second
+   product is visible without competing with the five destinations. */
+.tb-efb {
+  color: color-mix(in srgb, var(--shell-accent) 82%, var(--shell-ink));
+  border-color: color-mix(in srgb, var(--shell-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--shell-accent) 10%, transparent);
+}
+.tb-efb:hover {
+  color: var(--shell-ink);
+  border-color: color-mix(in srgb, var(--shell-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--shell-accent) 18%, transparent);
+}
+@media (max-width: 720px) { .tb-efb span { display: none; } }
 .tb-avatar {
   width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
   background: color-mix(in srgb, var(--shell-accent) 16%, transparent);

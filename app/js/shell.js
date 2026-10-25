@@ -39,6 +39,10 @@ const ICON = {
   progress: SVG('<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3"/>'),
   checklist: SVG('<path d="M6 3h10a2 2 0 0 1 2 2v16H6a2 2 0 0 1-2-2z"/><path d="M8 8l1.6 1.6L12 7M8 13l1.6 1.6L12 12M14 9h2M14 14h2"/>'),
   phone: SVG('<rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 5.5h2M10.5 18.5h3"/>'),
+  // The EFB is a second product, not a sixth destination: it gets its own
+  // control in the bar so it is one press from every page without changing the
+  // five-tab navigation the tracker is built around.
+  efb: SVG('<rect x="3.5" y="4" width="17" height="13" rx="2"/><path d="M7.5 8h3.5M7.5 11.5h5.5M2.5 20h19"/>'),
 };
 
 /** Sidebar icon for a destination, keyed by its id or its link. */
@@ -346,6 +350,7 @@ function buildBar(bar, { theme = false, rail = false, search = null, status = nu
       <div class="status is-off" data-status="sim" title="Simulator status"><i></i><span>No connection</span></div>
       <div class="status is-off" data-status="live" title="Live tracking status"><i></i><span>No live data</span></div>
     </div>`}
+    <a class="tb-btn tb-efb" href="efb.html" title="Stratos EFB — electronic flight bag" aria-label="Open Stratos EFB">${ICON.efb}<span>EFB</span></a>
     <button class="tb-support" data-support type="button" title="Support Stratos — the app is complete without it">
       <span>Support Us</span><b>${ICON.heart}Go Premium</b>
     </button>

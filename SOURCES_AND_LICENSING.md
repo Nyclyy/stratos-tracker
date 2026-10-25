@@ -86,6 +86,19 @@ The pairing QR is drawn by **qrcode-generator 1.4.4** by Kazuhiko Arase, vendore
 - Downloaded documents are cached in a separate IndexedDB database (`stratos_charts`), capped at 40 documents / 30 days. Clearing site data clears them.
 - The FAA publication window from the metafile is shown with every chart. A document whose window has passed is labelled expired; if the window is missing it is labelled unverified. Stratos never calls a chart current without the publisher's dates.
 
+## Stratos EFB
+
+The electronic flight bag (`app/efb.html`) is a second surface over the same data, not a second data source. Nothing in it is invented, and each app states where its numbers came from.
+
+- **Briefing** reads the SimBrief flight plan the tracker already stored (or the route the Flight Deck has loaded). Identity, procedures, runways, times, weights and fuel are labelled `OFP`; the route table is the plan's own navlog; and the published OFP PDF is the link SimBrief itself generated. A field the plan does not carry is shown as unavailable rather than filled in, and a plan with no navlog says so.
+- **Charts** uses the FAA d-TPP catalogue described above, with the same provider registry, validity window, viewer, cache and Premium rule (ILS/LOC free, other categories gated). Airports outside the integrated coverage list publisher links only.
+- **Weather** is the same NOAA Aviation Weather Center METAR/TAF text, decoded locally into wind, visibility, cloud, temperature and QNH, with observation time and age shown. Runway wind components are vector arithmetic on the runway heading. Where no verified free SIGMET feed is configured, the app says that instead of showing an advisory, and it links the official sources.
+- **Performance** separates what can be computed from what must be published. Pressure altitude, ISA temperature and deviation, density altitude, and head/cross/tail wind are standard-atmosphere and vector calculations, computed for any type. V-speeds and field lengths are **not** computed: they exist only when a validated, aircraft-specific dataset is imported, are read by trilinear interpolation inside the dataset's own weight/pressure-altitude/temperature axes, and are never extrapolated beyond them. No manufacturer or third-party performance dataset is bundled, copied or scraped, and Stratos does not claim an approved dataset it does not hold; the app is labelled a simulator planning aid, not certified performance and not for real-world dispatch. Runway slope, contamination, bleed, anti-ice and obstacle corrections are applied only where the imported dataset itself publishes them.
+- **Weight & Balance and Fuel** use the SimBrief weights and fuel figures when a plan is loaded (labelled `OFP`) or values the pilot enters (labelled as entered). Limits and centre-of-gravity arms are shown only when the aircraft's own data provides them; without arms and moments the app explains why it cannot give a CG instead of showing one.
+- **Documents** presents the same community checklists and limitations as the tracker, with the same unverified label. No manufacturer FCOM/QRH or add-on EFB file is bundled.
+- **Live Flight** renders the existing bridge telemetry through the same map component as the phone, and **Logbook** reads the same local logbook; the EFB creates no second tracking system and no second store.
+- Settings, the flight plan and checklist progress are kept in this browser/desktop app's own storage. No analytics or third-party request is added by the EFB.
+
 ## Relay and privacy
 
 - The optional relay is part of this project. It stores SHA-256 token hashes and the latest telemetry snapshot; it does not store a flight history or user identity. It has no command channel to the simulator PC.

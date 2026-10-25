@@ -110,6 +110,7 @@ test('a packaged build can update itself from the GitHub releases', () => {
   assert.match(main, /autoUpdater\.quitAndInstall\(\)/, 'installing restarts straight into the new build');
   assert.match(main, /autoUpdater\.quitAndInstall\(true, true\)/, 'a download left from an earlier session is applied at launch, silently, with a relaunch');
   assert.match(main, /!sawDownloadThisRun && Date\.now\(\) - launchedAt < LAUNCH_WINDOW_MS/, 'launch-time apply is limited to the first minutes of a session');
+  assert.match(main, /setTimeout\(check, LAUNCH_RECHECK_MS\)/, 'a release published while the app is open is picked up without waiting six hours');
 
   const preload = read('electron-preload.cjs');
   for (const channel of ['updater:status', 'updater:check', 'updater:install']) {
