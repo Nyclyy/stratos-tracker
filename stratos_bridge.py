@@ -44,6 +44,7 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import stratos_cifp as nav_cifp
+import stratos_navdata as nav_near
 
 from bridge_logbook_addon import (
     VERSION,
@@ -103,6 +104,12 @@ def nav_data():
         if NAV_DATA is None:
             NAV_DATA = nav_cifp.NavData(os.environ.get("STRATOS_XPLANE_DIR", "").strip())
         return NAV_DATA
+
+
+# Every real navigation point near a position, from the same nav data the
+# procedures come from. The first call parses the fix and navaid files (a second
+# or two); after that a radius query is a grid lookup and a great-circle filter.
+nav_near.set_logger(lambda message: log(message))
 
 
 PHOTOS = {}
@@ -2081,6 +2088,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/procedures.json":
             self.handle_procedures(parsed)
             return
+        if path == "/navdata/near":
+            self.handle_navdata_near(parsed)
+            return
+        if path == "/navdata/status":
+            self.send_json(nav_near.status())
+            return
         if path == "/weather":
             self.handle_weather(parsed)
             return
@@ -2392,6 +2405,43 @@ class Handler(BaseHTTPRequestHandler):
         if not payload.get("ok"):
             status = 503 if payload.get("reason") == "no-navdata" else 404
         self.send_json(payload, status)
+
+    def handle_navdata_near(self, parsed):
+        """Real navigation points within a great-circle radius of a position.
+
+        The Flight Planner's map asks this as it moves: the fixes, VORs, NDBs
+        and airports around the centre of the view, with the distance to each.
+        Every record comes from a named source — the simulator's own nav data
+        for fixes and radio navaids, the airport list for airports — and the
+        radius is measured, not estimated. Nothing is generated to fill a gap.
+        """
+        query = urllib.parse.parse_qs(parsed.query)
+
+        def number(key, default=None):
+            raw = (query.get(key, [""])[0] or "").strip()
+            if not raw:
+                return default
+            try:
+                return float(raw)
+            except ValueError:
+                return None
+
+        lat = number("lat")
+        lon = number("lon")
+        if lat is None or lon is None:
+            self.send_json({"ok": False, "reason": "bad-request",
+                            "error": "lat and lon are required."}, 400)
+            return
+        radius = number("nm", 40.0)
+        limit = number("limit", 400)
+        kinds = [kind for kind in (query.get("kinds", [""])[0] or "").split(",") if kind in nav_near.WANTED_KINDS]
+        try:
+            answer = nav_near.near(lat, lon, radius, kinds or nav_near.WANTED_KINDS, int(limit or 400))
+        except Exception as exc:
+            self.send_json({"ok": False, "reason": "read-error",
+                            "error": "Could not read the navigation data: %s" % exc}, 502)
+            return
+        self.send_json(answer, 200 if answer.get("ok") else 400)
 
     def handle_photo(self, parsed):
         """One aircraft photo by registration, for a page the bridge serves.

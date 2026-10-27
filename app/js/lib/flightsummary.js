@@ -280,6 +280,10 @@ export function parseOfp(json, fetchedAt = Date.now()) {
       lat: num(fix.pos_lat),
       lon: num(fix.pos_long),
       altFt: num(fix.altitude_feet),
+      // SimBrief states the point type (apt, vor, ndb, wpt); it is kept as
+      // published so a map can choose a symbol without inferring it from the
+      // identifier.
+      type: str(fix.type).toLowerCase(),
     })),
   };
   // The procedures are taken from the plan's own fields and route, including a

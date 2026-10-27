@@ -1,4 +1,28 @@
 {
+  "2.1.26": {
+    "summary": "The Flight Deck map gets the same globe as the Flight Planner — real NASA imagery and real terrain shading, with the ground under the centre read from the tiles — and the EFB gains a Flight Planner that builds an IFR route from published navigation data.",
+    "changelog": {
+      "features": [
+        "The EFB Flight Planner builds a route on a real chart: choose a departure airport, add waypoints, VORs and fixes that exist in the data around the view, then an arrival, and continue to a separate SID and STAR page.",
+        "Navigation points around the chart come from OurAirports and the simulator’s own navigation data. A tap resolves to the published record nearest it, or to an exact custom coordinate — never a generated W01.",
+        "Globe mode on both maps: the tracker and the planner share one movable globe with four surfaces — bundled outlines that make no request, NASA Blue Marble imagery through NASA GIBS, and terrain from the AWS terrain tiles.",
+        "An explicit Read terrain action reports the ground at the centre with the level and ground resolution it was read at, and how many samples inside the radius actually had data."
+      ],
+      "improvements": [
+        "The tracker’s map gains Projection and Globe surface controls, a camera reset and its own attribution line, and remembers the projection and surface you chose.",
+        "The airline you are flying appears as its real mark in the EFB header and in Settings instead of its code text.",
+        "Reset plan clears the departure, route, procedures, fuel and alternate in one action, keeping your saved plans.",
+        "A georeferenced approach chart still opens flat on the tracker, and closing it returns to the globe with the route reframed."
+      ],
+      "fixes": [
+        "Touching down at the arrival airport no longer erases the trail behind the flight, and the place badge on the globe names a feature on the near side of the sphere.",
+        "Moving a waypoint works on the globe as it does on the flat chart."
+      ],
+      "performance": [
+        "The globe is painted at a level chosen from the sphere instead of from a temporary coarse frame, so turning it no longer fetches and shades a second set of tiles — measured zero image requests during a drag."
+      ]
+    }
+  },
   "2.1.24": {
     "summary": "Stratos EFB arrives: an iPad-style flight bag beside the tracker, and a flown trail that no longer disappears when the wheels touch down.",
     "changelog": {
@@ -53,7 +77,7 @@
     "summary": "A calmer, more professional Stratos: five destinations on every page, a real flight-plan card in place of the pencil, and SimBrief SID and STAR that finally import.",
     "changelog": {
       "features": [
-        "Five top-level destinations on every page \u2014 Flight Deck, Flight Planning, Logbook, Explore and Profile \u2014 with Live, Charts, Weather and the data pack one tap away in the map's tools menu.",
+        "Five top-level destinations on every page — Flight Deck, Flight Planning, Logbook, Explore and Profile — with Live, Charts, Weather and the data pack one tap away in the map's tools menu.",
         "The flight-plan card replaces the pencil control: callsign, aircraft, departure and arrival, SID and STAR with their planned runways, cruise, distance and time.",
         "It expands in place for route, alternate, weather, weights, fuel, passengers, cargo and live progress, and remembers whether it is open.",
         "Explore gathers Weather, Airports, Charts, Statistics and Live in one hub, linked from its own strip on the Explore page.",

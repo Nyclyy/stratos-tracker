@@ -12,7 +12,7 @@
  */
 
 import {
-  airportByCode, airportRunways, esc, fmtAge, fmtFt, fmtUtc,
+  airportByCode, airportRunways, esc, fmtAge, fmtFt, fmtUtc, fmtVisibility,
   searchAirports, weatherFor, windsAloft,
 } from './common.js';
 import { parseMetar } from '../lib/routeweather.js';
@@ -105,7 +105,7 @@ export async function mount(root, ctx) {
         <dt>Gusts</dt><dd>${decoded.wind.gustKt ? `${decoded.wind.gustKt} kt` : 'None reported'}</dd>
       </dl>
       <div class="e-field">
-        <label for="wx-runway">Runway for wind components</label>
+        <label for="wx-runway" class="wx-wind-label">Runway wind components</label>
         <select class="e-select" id="wx-runway">${runwayOptions()}</select>
         ${components ? `<div class="e-notice" style="margin-top:8px">
           <div><b>${components.headwindKt >= 0 ? `${components.headwindKt} kt headwind` : `${Math.abs(components.headwindKt)} kt tailwind`}</b><br>
@@ -134,14 +134,14 @@ export async function mount(root, ctx) {
       ${record.metar ? `<code class="e-code" style="margin:10px 0 12px">${esc(record.metar)}</code>` : '<div class="e-notice warn" style="margin:10px 0">No current METAR is published for this station. The page will not display an older observation as current.</div>'}
       ${decoded ? `<div class="e-grid two" style="gap:10px">
         <dl class="e-kv">
-          <dt>Visibility</dt><dd>${decoded.visibilitySm != null ? `${decoded.visibilitySm} SM` : '—'}</dd>
+          <dt>Visibility</dt><dd>${esc(fmtVisibility(decoded))}</dd>
           <dt>Ceiling</dt><dd>${decoded.ceilingFt != null ? fmtFt(decoded.ceilingFt) : 'No ceiling'}</dd>
           <dt>Cloud</dt><dd style="font-weight:500">${esc(cloudText(decoded.clouds))}</dd>
           <dt>Temperature</dt><dd>${decoded.temperatureC != null ? `${decoded.temperatureC}°C` : '—'}</dd>
           <dt>Dew point</dt><dd>${decoded.dewpointC != null ? `${decoded.dewpointC}°C` : '—'}</dd>
           <dt>Altimeter</dt><dd>${decoded.altimeter != null ? `${decoded.altimeter} ${decoded.altimeterUnit === 'inHg' ? 'inHg' : 'hPa'}` : '—'}</dd>
         </dl>
-        <div>${windCard(decoded)}</div>
+        <div class="wx-wind">${windCard(decoded)}</div>
       </div>` : ''}
       <div class="e-small e-faint" style="margin-top:9px">Source: ${esc(record.source || 'NOAA Aviation Weather Center')} · fetched ${esc(fmtAge(record.fetchedAt))}${record.decoded && record.decoded.obs_time ? ` · observation ${esc(fmtUtc(Number(record.decoded.obs_time) * 1000))}` : ''}</div>
     </div>`;

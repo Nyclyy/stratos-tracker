@@ -1,8 +1,8 @@
 {
  "name": "Stratos EFB",
  "short_name": "Stratos EFB",
- "description": "Electronic flight bag for flight simulation: briefing, charts, weather, performance, weight and balance, fuel, documents, airports, live progress and logbook.",
- "start_url": "./efb.html",
+ "description": "Electronic flight bag for flight simulation: briefing, charts, weather, performance, weight and balance, fuel, checklists, airports, live progress and logbook.",
+ "start_url": "./efb.html#/home",
  "scope": "./",
  "display": "standalone",
  "display_override": ["standalone", "minimal-ui"],
@@ -48,9 +48,9 @@
    "url": "./efb.html#/charts"
   },
   {
-   "name": "Live Flight",
-   "short_name": "Live",
-   "url": "./efb.html#/live"
+   "name": "Navigator",
+   "short_name": "Navigator",
+   "url": "./efb.html#/navigator"
   }
  ],
  "categories": ["navigation", "travel", "productivity"],

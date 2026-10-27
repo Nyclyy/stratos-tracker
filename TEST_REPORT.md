@@ -2,6 +2,23 @@
 
 Date: 2026-10-19. Environment: Linux x64 cloud VM, Node v24.21.0, Python 3 (FreeStyle build), Chromium 156 via Playwright (headless, software rasterisation, private library prefix). No simulator, iPhone, Windows host or Vercel account was available.
 
+## 2026-10-27 — The tracker's globe, and a Flight Planner built on published data (Windows 11 x64)
+
+Environment: Windows 11 x64, the project's own dev server (`PORT=8131 node scripts/dev-server.mjs`) in Chromium in the preview panel at 944×916, with the NASA GIBS and AWS terrain services reached over the network. No simulator, no bridge and no iPhone were available, so live telemetry is not claimed here. The Flight Planner, the phone pages and the charts were exercised in earlier sessions and are covered by their own suites.
+
+| Check | Method | Result |
+| --- | --- | --- |
+| Globe on the tracker | Map layers → Projection → **Globe** | pass — the flat chart becomes a movable orthographic sphere; the projection and the surface are remembered across a reload |
+| Imagery is the publisher's | surface **Imagery** | pass — level 2 of the GIBS 4326 pyramid, 10 tiles, credited on the sphere and in the attribution line `Imagery: NASA Earth Observatory Blue Marble · NASA GIBS/ESDIS` |
+| Outlines costs nothing | surface **Outlines** | pass — the note states that nothing is fetched; no request leaves the app |
+| Elevation read against known ground | **Read terrain** centred on the Gulf of California (27.4 N 110 W) and then Bavaria (49 N 12 E) | pass — 8,297 ft and 1,401 ft at the centre, both read at level 9 (about 238 m and 201 m per pixel), each with the number of samples that had data; the highest sampled point within 320 NM of Bavaria was 7,507 ft, as the Alps would give |
+| The place badge names near-side ground | globe centred on Europe | pass — it names Austria, the nearest label point to 49 N 12 E (2.05°); before this the badge projected its labels with the flat chart's math, which means nothing on a sphere |
+| Turning the globe costs no extra tiles | synthetic pointer drag, 171 frames | measured — median drawn frame 19.9 ms, 95th percentile 25.7 ms, and **0** GIBS requests during the drag, because the level is chosen from the sphere and not from a transient coarse frame |
+| Waypoint drag on the sphere | `unvis()` used by `moveWp` | pass — a dragged waypoint lands under the pointer on the globe as it does on the flat chart |
+| Suites | `npm test`, `npm run test:py`, `npm run test:integration` | 407 of 412 JavaScript tests pass, plus the relay worker smoke, 72 Python tests and 2 integration tests. All five failures are in `tests/downloads.test.mjs`, which asserts that the manifest's **latest** release already carries its installer table; that table is written by the release workflow once the installers have been built, which is how 2.1.24 and 2.1.25 landed too, so the release commit for this version has no table yet |
+
+Limitations: the frame timings come from a software-rasterised Chromium in the preview panel, not from a GPU-backed browser on a laptop; they are indicative of the main-thread cost, not a benchmark. The globe's imagery pass is deliberately capped (about 320 pixels across the sphere) so a large sphere is soft when zoomed in — the vector layers and labels are drawn at full resolution over it, and raising that cap is a one-line cost decision. Terrain elevation and imagery remain a display product for a simulator map; nothing here is used for terrain clearance, minima or dispatch. No simulator, bridge or phone was connected during this session, so the live path, the recorded trail and the phone pages were not re-exercised.
+
 ## 2026-10-25 — A phone opens Stratos with the PC switched off (Windows 11 x64)
 
 Environment: Windows 11 x64, Playwright Chromium with an emulated **iPhone 13** (390×844, touch, `pointer: coarse`) against a throwaway HTTPS server on 127.0.0.1:8443 with a self-signed certificate, so the mixed-content branch runs exactly as it does on the deployed site; a stub bridge on 127.0.0.1:8765 stood in for the PC in the second half. No real iPhone, no simulator and no real `stratos_bridge.py` were used for this path.

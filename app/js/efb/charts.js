@@ -73,31 +73,31 @@ export async function mount(root, ctx) {
   let destroyed = false;
 
   root.innerHTML = `
-    <div class="e-row" style="margin-bottom:10px">
-      <div class="e-search" id="chart-search" style="max-width:420px">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10.8" cy="10.8" r="5.6"/><path d="m15 15 4.4 4.4"/></svg>
-        <input class="e-input" id="chart-icao" placeholder="Airport ICAO or name" value="${esc(icao)}" autocomplete="off" spellcheck="false" aria-label="Search charts by airport">
-        <div class="e-results" id="chart-results" hidden></div>
-      </div>
-      <button class="e-btn" type="button" data-load>Load charts</button>
-      <span class="e-spacer"></span>
-      <div class="e-seg" id="chart-filter" role="group" aria-label="Chart type filter">
-        ${CATEGORY_FILTERS.map(item => `<button type="button" data-cat="${item.key}" aria-pressed="${item.key === 'all' ? 'true' : 'false'}">${item.label}</button>`).join('')}
-      </div>
-    </div>
-    <div id="chart-quick" class="e-row" style="margin-bottom:12px"></div>
-    <div id="chart-notice"></div>
-    <div class="e-grid" style="grid-template-columns:minmax(0,360px) minmax(0,1fr);align-items:start" id="chart-layout">
-      <div>
-        <div class="e-row" style="margin-bottom:8px">
-          <input class="e-input small" id="chart-query" placeholder="Filter procedures" aria-label="Filter charts" style="max-width:260px">
-          <span class="e-small e-faint" id="chart-count"></span>
+    <div class="ch-workspace">
+      <aside class="ch-side" aria-label="Chart library">
+        <div class="ch-side-top">
+          <div class="e-search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10.8" cy="10.8" r="5.6"/><path d="m15 15 4.4 4.4"/></svg>
+            <input class="e-input" id="chart-icao" placeholder="Airport ICAO or name" value="${esc(icao)}" autocomplete="off" spellcheck="false" aria-label="Search charts by airport">
+            <div class="e-results" id="chart-results" hidden></div>
+          </div>
+          <div class="e-row" style="gap:6px">
+            <button class="e-btn small" type="button" data-load>Load charts</button>
+            <span class="e-spacer"></span>
+            <span class="e-small e-faint" id="chart-count"></span>
+          </div>
+          <div id="chart-quick" class="ch-quick"></div>
+          <div class="e-seg ch-seg" id="chart-filter" role="group" aria-label="Chart type filter">
+            ${CATEGORY_FILTERS.map(item => `<button type="button" data-cat="${item.key}" aria-pressed="${item.key === 'all' ? 'true' : 'false'}">${item.label}</button>`).join('')}
+          </div>
+          <input class="e-input small" id="chart-query" placeholder="Filter documents" aria-label="Filter charts">
         </div>
-        <div id="chart-list" class="e-list"></div>
-      </div>
-      <div class="e-card chart-frame" style="min-height:420px" id="chart-viewer-card">
-        <div id="chart-viewer"></div>
-      </div>
+        <div id="chart-list" class="e-list ch-list"></div>
+      </aside>
+      <section class="ch-main">
+        <div id="chart-notice"></div>
+        <div class="e-card chart-frame" id="chart-viewer-card"></div>
+      </section>
     </div>`;
 
   const listEl = root.querySelector('#chart-list');
@@ -113,7 +113,7 @@ export async function mount(root, ctx) {
     for (const item of recent) if (!items.some(entry => entry.icao === item.icao)) items.push({ icao: item.icao, label: item.name || item.icao });
     host.innerHTML = items.length
       ? items.map(item => `<button class="e-btn small ${item.icao === icao ? 'primary' : 'ghost'}" type="button" data-quick="${esc(item.icao)}">${esc(item.label)}</button>`).join('')
-      : '<span class="e-small e-faint">Type an airport above. Recently opened airports will appear here.</span>';
+      : '<span class="e-small e-faint">Recently opened airports appear here.</span>';
     host.querySelectorAll('[data-quick]').forEach(button => {
       button.addEventListener('click', () => {
         icao = button.dataset.quick;
@@ -142,14 +142,17 @@ export async function mount(root, ctx) {
       return;
     }
     if (!catalogue) {
-      listEl.innerHTML = '';
+      listEl.innerHTML = `<div class="ch-hint">
+        <b>No charts loaded</b>
+        <span>Search for an airport above, or open one of the airports on this flight.</span>
+      </div>`;
       countEl.textContent = '';
       return;
     }
     const charts = visibleCharts();
-    countEl.textContent = `${charts.length} document${charts.length === 1 ? '' : 's'}`;
+    countEl.textContent = `${charts.length} doc${charts.length === 1 ? '' : 's'}`;
     if (!charts.length) {
-      listEl.innerHTML = `<div class="e-empty"><b>No matching charts</b><p>Nothing in this catalogue matches the current filter.</p></div>`;
+      listEl.innerHTML = `<div class="ch-hint"><b>No matching charts</b><span>Nothing in this catalogue matches the current filter.</span></div>`;
       return;
     }
     listEl.innerHTML = charts.map(chart => {
@@ -175,12 +178,42 @@ export async function mount(root, ctx) {
       .filter(Boolean).join(' · ');
   }
 
+  function sourcesPanel() {
+    if (!sourceLinks.length) return '';
+    return `<div class="ch-sources">
+      <div class="ch-sources-head">
+        <div class="e-label">Official sources</div>
+        <div class="ch-sources-note">These publishers hold the documents for this airport.</div>
+      </div>
+      <div class="ch-source-list">${sourceLinks.map(source => `<a class="ch-source" href="${esc(source.url)}" target="_blank" rel="noopener">
+        <div class="ch-source-main"><b>${esc(source.name || source.label || 'Publisher')}</b><span>${esc(source.note || 'Official aeronautical documents')}</span></div>
+        <span class="e-badge">Open ↗</span>
+      </a>`).join('')}</div>
+      <div class="e-small e-faint">Stratos will not copy or scrape a publisher that has not licensed its documents.</div>
+    </div>`;
+  }
+
   function renderViewer() {
     if (!viewerCard) return;
     if (!selected) {
-      viewerCard.innerHTML = `<div class="e-empty" style="margin:14px"><b>No chart open</b><p>Choose a document from the list. Charts open in the same viewer the tracker uses: wheel or pinch to zoom, drag to pan, Page Up/Down for pages.</p></div>`;
+      const external = !catalogue && sourceLinks.length > 0;
+      viewerCard.classList.toggle('is-centred', external);
+      if (external) {
+        viewerCard.innerHTML = `<div class="ch-viewer-head">
+            <div class="e-label">Charts · ${esc(icao)}
+            </div>
+            <div class="ch-viewer-title">No licensed chart to display</div>
+            <p class="ch-viewer-text">${esc((coverage && coverage.message) || 'The charts for this airport are published by an external provider.')} Stratos links to the publisher instead of embedding a copy.</p>
+          </div>${sourcesPanel()}`;
+        return;
+      }
+      viewerCard.innerHTML = `<div class="ch-viewer-empty">
+        <b>No chart open</b>
+        <p>Search for an airport, then choose a document from the list. Charts open in the same viewer the tracker uses: wheel or pinch to zoom, drag to pan, Page Up/Down for pages.</p>
+      </div>`;
       return;
     }
+    viewerCard.classList.remove('is-centred');
     const unlocked = canOpenChart(selected, isPremium(entitlement));
     const official = selected.pdf && selected.cycle ? officialChartUrl(selected.cycle, selected.pdf) : null;
     if (!unlocked) {
@@ -336,9 +369,11 @@ export async function mount(root, ctx) {
     if (!result.ok) {
       error = result.error || '';
       if (result.unsupported) {
-        noticeEl.innerHTML = `<div class="e-notice"><div><b>${esc(icao)} is outside the integrated chart coverage.</b><br>${esc((coverage && coverage.message) || 'Stratos has not licensed a publisher for this region.')}</div></div>${publisherLinks()}`;
+        // The viewer pane explains the coverage gap and lists the publishers, so
+        // a second banner would only repeat it.
+        noticeEl.innerHTML = '';
       } else {
-        noticeEl.innerHTML = `<div class="e-notice bad"><div><b>No charts loaded for ${esc(icao)}.</b><br>${esc(error)}</div></div>${publisherLinks()}`;
+        noticeEl.innerHTML = `<div class="e-notice bad"><div><b>No charts loaded for ${esc(icao)}.</b><br>${esc(error)}</div></div>`;
       }
       renderList();
       renderViewer();
@@ -355,16 +390,6 @@ export async function mount(root, ctx) {
     } else {
       renderViewer();
     }
-  }
-
-  function publisherLinks() {
-    if (!sourceLinks.length) return '';
-    return `<div class="e-card" style="margin-top:10px"><h3>Official sources</h3>
-      <div class="e-list">${sourceLinks.map(source => `<a class="e-list-item" href="${esc(source.url)}" target="_blank" rel="noopener">
-        <div class="li-main"><b>${esc(source.name || source.label || 'Publisher')}</b><span>${esc(source.note || 'Official aeronautical documents')}</span></div>
-        <span class="e-badge">Open ↗</span></a>`).join('')}</div>
-      <div class="e-small e-faint" style="margin-top:8px">Stratos will not copy or scrape a publisher that has not licensed its documents.</div>
-    </div>`;
   }
 
   function docShow() {

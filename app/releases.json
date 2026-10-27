@@ -3,53 +3,60 @@
   "product": "stratos",
   "source": "https://github.com/Nyclyy/stratos-tracker",
   "latest": {
-    "version": "2.1.25",
-    "releasedAt": "2026-10-25",
+    "version": "2.1.26",
+    "releasedAt": "2026-10-27",
     "severity": "normal",
-    "summary": "The bag stands on its own on a tablet, and opening Stratos on a phone no longer strands you on a browser error page when the PC is off.",
+    "summary": "The Flight Deck map gets the same globe as the Flight Planner — real NASA imagery and real terrain shading, with the ground under the centre read from the tiles — and the EFB gains a Flight Planner that builds an IFR route from published navigation data.",
     "changelog": {
       "features": [
-        "Stratos EFB installs to a tablet home screen as its own app: efb.html has its own manifest, a standalone window, its own id and icons, so an iPad keeps the Flight Deck icon too."
+        "The EFB Flight Planner builds a route on a real chart: choose a departure airport, add waypoints, VORs and fixes that exist in the data around the view, then an arrival, and continue to a separate SID and STAR page.",
+        "Navigation points around the chart come from OurAirports and the simulator’s own navigation data. A tap resolves to the published record nearest it, or to an exact custom coordinate — never a generated W01.",
+        "Globe mode on both maps: the tracker and the planner share one movable globe with four surfaces — bundled outlines that make no request, NASA Blue Marble imagery through NASA GIBS, and terrain from the AWS terrain tiles.",
+        "An explicit Read terrain action reports the ground at the centre with the level and ground resolution it was read at, and how many samples inside the radius actually had data."
       ],
       "improvements": [
-        "Opening Stratos on a phone while the PC is idle now leaves you on the hosted Flight Deck, which works without a simulator, and offers one tap to the map the PC serves instead of claiming the address cannot be reached."
+        "The tracker’s map gains Projection and Globe surface controls, a camera reset and its own attribution line, and remembers the projection and surface you chose.",
+        "The airline you are flying appears as its real mark in the EFB header and in Settings instead of its code text.",
+        "Reset plan clears the departure, route, procedures, fuel and alternate in one action, keeping your saved plans.",
+        "A georeferenced approach chart still opens flat on the tracker, and closing it returns to the globe with the route reframed."
       ],
       "fixes": [
-        "The hop to the PC is a deliberate tap, never a navigation on load: an address the browser cannot answer can no longer replace the app with an error page it could not undo.",
-        "Connect on the hosted page opens the PC this phone already knows, or the fixed local name on a first visit, so the pairing page is not looked for again.",
-        "The phone keeps tracking once it is on the PC page: the live stream is same-origin there, reconnects after a suspend, and asks for no code, no URL and no button."
+        "Touching down at the arrival airport no longer erases the trail behind the flight, and the place badge on the globe names a feature on the near side of the sphere.",
+        "Moving a waypoint works on the globe as it does on the flat chart."
       ],
-      "performance": [],
-      "ui": [
-        "The offer names the machine it opens, is dismissible for the session, and appears only on a touch screen with a small viewport."
-      ],
-      "compatibility": [],
-      "other": []
-    },
-    "downloads": {
-      "windows": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.25/Stratos-Setup.exe",
-        "sha256": "e0bf15d132edef626f6a84183c29fd57efe435b965e196df9f75eb7763b48459",
-        "size": 107334063
-      },
-      "mac-arm64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.25/Stratos-2.1.25-mac-arm64.dmg",
-        "sha256": "90f6fd799484d6ac9de36c87e4c1b05b8c015801d9d9aa86b18035781bcfd22f",
-        "size": 123128040
-      },
-      "mac-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.25/Stratos-2.1.25-mac-x64.dmg",
-        "sha256": "c41451faaf779b3d413173aaa83257b88560d00947886c463ccce074a0bbd7fa",
-        "size": 128443466
-      },
-      "linux-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.25/Stratos-2.1.25-linux-x64.AppImage",
-        "sha256": "bef7dab26e726f2f050a3bacfe6ad662fa3f1bc77dbf310a988648aee5157237",
-        "size": 144030589
-      }
+      "performance": [
+        "The globe is painted at a level chosen from the sphere instead of from a temporary coarse frame, so turning it no longer fetches and shades a second set of tiles — measured zero image requests during a drag."
+      ]
     }
   },
   "releases": [
+    {
+      "version": "2.1.26",
+      "releasedAt": "2026-10-27",
+      "severity": "normal",
+      "summary": "The Flight Deck map gets the same globe as the Flight Planner — real NASA imagery and real terrain shading, with the ground under the centre read from the tiles — and the EFB gains a Flight Planner that builds an IFR route from published navigation data.",
+      "changelog": {
+        "features": [
+          "The EFB Flight Planner builds a route on a real chart: choose a departure airport, add waypoints, VORs and fixes that exist in the data around the view, then an arrival, and continue to a separate SID and STAR page.",
+          "Navigation points around the chart come from OurAirports and the simulator’s own navigation data. A tap resolves to the published record nearest it, or to an exact custom coordinate — never a generated W01.",
+          "Globe mode on both maps: the tracker and the planner share one movable globe with four surfaces — bundled outlines that make no request, NASA Blue Marble imagery through NASA GIBS, and terrain from the AWS terrain tiles.",
+          "An explicit Read terrain action reports the ground at the centre with the level and ground resolution it was read at, and how many samples inside the radius actually had data."
+        ],
+        "improvements": [
+          "The tracker’s map gains Projection and Globe surface controls, a camera reset and its own attribution line, and remembers the projection and surface you chose.",
+          "The airline you are flying appears as its real mark in the EFB header and in Settings instead of its code text.",
+          "Reset plan clears the departure, route, procedures, fuel and alternate in one action, keeping your saved plans.",
+          "A georeferenced approach chart still opens flat on the tracker, and closing it returns to the globe with the route reframed."
+        ],
+        "fixes": [
+          "Touching down at the arrival airport no longer erases the trail behind the flight, and the place badge on the globe names a feature on the near side of the sphere.",
+          "Moving a waypoint works on the globe as it does on the flat chart."
+        ],
+        "performance": [
+          "The globe is painted at a level chosen from the sphere instead of from a temporary coarse frame, so turning it no longer fetches and shades a second set of tiles — measured zero image requests during a drag."
+        ]
+      }
+    },
     {
       "version": "2.1.25",
       "releasedAt": "2026-10-25",

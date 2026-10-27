@@ -41,6 +41,23 @@ test('route weather: METAR wind, visibility and ceiling are read from the report
   assert.equal(parseMetar(''), null);
 });
 
+test('route weather: metric visibility is converted, not dropped', () => {
+  // Most of the world reports metres. "9999" is 10 km or more, not a missing field.
+  const parsed = parseMetar('METAR LHBP 260030Z 24009KT 9999 FEW006 BKN040 09/08 Q1014');
+  assert.equal(parsed.visibilityM, 9999);
+  assert.ok(parsed.visibilitySm > 6 && parsed.visibilitySm < 6.5);
+  assert.equal(parsed.flightCategory, 'VFR');
+
+  const low = parseMetar('EPWA 260030Z 18003KT 0800 R33/1200 FG VV002 08/08 Q1007');
+  assert.equal(low.visibilityM, 800);
+  assert.equal(low.flightCategory, 'LIFR');
+
+  // A station that reports statute miles keeps its own unit and no metric value.
+  const imperial = parseMetar(VFR);
+  assert.equal(imperial.visibilityM, null);
+  assert.equal(imperial.visibilitySm, 10);
+});
+
 test('route weather: wind components use the course, with gusts when present', () => {
   assert.deepEqual(windComponents(270, 270, 20), {
     effectiveKt: 20, angleDeg: 0, headwindKt: 20, crosswindKt: 0,

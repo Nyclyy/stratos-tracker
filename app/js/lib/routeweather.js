@@ -62,6 +62,17 @@ export function parseMetar(raw) {
   const windMatch = /(?:^|\s)(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT(?:\s|$)/.exec(text);
   const visibilityMatch = /(?:^|\s)((?:M?\d+\s+)?M?\d+\/\d+|M?\d+(?:\.\d+)?|CAVOK)SM(?:\s|$)/.exec(text)
     || /(?:^|\s)(CAVOK)(?:\s|$)/.exec(text);
+  // Most of the world reports visibility in metres ("9999", "2000", "2000NE",
+  // "0800"). It is a real observation, so it is converted rather than dropped.
+  // Only the leading group after the wind is considered, which is where the
+  // metric form always sits — a "9999"-shaped token further in could be anything.
+  const metricVisibility = visibilityMatch ? null : (() => {
+    const tokens = text.split(/\s+/).slice(2, 8);
+    for (const token of tokens) {
+      if (/^\d{3,4}(?:N|NE|E|SE|S|SW|W|NW)?$/.test(token)) return [token, token.slice(0, 4)];
+    }
+    return null;
+  })();
   const clouds = [...text.matchAll(/(?:^|\s)(FEW|SCT|BKN|OVC|VV)(\d{3})(?:CB|TCU)?(?=\s|$)/g)]
     .map(match => ({ cover: match[1], baseFt: Number(match[2]) * 100 }));
   const tempMatch = /\s(M?\d{2})\/(M?\d{2})\s/.exec(text);
@@ -73,9 +84,12 @@ export function parseMetar(raw) {
     gustKt: windMatch[3] ? Number(windMatch[3]) : null,
   } : null;
 
+  const visibilityM = metricVisibility ? Number(metricVisibility[1]) : null;
   const visibilitySm = visibilityMatch
     ? (visibilityMatch[1] === 'CAVOK' ? 10 : parseVisibility(visibilityMatch[1]))
-    : null;
+    : visibilityM != null && Number.isFinite(visibilityM)
+      ? Math.round((visibilityM / 1609.34) * 10) / 10
+      : null;
   const ceilingFt = clouds
     .filter(layer => layer.cover === 'BKN' || layer.cover === 'OVC' || layer.cover === 'VV')
     .reduce((lowest, layer) => (lowest == null ? layer.baseFt : Math.min(lowest, layer.baseFt)), null);
@@ -83,6 +97,7 @@ export function parseMetar(raw) {
   return {
     wind,
     visibilitySm,
+    visibilityM,
     clouds,
     ceilingFt,
     temperatureC: tempMatch ? Number(tempMatch[1].replace('M', '-')) : null,

@@ -205,3 +205,60 @@ test('minimap: a hidden track layer does not contribute to fit', () => {
   map.setLayers({ track: false });
   assert.ok(map.fit().zoom > withTrack, 'fit falls back to the aircraft position alone');
 });
+
+/* ── the globe ───────────────────────────────────────────────────────── */
+
+test('minimap: the globe projects the facing hemisphere and cuts the far side', () => {
+  const map = new MiniMap(makeCanvas(), { padding: 22 });
+  map.setMode('globe');
+  map.globeCenter = { lat: 0, lon: 0 };
+  const centre = map.globeProject(0, 0);
+  assert.ok(Math.abs(centre.x - 200) < 0.001 && Math.abs(centre.y - 150) < 0.001,
+    'the camera target lands in the middle of the chart');
+  assert.ok(map.globeProject(0, 90), 'a point 90 degrees away is still on the limb');
+  assert.equal(map.globeProject(0, 100), null, 'the far side is not drawn');
+  assert.equal(map.globeProject(-10, 180), null);
+});
+
+test('minimap: a projected globe point unprojects back to itself', () => {
+  const map = new MiniMap(makeCanvas(), { padding: 22 });
+  map.setMode('globe');
+  map.globeCenter = { lat: 47.4, lon: -122.3 };
+  for (const [lat, lon] of [[47.4, -122.3], [40, -100], [30, -140], [70, -100]]) {
+    const point = map.globeProject(lat, lon);
+    assert.ok(point, `${lat},${lon} faces the camera`);
+    const back = map.globeUnproject(point.x, point.y);
+    assert.ok(Math.abs(back.lat - lat) < 0.001, `latitude round-trips (${lat})`);
+    assert.ok(Math.abs(back.lon - lon) < 0.001, `longitude round-trips (${lon})`);
+  }
+  assert.equal(map.globeUnproject(-20, 150), null, 'a click outside the sphere is not a place');
+});
+
+test('minimap: switching to the globe keeps the place in view, and the span is a distance', () => {
+  const map = new MiniMap(makeCanvas(), { padding: 22 });
+  map.setRoute([{ id: 'KSFO', lat: 37.62, lon: -122.38 }, { id: 'KJFK', lat: 40.64, lon: -73.78 }]);
+  map.centerOn(52.3, 4.76, 6);
+  const before = map.viewCenter();
+  assert.equal(map.setMode('globe'), 'globe');
+  const after = map.viewCenter();
+  assert.ok(Math.abs(after.lat - before.lat) < 0.6 && Math.abs(after.lon - before.lon) < 0.6,
+    'the camera opens over the same place the flat chart was showing');
+  const span = map.viewSpanNm();
+  assert.ok(span > 1000 && span < 12000, `the visible span is a real distance (${span} NM)`);
+  // Zooming in shrinks the span: the projection is scaled, not redrawn.
+  map.zoomBy(1);
+  assert.ok(map.viewSpanNm() < span);
+});
+
+test('minimap: the globe frames the route it is showing', () => {
+  const map = new MiniMap(makeCanvas(), { padding: 22 });
+  map.setRoute([{ id: 'KSFO', lat: 37.62, lon: -122.38 }, { id: 'EGLL', lat: 51.47, lon: -0.4543 }]);
+  map.setMode('globe');
+  map.fitRoute();
+  const projected = map.route.map(point => map.globeProject(point.lat, point.lon));
+  assert.ok(projected.every(Boolean), 'both ends of a long-haul route face the camera');
+  const extent = Math.max(...projected.map(p => Math.hypot(p.x - 200, p.y - 150)));
+  const radius = map.globeRadius();
+  assert.ok(extent < radius, 'the whole route is on the visible disc');
+  assert.ok(extent > radius * 0.3, 'and the route is scaled up to use it');
+});

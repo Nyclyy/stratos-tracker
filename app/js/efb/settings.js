@@ -14,6 +14,9 @@ import { chartCacheSize, clearChartCache } from '../lib/charts.js';
 import { defaultBridgeBase, bridgeHealth } from '../bridge.js';
 import { APP_VERSION, displayVersion } from '../lib/version.js';
 import { EFB_AIRCRAFT, aircraftLabel } from '../data/efb-aircraft.js';
+import {
+  airlineByIcao, airlineTitle, airlineVars, resolveAirline, searchAirlines,
+} from '../lib/airlines.js';
 
 const WALLPAPERS = [
   { key: 'aurora', label: 'Aurora', css: 'linear-gradient(135deg,#0b1c3a,#101a2e 50%,#1b1030)' },
@@ -37,6 +40,11 @@ export async function mount(root, ctx) {
   let cacheBytes = null;
   let cacheBusy = false;
   let planMessage = '';
+  // The airline being previewed and the search text survive a re-render, so a
+  // pilot can compare two airlines before applying one.
+  let airlineDraft = prefs.airline || '';
+  let airlineQuery = '';
+  let airlineMessage = '';
 
   root.innerHTML = '<div class="e-loading"><i></i>Reading preferences…</div>';
 
@@ -56,6 +64,135 @@ export async function mount(root, ctx) {
   async function checkBridge() {
     health = await bridgeHealth(defaultBridgeBase(), 2500).catch(() => null);
     render();
+  }
+
+  /**
+   * Airline / EFB appearance. The selector previews before it applies, the
+   * automatic mode is the default, and the detected callsign is stated so a
+   * pilot can see exactly what Stratos read from the plan.
+   */
+  function airlineCard() {
+    const resolved = resolveAirline(prefs, plan);
+    /* The preview shows the airline the bag is wearing right now — the one the
+       pilot picked, or the one detected from the plan — so the logo and the
+       colours are on screen before anything is applied. */
+    const selected = airlineByIcao(airlineDraft) || resolved.airline;
+    const shown = selected ? selected.icao : '';
+    const mode = prefs.airlineMode === 'manual' ? 'manual' : 'auto';
+    const detected = resolved.detected;
+    const detection = mode === 'manual'
+      ? (resolved.airline
+        ? `Manual selection: ${resolved.airline.name} (${resolved.airline.icao}). Automatic detection is still available above.`
+        : 'Manual selection with no airline chosen — the Stratos default is shown.')
+      : detected && detected.airline
+        ? `Detected from ${detected.source === 'plan' ? 'the plan\u2019s airline field' : detected.source === 'live' ? 'the simulator callsign' : 'the SimBrief callsign'}${detected.callsign ? ` ${detected.callsign}` : ''} → ${detected.airline.name}.`
+        : plan && plan.ofp
+          ? 'The stored plan has no airline designator Stratos can verify, so the Stratos default is shown.'
+          : 'No SimBrief plan is stored, so there is no callsign to detect. The Stratos default is shown.';
+    const rows = searchAirlines(airlineQuery);
+    const vars = selected ? airlineVars(selected) : null;
+    const previewStyle = vars ? Object.entries(vars).map(([key, value]) => `${key}:${value}`).join(';') : '';
+
+    return `<div class="e-card air-card">
+      <h3>Airline appearance <span class="e-spacer"></span>
+        <span class="e-badge">${esc(resolved.airline ? resolved.airline.icao : 'Stratos')}</span>
+      </h3>
+      <div class="set-row">
+        <div class="set-main"><b>Source</b><span>Automatic follows the callsign in your SimBrief plan.</span></div>
+        <div class="set-control">
+          <div class="e-seg" role="group" aria-label="Airline source">
+            <button type="button" data-air-mode="auto" aria-pressed="${mode === 'auto'}">Automatic</button>
+            <button type="button" data-air-mode="manual" aria-pressed="${mode === 'manual'}">Manual</button>
+          </div>
+        </div>
+      </div>
+      <p class="air-detection" role="status">${esc(detection)}</p>
+
+      <div class="e-field" style="margin-top:10px">
+        <label for="air-search">Choose an airline</label>
+        <input class="e-input" id="air-search" value="${esc(airlineQuery)}" autocomplete="off" spellcheck="false" placeholder="Search a name, ICAO or IATA code">
+      </div>
+      <div class="air-list" role="listbox" aria-label="Airlines">
+        ${rows.length ? rows.map(airline => `
+          <button class="air-row" type="button" role="option" aria-selected="${airline.icao === shown}" data-air="${esc(airline.icao)}">
+            <i class="air-dot" style="background:${esc(airline.accent)}" aria-hidden="true"></i>
+            <b>${esc(airline.iata || airline.icao)}</b>
+            <span>${esc(airline.name)}</span>
+            <em>${esc(airline.icao)}${airline.iata ? ` · ${esc(airline.iata)}` : ''}</em>
+          </button>`).join('') : '<p class="air-none">No airline matches that search.</p>'}
+      </div>
+
+      <div class="air-preview" style="${previewStyle}">
+        <span class="air-mark${selected && selected.logo ? ' has-logo' : ''}">${selected && selected.logo
+          ? `<img src="${esc(selected.logo)}" alt="">`
+          : esc(selected ? (selected.iata || selected.icao) : 'ST')}</span>
+        <span class="air-name"><b>${esc(selected ? selected.name : 'Stratos default')}</b><small>${esc(selected ? airlineTitle(selected) : 'House colours — no airline selected')}</small></span>
+        <span class="air-sample"><i></i>Selected</span>
+      </div>
+
+      <div class="e-row" style="margin-top:9px">
+        <button class="e-btn small primary" type="button" data-air-apply ${selected ? '' : 'disabled'}>Use this airline</button>
+        <button class="e-btn small ghost" type="button" data-air-reset>Stratos default</button>
+      </div>
+      <div class="e-small ${airlineMessage ? '' : 'e-faint'}" style="margin-top:7px" role="status">${esc(airlineMessage || 'The airline changes the accent colour, the mark in the header and the deck wallpaper. Its logo is shown where Stratos ships one.')}</div>
+    </div>`;
+  }
+
+  function wireAirlineCard() {
+    root.querySelector('#air-search')?.addEventListener('input', event => {
+      airlineQuery = event.target.value;
+      const caret = event.target.selectionStart;
+      render();
+      const next = root.querySelector('#air-search');
+      if (next) { next.focus(); try { next.setSelectionRange(caret, caret); } catch (_) { /* not a text field */ } }
+    });
+    root.querySelectorAll('[data-air]').forEach(button => {
+      button.addEventListener('click', () => {
+        airlineDraft = button.dataset.air;
+        airlineMessage = '';
+        render();
+      });
+    });
+    root.querySelectorAll('[data-air-mode]').forEach(button => {
+      button.addEventListener('click', () => {
+        if (button.dataset.airMode === 'auto') {
+          airlineMessage = 'Automatic: the airline follows the SimBrief callsign.';
+          ctx.setPrefs({ airlineMode: 'auto' });
+          render();
+          return;
+        }
+        // Switching to manual keeps the airline already on screen, so the look
+        // does not jump while the pilot chooses.
+        const pick = airlineDraft
+          || (resolveAirline(prefs, plan).detected.airline || {}).icao
+          || '';
+        if (!pick) {
+          airlineMessage = 'Choose an airline below, then switch to Manual.';
+          render();
+          return;
+        }
+        airlineDraft = pick;
+        airlineMessage = 'Manual selection saved.';
+        ctx.setPrefs({ airlineMode: 'manual', airline: pick });
+        render();
+      });
+    });
+    root.querySelector('[data-air-apply]')?.addEventListener('click', () => {
+      // The airline on screen is the one to apply: the previewed choice, or the
+      // detected airline already in use. A single click then pins what is shown.
+      const pick = airlineByIcao(airlineDraft) || resolveAirline(prefs, plan).airline;
+      if (!pick) { airlineMessage = 'Choose an airline first.'; render(); return; }
+      airlineDraft = pick.icao;
+      airlineMessage = `${airlineTitle(pick)} applied.`;
+      ctx.setPrefs({ airlineMode: 'manual', airline: pick.icao });
+      render();
+    });
+    root.querySelector('[data-air-reset]')?.addEventListener('click', () => {
+      airlineDraft = '';
+      airlineMessage = 'Reset to the Stratos appearance. Automatic detection is back on.';
+      ctx.setPrefs({ airlineMode: 'auto', airline: '' });
+      render();
+    });
   }
 
   function render() {
@@ -124,7 +261,9 @@ export async function mount(root, ctx) {
         </div>
 
         <div>
-          <div class="e-card">
+          ${airlineCard()}
+
+          <div class="e-card" style="margin-top:12px">
             <h3>Live tracking <span class="e-spacer"></span><span class="e-badge ${liveTone}">${esc(connectionText(status.status))}</span></h3>
             <dl class="e-kv">
               <dt>Bridge</dt><dd>${health ? `${esc(health.version || 'running')}${health.host ? ` · ${esc(health.host)}` : ''}` : 'not reachable'}</dd>
@@ -211,13 +350,22 @@ export async function mount(root, ctx) {
       render();
     });
     root.querySelector('[data-reset-prefs]').addEventListener('click', () => {
-      ctx.setPrefs({ units: 'kg', wallpaper: 'aurora', motion: 'full', aircraft: '' });
+      airlineDraft = '';
+      ctx.setPrefs({ units: 'kg', wallpaper: 'aurora', motion: 'full', aircraft: '', airlineMode: 'auto', airline: '', chartTheme: 'night' });
       render();
     });
+    wireAirlineCard();
   }
 
+  // Telemetry arrives several times a second; the settings page only needs to
+  // redraw when the connection state itself changes, or a search field would
+  // lose the caret on every frame.
+  let liveKey = '';
   const offLive = onLive(next => {
+    const key = `${next.status}:${next.detail || ''}`;
     status = next;
+    if (key === liveKey) return;
+    liveKey = key;
     if (!destroyed) render();
   });
   const offPlan = onPlanChange(next => {

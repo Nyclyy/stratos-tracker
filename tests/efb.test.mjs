@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 test('EFB conditions: pressure altitude, ISA and density altitude', async () => {
   const {
@@ -270,13 +271,36 @@ test('EFB charts: a real d-TPP payload becomes a catalogue the viewer can group'
   assert.equal(catalogueFromPayload({ charts: [{ code: 'APD', title: 'X', pdf: null }] }, 'KEWR'), null);
 });
 
-test('EFB live map keeps the flight it drew when the rollout opens a new record', async () => {
+test('EFB Navigator keeps the flight it drew when the rollout opens a new record', async () => {
   const fs = await import('node:fs');
-  const page = fs.readFileSync(new URL('../app/js/efb/live.js', import.meta.url), 'utf8');
+  const page = fs.readFileSync(new URL('../app/js/efb/navigator.js', import.meta.url), 'utf8');
   assert.match(page, /trailContinues\(drawnTrack\[drawnTrack\.length - 1\], track\[0\]\)/,
     'a record that starts where the drawn path stopped continues it');
   assert.match(page, /drawnTrack = track\.slice\(\);/, 'a flight from somewhere else replaces the path');
   assert.match(page, /if \(drawnTrack\.length > 6000\) drawnTrack\.splice/, 'the joined path stays bounded');
+});
+
+test('Navigator describes the route it drew, not a plan left over from another flight', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/js/efb/navigator.js', import.meta.url), 'utf8');
+
+  // The route built in the Flight Plan app carries its own airports, procedures
+  // and cruise in the shared record, so it is described from itself.
+  assert.match(page, /const meta = loadRouteMeta\(\);/, 'the shared route record is read for the summary');
+  assert.match(page, /const own = meta\.plan \|\| null;/, 'and its plan is what the summary prefers');
+  assert.match(page, /const origin = \(own\.origin && own\.origin\.id\) \|\| '';/, 'the route names its own airports');
+  assert.match(page, /sid: procedureLabel\(own\.sid\)/, 'and its own procedures');
+  assert.match(page, /meta\.cruiseAlt \? fmtFl\(meta\.cruiseAlt\)/, 'and its own cruise level');
+
+  // The callsign and the aircraft belong to a SimBrief plan, and it is only this
+  // route's plan while both of its airports match.
+  assert.match(page, /const sameFlight = Boolean\(ofp && origin && destination/, 'a match is required before any of it is shown');
+  assert.match(page, /callsign: sameFlight \?[^:]*: '',/, 'a callsign from another flight is withheld');
+  assert.match(page, /aircraft: sameFlight \?[^:]*: '',/, 'so is its aircraft');
+  assert.match(page, /plannedNm: sameFlight &&[^,]*,/i, 'and its planned distance');
+
+  // With no route record the SimBrief plan is the flight, which is the older path.
+  assert.match(page, /if \(!own\) \{\n\s+if \(!ofp\) return null;/, 'a SimBrief-only flight still reads from the plan');
 });
 
 test('the EFB installs as its own app on a tablet or phone home screen', async () => {
@@ -285,7 +309,7 @@ test('the EFB installs as its own app on a tablet or phone home screen', async (
   const read = file => fs.readFileSync(new URL(file, root), 'utf8');
   const manifest = JSON.parse(read('app/manifest-efb.webmanifest'));
   assert.equal(manifest.name, 'Stratos EFB');
-  assert.equal(manifest.start_url, './efb.html', 'an installed bag starts on the bag, never on the tracker');
+  assert.equal(manifest.start_url, './efb.html#/home', 'an installed bag starts on its own deck, never on the tracker');
   assert.equal(manifest.display, 'standalone', 'it launches without browser chrome');
   assert.notEqual(manifest.id, './', 'the bag is a separate install from the Flight Deck, which uses ./');
   const sizes = manifest.icons.map(icon => icon.sizes);
@@ -310,4 +334,305 @@ test('the EFB installs as its own app on a tablet or phone home screen', async (
   const tracker = JSON.parse(read('app/manifest.webmanifest'));
   assert.notEqual(tracker.start_url, manifest.start_url);
   assert.notEqual(tracker.id, manifest.id);
+});
+
+test('the EFB opens on a deck of apps, and Checklists is its own app', async () => {
+  const fs = await import('node:fs');
+  const root = new URL('../', import.meta.url);
+  const shell = fs.readFileSync(new URL('app/js/efb.js', root), 'utf8');
+  const page = fs.readFileSync(new URL('app/efb.html', root), 'utf8');
+
+  assert.match(shell, /const HOME_ROUTE = 'home'/, 'the deck is a route, not a splash screen');
+  assert.match(shell, /const DEFAULT_ROUTE = HOME_ROUTE/, 'opening the bag lands on the deck');
+  assert.match(shell, /id: 'checklists'/, 'Checklists is an app of its own');
+  assert.match(shell, /module: '\.\/efb\/checklists\.js'/, 'and loads its own module');
+  assert.doesNotMatch(shell, /efb\/documents\.js/, 'the document library is not shipped as an app');
+  assert.ok(fs.existsSync(new URL('app/js/efb/checklists.js', root)), 'the checklists module exists where the shell loads it');
+
+  assert.match(page, /id="efb-home"/, 'the deck is in the page');
+  assert.match(page, /id="home-grid"/, 'with a grid of apps');
+  assert.match(page, /id="home-dock"/, 'and a dock');
+  assert.match(page, /href="#\/home"[^>]*aria-label="Home screen"/, 'every app view can come back to the deck');
+});
+
+test('the flight phase comes from the bridge, or from the position when there is no record', async () => {
+  const { flightPhase, phaseLabel } = await import('../app/js/efb/common.js');
+  const at = telemetry => ({ telemetry, currentFlight: null });
+
+  assert.equal(flightPhase(null), null, 'no snapshot is no phase');
+  assert.equal(flightPhase({ telemetry: null }), null);
+
+  const parked = flightPhase(at({ gs: 0, alt: 495, agl: 0, vs: 0, onGround: true }));
+  assert.equal(parked.code, 'PARKED');
+  assert.equal(parked.derived, true, 'a phase read from the position says so');
+  assert.equal(flightPhase(at({ gs: 14, agl: 0, onGround: true })).code, 'TAXI');
+  assert.equal(flightPhase(at({ gs: 120, agl: 0, onGround: true })).code, 'TAKEOFF');
+  assert.equal(flightPhase(at({ gs: 250, alt: 12000, agl: 11500, vs: 2200, onGround: false })).code, 'CLIMB');
+  assert.equal(flightPhase(at({ gs: 472, alt: 35000, agl: 34500, vs: 0, onGround: false })).code, 'CRUISE');
+  assert.equal(flightPhase(at({ gs: 300, alt: 20000, agl: 19500, vs: -1800, onGround: false })).code, 'DESCENT');
+  assert.equal(flightPhase(at({ gs: 150, alt: 1800, agl: 1500, vs: -700, onGround: false })).code, 'APPROACH');
+  assert.equal(flightPhase(at({ gs: 180, alt: 1200, agl: 900, vs: 0, onGround: false })).code, 'LEVEL',
+    'level at low height is not called cruise');
+
+  const recorded = flightPhase({ telemetry: { gs: 0, onGround: true }, currentFlight: { phase: 'LANDED' } });
+  assert.equal(recorded.code, 'LANDED');
+  assert.equal(recorded.derived, false, 'a recorded phase is not marked as derived');
+  assert.equal(recorded.label, 'Landed');
+  assert.equal(phaseLabel('TAXI'), 'Taxiing');
+  assert.equal(phaseLabel(''), '');
+  assert.equal(phaseLabel('SOMETHING'), 'SOMETHING', 'an unknown code is shown as it arrived');
+});
+
+test('Navigator replaced Live: one map app, planned route, chart conventions', async () => {
+  const fs = await import('node:fs');
+  const root = new URL('../', import.meta.url);
+  const shell = fs.readFileSync(new URL('app/js/efb.js', root), 'utf8');
+  const page = fs.readFileSync(new URL('app/js/efb/navigator.js', root), 'utf8');
+  const html = fs.readFileSync(new URL('app/efb.html', root), 'utf8');
+
+  assert.match(shell, /id: 'navigator', group: 'Flight', name: 'Navigator'/, 'Navigator is the map app');
+  assert.match(shell, /module: '\.\/efb\/navigator\.js'/, 'and loads its own module');
+  assert.equal(fs.existsSync(new URL('app/js/efb/live.js', root)), false, 'the old Live module is gone');
+  assert.doesNotMatch(shell, /name: 'Live'/, 'no app is still called Live');
+  assert.match(shell, /const LEGACY_ROUTES = \{ live: 'navigator', map: 'navigator' \}/, 'old links land on Navigator');
+  assert.match(shell, /const DOCK = \['navigator'/, 'the dock opens on it');
+  assert.match(html, /href="#\/navigator"/, 'the deck widget opens Navigator');
+  const manifest = JSON.parse(fs.readFileSync(new URL('app/manifest-efb.webmanifest', root), 'utf8'));
+  assert.ok(manifest.shortcuts.some(shortcut => shortcut.url.endsWith('#/navigator')), 'the install shortcut too');
+
+  // Route rendering: chart symbols, leg geometry and collision-thinned labels.
+  assert.match(page, /new MiniMap\(el\.canvas, \{/, 'the page reuses the tracker\'s map engine');
+  assert.match(page, /routeStyle: 'nav'/, 'and asks for the chart-style route');
+  assert.match(page, /pannable: true/, 'the chart can be panned and wheel-zoomed');
+  assert.match(page, /ownSymbol: 'aircraft'/, 'own aircraft is drawn as an aircraft');
+  assert.match(page, /chartTheme/, 'the chart theme is chosen, not inherited from the tracker');
+  assert.match(page, /attribution: false/, 'the credit lives in the footer instead of on the canvas');
+  assert.match(page, /map-credit[^<]*© Esri/, 'and it is still shown');
+  assert.match(page, /map\?\.setPosition\(null\)/, 'an offline feed clears the last position');
+  assert.match(page, /The aircraft is still tracked on the map/, 'tracking needs no flight plan');
+  assert.match(page, /flightPhase\(message\)/, 'the chip shows the current phase');
+  assert.match(page, /setRouteState\(stateNow\)/, 'route progress is handed to the chart');
+  assert.match(page, /data-wp="\$\{index\}"/, 'the panel lists waypoints');
+  assert.match(page, /data-leg="\$\{index\}"/, 'and the legs between them');
+  assert.match(page, /data-centre/, 'a selected point can be centred');
+  assert.match(page, /distanceNm\(from, to\)/, 'a leg reports its real distance');
+  assert.match(page, /bearingDeg\(from, to\)/, 'and its initial track');
+
+  // The map is its own view: the content region is the chart, edge to edge.
+  assert.match(html, /<body class="efb"/, 'the page is the bag shell');
+  const css = fs.readFileSync(new URL('app/efb.css', root), 'utf8');
+  assert.match(css, /body\.view-map \.efb-body \{ padding: 0/, 'the map view removes the page padding');
+  assert.match(css, /^\.map-shell \{ flex: 1; display: flex; flex-direction: column/m, 'the chart and its bar stack');
+  assert.match(css, /^\.map-foot\b/m, 'the progress bar has a bar of its own under the chart');
+  assert.match(css, /^\.nav-panel \{/m, 'the route panel is styled');
+});
+
+test('the map engine draws route points as chart symbols without label pile-ups', async () => {
+  const fs = await import('node:fs');
+  const source = fs.readFileSync(new URL('../app/js/minimap.js', import.meta.url), 'utf8');
+
+  assert.match(source, /function drawNavPoint/, 'one symbol per point type');
+  assert.match(source, /ctx\.arc\(0, 0, 5\.2/, 'an airport is a ringed dot');
+  assert.match(source, /Math\.PI \/ 3/, 'a navaid is a hexagon');
+  assert.match(source, /ctx\.moveTo\(0, -4\.8\)/, 'a fix is a triangle');
+  assert.match(source, /const taken = \[\]/, 'labels share one occupancy list');
+  assert.match(source, /if \(clash\)/, 'a label that would collide is dropped');
+  assert.match(source, /important\.forEach\(labelFor\)/, 'endpoints and the next waypoint are placed first');
+  assert.match(source, /legNm/, 'leg distances come from the plan');
+  assert.match(source, /chartTheme === 'day'/, 'a page can choose a day chart');
+  assert.match(source, /panBy\(dx, dy\)/, 'the chart pans');
+  assert.match(source, /zoomAt\(x, y,/, 'wheel zoom keeps the point under the pointer');
+});
+
+test('airline callsigns are parsed strictly and only a known designator is applied', async () => {
+  const {
+    AIRLINES, airlineByIcao, airlineVars, detectAirline, parseCallsign, resolveAirline, searchAirlines,
+  } = await import('../app/js/lib/airlines.js');
+
+  assert.equal(parseCallsign('ACA123').designator, 'ACA');
+  assert.equal(parseCallsign(' aca 123 ').designator, 'ACA');
+  assert.equal(parseCallsign('UAL123').designator, 'UAL');
+  assert.equal(parseCallsign('ACA123A').designator, 'ACA', 'a suffix letter is part of the flight number');
+  assert.equal(parseCallsign('C-FACA'), null, 'a registration is not a callsign');
+  assert.equal(parseCallsign('KJFK'), null, 'an airport is not a callsign');
+  assert.equal(parseCallsign('1234'), null);
+  assert.equal(parseCallsign(''), null);
+  assert.equal(parseCallsign('AC1234KJFK'), null);
+
+  // A designator the table does not know is not an airline, however plausible.
+  assert.equal(detectAirline({ ofp: { flight: { callsign: 'ZZZ123', airline: 'ZZZ' } } }).airline, null);
+  assert.equal(detectAirline({ ofp: { flight: { callsign: 'ACA123' } } }).airline.name, 'Air Canada');
+  assert.equal(detectAirline({ ofp: { flight: { callsign: 'EZY456' } } }).airline.icao, 'EZY');
+  assert.equal(detectAirline({ ofp: { flight: { callsign: 'AAL789' } } }).airline.icao, 'AAL');
+  assert.equal(detectAirline({ ofp: { flight: { callsign: 'UAL123' } } }).airline.icao, 'UAL');
+  assert.equal(detectAirline({ ofp: { flight: { airline: 'DLH', callsign: null } } }).source, 'plan',
+    'the plan\'s airline field is authoritative');
+  assert.equal(detectAirline({ ofp: { flight: { callsign: 'ACA123' } } }).source, 'callsign');
+  assert.equal(detectAirline({ ofp: { flight: { callsign: 'C-FACA' } } }).airline, null,
+    'a registration never picks an airline');
+  assert.equal(detectAirline(null).airline, null);
+
+  // Manual beats automatic; a manual code outside the table falls back to detection.
+  const plan = { ofp: { flight: { callsign: 'ACA123' } } };
+  assert.equal(resolveAirline({ airlineMode: 'manual', airline: 'UAL' }, plan).airline.icao, 'UAL');
+  assert.equal(resolveAirline({ airlineMode: 'auto', airline: 'UAL' }, plan).airline.icao, 'ACA');
+  assert.equal(resolveAirline({ airlineMode: 'manual', airline: 'ACA' }, null).airline.icao, 'ACA');
+  assert.equal(resolveAirline({ airlineMode: 'auto' }, null).airline, null, 'nothing detected means house colours');
+  assert.equal(resolveAirline({ airlineMode: 'manual', airline: 'ZZZ' }, null).airline, null);
+
+  // Every profile is complete, and its tokens keep the interface readable.
+  for (const airline of AIRLINES) {
+    assert.match(airline.icao, /^[A-Z]{3}$/);
+    assert.match(airline.accent, /^#[0-9a-f]{6}$/i);
+    assert.match(airline.deep, /^#[0-9a-f]{6}$/i);
+    assert.ok(airline.name.length > 2);
+    const vars = airlineVars(airline);
+    assert.equal(vars['--efb-accent'], airline.accent);
+    assert.match(vars['--efb-accent-soft'], /^rgba\(/);
+    assert.match(vars['--efb-accent-ink'], /^#[0-9a-f]{6}$/i);
+  }
+  assert.equal(airlineByIcao('aca').name, 'Air Canada', 'lookups are case-insensitive');
+  assert.equal(airlineByIcao('ZZZ'), null);
+  assert.equal(searchAirlines('easy').length, 1);
+  assert.equal(searchAirlines('UAL')[0].name, 'United Airlines');
+  assert.equal(searchAirlines('').length, AIRLINES.length);
+  assert.equal(airlineVars(null)['--efb-accent'], '#22d3ee', 'the house default is the Stratos cyan');
+});
+
+test('the SimBrief plan carries the airline, the codesign and the point types', async () => {
+  const { plannedRouteFromOfp, fixKind } = await import('../app/js/efb/common.js');
+  const ofp = {
+    origin: { icao: 'CYUL' },
+    destination: { icao: 'LFPG' },
+    flight: { callsign: 'ACA880', airline: 'ACA', flightNumber: '880' },
+    fixes: [
+      { ident: 'CYUL', lat: 45.47, lon: -73.74, altFt: 0, type: 'apt' },
+      { ident: 'FAWNS', lat: 45.1, lon: -72.2, altFt: 24000, type: 'wpt' },
+      { ident: 'YQB', lat: 46.79, lon: -71.4, altFt: 33000, type: 'vor' },
+      { ident: 'LFPG', lat: 49.01, lon: 2.55, altFt: 0, type: 'apt' },
+    ],
+  };
+  const route = plannedRouteFromOfp(ofp);
+  assert.deepEqual(route.map(point => point.kind), ['apt', 'fix', 'nav', 'apt']);
+  assert.equal(route[1].altFt, 24000, 'the planned level comes through');
+  assert.equal(fixKind({ ident: 'CYUL', type: '' }, ofp), 'apt', 'an untagged endpoint is still the airport');
+  assert.equal(fixKind({ ident: 'ABCD', type: '' }, ofp), 'fix', 'an untagged enroute point is not promoted');
+});
+
+test('the Notepad types and draws, and keeps neither secret nor synced', async () => {
+  const fs = await import('node:fs');
+  const root = new URL('../', import.meta.url);
+  const shell = fs.readFileSync(new URL('app/js/efb.js', root), 'utf8');
+  const module = fs.readFileSync(new URL('app/js/efb/notepad.js', root), 'utf8');
+
+  assert.match(shell, /id: 'notepad'/, 'the notepad is an app on the deck');
+  assert.match(shell, /module: '\.\/efb\/notepad\.js'/, 'with its own module');
+  const css = fs.readFileSync(new URL('app/efb.css', root), 'utf8');
+  assert.doesNotMatch(shell, /TILE_TINT/, 'the deck has one tile tone, not a tint per app');
+  assert.match(css, /\.hi-tile \{[^}]*background: #0e141c/, 'every tile is the same solid dark colour');
+  assert.doesNotMatch(css, /var\(--tile-a/, 'and no per-app gradient survives');
+  assert.match(shell, /notepad: '<path/, 'and its own icon');
+  assert.ok(fs.existsSync(new URL('app/js/efb/notepad.js', root)));
+
+  assert.match(module, /localStorage\.getItem\(key\)/, 'notes are read from this device');
+  assert.match(module, /stratos\.efb\.notepad\.text/, 'the typed note has its own key');
+  assert.match(module, /stratos\.efb\.notepad\.strokes/, 'and the drawing its own');
+  assert.match(module, /addEventListener\('pointerdown'/, 'drawing starts with a pointer, pen or finger');
+  assert.match(module, /canvas\.setPointerCapture\(event\.pointerId\)/, 'a stroke keeps tracking outside the canvas');
+  assert.match(module, /point\[0\] \* w/, 'strokes are stored in normalised coordinates');
+  assert.match(module, /destination-out/, 'the eraser rubs out rather than painting black');
+  assert.match(module, /data-undo/, 'undo is offered');
+  assert.match(module, /window\.confirm\(\'Clear the drawing on this device\?'\)/, 'clearing a drawing asks first');
+  assert.match(module, /Nothing on this pad is uploaded, synced or shared/, 'the page says where the note lives');
+  assert.doesNotMatch(module, /fetch\(|bridgeHealth|syncLogbook/, 'the pad never leaves the device');
+});
+
+test('the deck widget reports the real flight and only shows numbers it has', async () => {
+  const fs = await import('node:fs');
+  const root = new URL('../', import.meta.url);
+  const shell = fs.readFileSync(new URL('app/js/efb.js', root), 'utf8');
+  const page = fs.readFileSync(new URL('app/efb.html', root), 'utf8');
+
+  assert.match(page, /id="home-widget"/, 'the widget is on the deck');
+  assert.match(page, /id="hw-route"/, 'with a route line');
+  assert.match(page, /id="hw-tele"/, 'and a telemetry area');
+
+  // Telemetry is read from the bridge snapshot, never from stored state.
+  assert.match(shell, /status\.status === 'live' \? status\.snapshot : null/, 'numbers come from a live snapshot only');
+  assert.match(shell, /fmtFl\(t\.alt\)/, 'altitude is the reported altitude');
+  assert.match(shell, /fmtKt\(t\.gs\)/, 'ground speed is the reported ground speed');
+  assert.match(shell, /The simulator is offline/, 'offline says so instead of leaving a position on screen');
+});
+
+test('the airline dresses the whole bag, with a preview and a manual override', async () => {
+  const fs = await import('node:fs');
+  const root = new URL('../', import.meta.url);
+  const shell = fs.readFileSync(new URL('app/js/efb.js', root), 'utf8');
+  const settings = fs.readFileSync(new URL('app/js/efb/settings.js', root), 'utf8');
+  const page = fs.readFileSync(new URL('app/efb.html', root), 'utf8');
+  const css = fs.readFileSync(new URL('app/efb.css', root), 'utf8');
+
+  // The shell resolves the airline once and writes the tokens every section reads.
+  assert.match(shell, /function applyAirlineState\(\)/, 'one place resolves the airline');
+  assert.match(shell, /resolveAirline\(state\.prefs, state\.plan, state\.liveCallsign\)/, 'from preference, plan and live callsign');
+  assert.match(shell, /applyAirline\(resolved\.airline\)/, 'which writes the accent tokens');
+  assert.match(shell, /applyAirlineState\(\);\n\}/, 'applying preferences reapplies the airline');
+  assert.match(shell, /applyAirlineState\(\);\n  \}\);/, 'a new plan or callsign re-resolves it');
+  assert.ok(/id="et-airline"/.test(page), 'the header carries the airline mark');
+  assert.ok(/id="home-airline"/.test(page), 'and the deck carries the wordmark');
+  assert.ok(/id="home-brand"/.test(page), 'with the operator mark laid under the deck');
+  assert.match(shell, /function renderBrandMark\(air\)/, 'drawn from the resolved airline');
+  assert.match(shell, /airlineText\(air\)/, 'and a typographic identifier where no mark is bundled');
+  assert.match(css, /\.home-brand\.is-on \{ opacity: 1; \}/, 'only shown once an airline is resolved');
+  assert.match(css, /\.hb-roundel \{[^}]*opacity: \.36/, 'the fallback roundel is faded behind the app labels');
+  assert.match(css, /body\[data-airline\]:not\(\[data-airline=""\]\) \.home-wall::after/, 'the wallpaper picks up the airline glow');
+  assert.match(css, /\.et-airline b \{[^}]*background: var\(--efb-accent\)/, 'the header pill is drawn in the accent');
+
+  // The real operator mark: a bundled, licensed file rendered as a one-tone mask.
+  assert.match(shell, /air\.logo\s*\?\s*`<span class="hb-mark hb-logo"/, 'a bundled mark is preferred over the roundel');
+  assert.match(shell, /--brand-logo:url\('/, 'and is passed to the stylesheet as a mask');
+  assert.match(css, /\.hb-logo \{[^}]*mask: var\(--brand-logo\) center \/ contain no-repeat/, 'so one tone runs across every airline');
+  const { AIRLINES: profiles } = await import('../app/js/lib/airlines.js');
+  for (const airline of profiles.filter(entry => entry.logo)) {
+    assert.ok(fs.existsSync(new URL(`app/${airline.logo}`, root)), `${airline.icao} has the mark it names`);
+    assert.ok(airline.logo.endsWith(`/${airline.icao}.svg`), `${airline.icao} names its own file`);
+  }
+  assert.ok(fs.existsSync(new URL('app/images/airlines/ATTRIBUTION.md', root)), 'every bundled mark has its source recorded');
+  assert.equal(profiles.find(entry => entry.icao === 'UAL').logo, null, 'an unlicensed mark is not bundled or imitated');
+
+  // Settings: search, preview before applying, automatic or manual, and a reset.
+  assert.match(settings, /function airlineCard\(\)/, 'the airline card is part of the settings page');
+  assert.match(settings, /searchAirlines\(airlineQuery\)/, 'the selector searches the table');
+  assert.match(settings, /class="air-preview"/, 'a preview is shown before applying');
+  assert.match(settings, /data-air-apply/, 'applying is an explicit action');
+  assert.match(settings, /data-air-mode="auto"/, 'automatic detection is offered');
+  assert.match(settings, /data-air-mode="manual"/, 'a manual override is offered');
+  assert.match(settings, /data-air-reset/, 'and the house appearance can be restored');
+  assert.match(settings, /ctx\.setPrefs\(\{ airlineMode: 'manual', airline: pick \}\)/, 'manual writes both mode and airline');
+  assert.match(settings, /No SimBrief plan is stored/, 'a missing plan is explained, not guessed around');
+});
+
+test('EFB performance leads the pilot through what it needs, and never guesses the rest', () => {
+  const src = fs.readFileSync(new URL('../app/js/efb/performance.js', import.meta.url), 'utf8');
+  const lib = fs.readFileSync(new URL('../app/js/lib/aircraftperformance.js', import.meta.url), 'utf8');
+
+  // One tap fills from the plan, the airport database and the observation.
+  assert.match(src, /async function fillFromSources\(/);
+  assert.match(src, /write\('airport', phaseAirportCode\(\), 'flight plan'\)/);
+  assert.match(src, /write\('elevationFt', Number\(airport\.elev\), 'airport'\)/);
+  assert.match(src, /write\('windKt', metar\.wind\.speedKt, 'METAR'\)/);
+  // The takeoff analysis belongs to the departure, the landing one to the arrival.
+  assert.match(src, /state\.phase === 'landing' \? ofp\.destination : ofp\.origin/);
+  // Takeoff weight for takeoff, planned landing weight for landing.
+  assert.match(src, /state\.phase === 'landing' \? weights\.lw : weights\.tow/);
+  // A value the pilot typed is never overwritten; only a METAR value is refreshed.
+  assert.match(src, /if \(!empty\(key\) && !replaceable\(key\)\) return false;/);
+  // The list of what is missing is shown before the numbers, not after.
+  assert.match(src, /function readinessRows\(\)/);
+  assert.match(src, /Still needed: /);
+  // A runway suggested from the wind is labelled a suggestion, never a report.
+  assert.match(src, /Suggested from the wind — this is not a report of which runway is in use\./);
+  assert.match(lib, /export function windComponents/);
+  assert.match(lib, /export function lookupPerformance/);
+  assert.match(src, /No validated performance dataset is loaded/);
 });

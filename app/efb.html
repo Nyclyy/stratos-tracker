@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#060a11">
+<meta name="theme-color" content="#070a0f">
 <meta name="color-scheme" content="dark">
-<meta name="description" content="Stratos EFB — an electronic flight bag for flight simulation: briefing, charts, weather, performance, weight and balance, fuel, documents, airports, live progress and logbook.">
+<meta name="description" content="Stratos EFB — an electronic flight bag for flight simulation: briefing, charts, weather, performance, weight and balance, fuel, checklists, airports, live progress and logbook.">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <!-- Its own manifest: installing this page puts the bag on a home screen and
@@ -17,68 +17,122 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Stratos EFB</title>
 <link rel="stylesheet" href="efb.css">
+<!-- The builder is a chart workspace with its own rail and panel rules; the
+     tokens and the `e-*` kit still come from efb.css above. -->
+<link rel="stylesheet" href="efb-flightplan.css">
 </head>
-<body class="efb-body">
-<div class="efb-stage">
-  <div class="efb-tablet" role="application" aria-label="Stratos electronic flight bag">
+<body class="efb" data-wall="aurora">
 
-    <div class="efb-status">
-      <div class="esb-brand">Stratos <i>EFB</i></div>
-      <div class="esb-flight" id="esb-flight">No flight plan</div>
-      <div class="esb-right">
-        <span class="esb-conn" id="esb-conn" data-state="offline" title="Simulator connection"><i></i><span>Offline</span></span>
-        <span class="esb-clock" id="esb-clock">--:--<small>Z</small></span>
-        <span class="efb-battery" id="esb-battery" title="Battery level"><em style="font-style:normal;font-size:10.5px;letter-spacing:.04em">—</em><span><b style="width:0%"></b></span></span>
-      </div>
-    </div>
-
-    <div class="efb-screen" id="efb-screen" data-wall="aurora">
-
-      <section id="home" class="efb-home" aria-label="EFB home screen">
-        <div class="home-head">
-          <div>
-            <h1>Electronic Flight Bag</h1>
-            <p>Briefing, charts and aircraft tools · simulator use only</p>
-          </div>
-          <span class="home-tag" id="efb-version">Stratos</span>
-        </div>
-        <div id="home-flight" class="home-flight"></div>
-        <div id="app-grid" class="app-grid" role="list" aria-label="Applications"></div>
-        <div class="home-foot">
-          <span>Every figure names its source. Anything unavailable is shown as unavailable, never estimated silently.</span>
-          <a href="index.html">Flight Tracker →</a>
-        </div>
-      </section>
-
-      <section id="app-view" class="efb-app" hidden aria-live="polite"></section>
-
-      <div class="efb-dock" id="dock">
-        <div class="dock-apps" id="dock-apps" aria-label="Dock"></div>
-        <button class="home-btn" id="home-btn" type="button" title="Home" aria-label="Go to the EFB home screen">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10.4V19h11v-8.6"/></svg>
-          <span>Home</span>
-        </button>
-      </div>
-
-    </div>
+<!-- The deck. Opening Stratos EFB lands here, like an EFB on a pilot's tablet:
+     a grid of apps over the wallpaper, a dock, and a status bar. Each icon opens
+     the real application; the shell's home control comes back. -->
+<div class="efb-home" id="efb-home" hidden>
+  <div class="home-wall" aria-hidden="true"></div>
+  <!-- The operator's mark, laid under the deck and drawn from the resolved
+       airline. Empty for the house theme; typographic, never bundled artwork. -->
+  <div class="home-brand" id="home-brand" aria-hidden="true"></div>
+  <div class="home-bar">
+    <span class="hb-time"><b id="home-clock">--:--</b><em id="home-date"></em></span>
+    <span class="hb-flight" id="home-flight"></span>
+    <span class="hb-right">
+      <span class="et-conn" id="home-conn" data-state="offline" title="Simulator connection"><i aria-hidden="true"></i><span>Offline</span></span>
+      <span class="hb-glyph" title="Device status is drawn by your tablet, not by this web app" aria-hidden="true">
+        <svg viewBox="0 0 26 12" width="26" height="12" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="1" width="20" height="10" rx="2.4"/><rect x="3" y="3" width="14" height="6" rx="1.2" fill="currentColor" stroke="none"/><path d="M23 4v4"/></svg>
+      </span>
+    </span>
   </div>
+  <div class="home-stage">
+    <div class="home-head">
+      <h1>Stratos EFB</h1>
+      <p>Electronic flight bag · simulator use only</p>
+      <!-- The airline's own identity, a wordmark rather than a bundled logo:
+           no airline trademark is redistributed with this app. -->
+      <div class="home-airline" id="home-airline" hidden></div>
+    </div>
+
+    <!-- Flight widget: the loaded route, phase and bridge state at a glance.
+         Values appear only when the simulator reports them; offline it says so
+         instead of showing a last known position as if it were current. -->
+    <a class="home-widget" id="home-widget" href="#/navigator" aria-label="Open Navigator">
+      <span class="hw-head">
+        <span class="hw-eyebrow">Navigator</span>
+        <span class="hw-state" id="hw-state" data-state="offline"><i aria-hidden="true"></i><span>Offline</span></span>
+        <span class="hw-phase" id="hw-phase" hidden></span>
+      </span>
+      <span class="hw-body">
+        <span class="hw-route" id="hw-route">No flight plan</span>
+        <span class="hw-meta" id="hw-meta"></span>
+      </span>
+      <span class="hw-tele" id="hw-tele"></span>
+    </a>
+
+    <div class="home-grid" id="home-grid"></div>
+    <p class="home-foot">Simulator use only · not for real-world navigation</p>
+  </div>
+  <div class="home-dock" id="home-dock" aria-label="Dock"></div>
 </div>
 
-<noscript><p style="padding:28px;color:#e9eff9;font-family:system-ui">Stratos EFB needs JavaScript, like the rest of Stratos.</p></noscript>
+<div class="efb-shell">
+
+  <header class="efb-top" role="banner">
+    <a class="et-icon et-gohome" href="#/home" title="Home screen (Esc)" aria-label="Home screen">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.2 10.6 12 4.2l7.8 6.4V20H4.2z"/><path d="M9.6 20v-5.6h4.8V20"/></svg>
+    </a>
+
+    <a class="et-brand" href="#/home" title="Stratos EFB — home screen">
+      <span class="et-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 13.2 12 8.6l9.5 4.6-9.5 2.1z"/><path d="M12 8.6V4.2"/><path d="M8.6 12.1 7.1 9.4M15.4 12.1l1.5-2.7"/></svg>
+      </span>
+      <span class="et-name">STRATOS<small>Electronic Flight Bag</small></span>
+    </a>
+
+    <!-- The active airline, resolved from the plan or chosen by hand. -->
+    <span class="et-airline" id="et-airline" hidden></span>
+
+    <div class="et-flight" id="et-flight" aria-live="polite">
+      <span class="et-flight-empty">No flight plan loaded</span>
+    </div>
+
+    <div class="et-right">
+      <span class="et-conn" id="esb-conn" data-state="offline" title="Simulator connection">
+        <i aria-hidden="true"></i><span>Offline</span>
+      </span>
+      <span class="et-clock" id="esb-clock" title="Coordinated Universal Time">--:--<small>Z</small></span>
+      <a class="et-icon" href="#/settings" title="EFB settings" aria-label="EFB settings">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.2M12 18.8V21M4.2 7.5l1.9 1.1M17.9 15.4l1.9 1.1M4.2 16.5l1.9-1.1M17.9 8.6l1.9-1.1"/></svg>
+      </a>
+      <a class="et-icon et-tracker" href="index.html" title="Open the Stratos Flight Deck" aria-label="Open the Stratos Flight Deck">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 5h6v6"/><path d="m11.6 12.4 7.1-7.1"/><path d="M17 14v4.4H5.6V7H10"/></svg>
+        <b>Flight Deck</b>
+      </a>
+    </div>
+  </header>
+
+  <nav class="efb-nav" id="efb-nav" aria-label="EFB sections"></nav>
+
+  <main class="efb-main" role="main">
+    <div class="efb-page-head">
+      <div class="eph-text">
+        <h1 id="efb-page-title">Navigator</h1>
+        <p id="efb-page-sub">Moving map, planned route and live progress</p>
+      </div>
+      <div class="efb-actions" id="efb-actions"></div>
+    </div>
+    <div class="efb-body" id="efb-body" aria-live="polite"></div>
+  </main>
+
+</div>
+
+<noscript><p style="padding:28px;color:#e6edf6;font-family:system-ui">Stratos EFB needs JavaScript, like the rest of Stratos.</p></noscript>
 
 <script type="module">
-  import { displayVersion } from './js/lib/version.js';
-  const tag = document.getElementById('efb-version');
-  if (tag) tag.textContent = displayVersion();
-
-  /* Opened from a home screen the bag has no browser chrome, and the operating
-     system's own status bar carries the clock, so the EFB's clock steps aside
-     instead of showing the same time twice. */
+  /* Opened from a home screen the operating system already draws its own status
+     bar, so the bag marks the difference instead of pretending to own the time. */
   try {
     if (navigator.standalone === true || matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: minimal-ui)').matches) {
       document.body.classList.add('efb-standalone');
     }
-  } catch (_) { /* older browser: the clock stays */ }
+  } catch (_) { /* older browser: nothing to mark */ }
 
   /* The same shell worker the tracker registers, so an installed bag opens
      offline and updates through the path the rest of Stratos already uses. */

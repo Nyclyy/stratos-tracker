@@ -11,16 +11,19 @@
  *   says which cells are unavailable and why; it never extrapolates, and it never
  *   fills a missing value with a plausible-looking number.
  *
- * The form is pre-filled from the imported plan and the departure METAR, and
- * every pre-filled value says where it came from.
+ * The form is pre-filled from the imported plan, the airport database and the
+ * observed weather for the airport the chosen phase belongs to — departure for
+ * takeoff, destination for landing — and every pre-filled value says where it
+ * came from. The readiness list at the top says what is still missing, so the
+ * pilot is never left guessing which field the calculation is waiting for.
  */
 
 import {
-  airportByCode, airportRunways, esc, fmtFt, fmtNum, currentPlan, weatherFor,
+  airportByCode, airportRunways, esc, fmtAge, fmtFt, fmtNum, currentPlan, weatherFor,
 } from './common.js';
 import {
   analyseConditions, datasetLabel, lookupPerformance, pressureAltitudeFt,
-  SCHEMA, validateDataset,
+  SCHEMA, validateDataset, windComponents,
 } from '../lib/aircraftperformance.js';
 import { EFB_AIRCRAFT, aircraftLabel } from '../data/efb-aircraft.js';
 import { parseMetar } from '../lib/routeweather.js';
@@ -129,6 +132,11 @@ export async function mount(root, ctx) {
 
   const formEl = root.querySelector('#perf-form');
   const resultsEl = root.querySelector('#perf-results');
+  // The runway list of the selected airport, refreshed when the airport changes
+  // and shared by the selector, the wind suggestion and the prefill.
+  let runwayRows = [];
+  // When the weather observation behind the pre-filled values was issued.
+  let observedAt = 0;
 
   function set(key, value, source = '') {
     state[key] = value;
@@ -149,9 +157,182 @@ export async function mount(root, ctx) {
     </div>`;
   }
 
+  /** The airport this phase's numbers belong to: departure for takeoff, arrival for landing. */
+  function phaseAirportCode() {
+    if (!ofp) return '';
+    const leg = state.phase === 'landing' ? ofp.destination : ofp.origin;
+    return (leg && leg.icao) || '';
+  }
+
+  /**
+   * The runway the wind favours, with its components. This is a suggestion from
+   * the wind alone — a runway is not active because it points the right way, and
+   * the app says so wherever it shows this.
+   */
+  function suggestedRunway() {
+    const from = Number(state.windFromDeg);
+    const speed = Number(state.windKt);
+    if (!Number.isFinite(from) || !Number.isFinite(speed) || speed <= 0 || !runwayRows.length) return null;
+    const gust = state.gustKt === '' ? null : Number(state.gustKt);
+    let best = null;
+    for (const row of runwayRows) {
+      const components = windComponents(row.heading, from, speed, gust);
+      if (!components) continue;
+      const score = components.headwindKt - components.crosswindKt * 0.15;
+      if (!best || score > best.score) best = { row, components, score };
+    }
+    return best;
+  }
+
+  /**
+   * Fill from what Stratos already has: the imported plan, the airport database
+   * and the observed weather for this phase's airport. An empty field is filled;
+   * a value the pilot typed is never overwritten. `refresh` is the pilot asking
+   * for the weather values to be read again, so those may be replaced.
+   */
+  async function fillFromSources({ refresh = false } = {}) {
+    const touched = [];
+    const replaceable = key => refresh && state.prefill[key] === 'METAR';
+    const empty = key => !String(state[key] ?? '').trim();
+    const write = (key, value, source) => {
+      if (value == null || value === '') return false;
+      if (!empty(key) && !replaceable(key)) return false;
+      state[key] = value;
+      state.prefill[key] = source;
+      touched.push(key);
+      return true;
+    };
+
+    if (ofp) {
+      write('airport', phaseAirportCode(), 'flight plan');
+      // A runway the plan names is the pilot's intention, so it is taken as-is;
+      // the database only supplies its published length.
+      const leg = state.phase === 'landing' ? ofp.destination : ofp.origin;
+      const plannedRwy = leg && leg.rwy ? String(leg.rwy) : '';
+      const weights = ofp.weights || {};
+      // Takeoff is planned at the takeoff weight, landing at the planned landing
+      // weight; the plan's own figures, in the unit this panel is working in.
+      const planned = state.phase === 'landing' ? weights.lw : weights.tow;
+      if (planned) {
+        const value = unit === (ofp.units || 'kg') ? planned : convertWeight(planned, ofp.units || 'kg', unit);
+        if (Number.isFinite(value) && value > 0) write('weight', Math.round(value), 'flight plan');
+      }
+      if (plannedRwy) {
+        const row = runwayRows.find(item => item.id.split('/').includes(plannedRwy));
+        if (row) {
+          write('runway', String(row.heading), 'flight plan');
+          if (row.lengthFt) write('runwayLengthFt', row.lengthFt, 'airport');
+        }
+      }
+    }
+
+    const airport = state.airport ? await airportByCode(state.airport).catch(() => null) : null;
+    if (airport) {
+      if (Number(airport.elev)) write('elevationFt', Number(airport.elev), 'airport');
+      if (!runwayRows.length) runwayRows = airportRunways(airport);
+    }
+
+    const weather = state.airport ? await weatherFor(state.airport, { force: refresh }).catch(() => null) : null;
+    const metar = weather && weather.metar ? parseMetar(weather.metar) : null;
+    if (metar) {
+      if (metar.altimeter != null) {
+        write('qnhHpa', metar.altimeterUnit === 'inHg' ? Math.round(metar.altimeter * 33.8639) : Math.round(metar.altimeter), 'METAR');
+      }
+      if (metar.temperatureC != null) write('oatC', metar.temperatureC, 'METAR');
+      if (metar.wind) {
+        if (metar.wind.direction != null) write('windFromDeg', metar.wind.direction, 'METAR');
+        if (metar.wind.speedKt != null) write('windKt', metar.wind.speedKt, 'METAR');
+        if (metar.wind.gustKt) write('gustKt', metar.wind.gustKt, 'METAR');
+      }
+      // When the observation itself was issued, so the panel can say how old the
+      // numbers are instead of implying they are current.
+      observedAt = Number(weather.obs_time || weather.observedAt || 0) || Number(weather.fetchedAt || 0) || observedAt;
+    }
+    if (!destroyed) saveInputs(state);
+    return touched;
+  }
+
+  /** What the calculation has and what it is still waiting for. */
+  function readinessRows() {
+    const has = key => String(state[key] ?? '').trim() !== '';
+    const datasetForType = Boolean(dataset && String(dataset.aircraft.icao || '').toUpperCase() === String(state.aircraft).toUpperCase());
+    return [
+      ['Aircraft', true, aircraftLabel(state.aircraft)],
+      ['Airport', Boolean(state.airport), state.airport || 'no airport selected'],
+      ['Elevation', has('elevationFt'), has('elevationFt') ? fmtFt(state.elevationFt) : 'from the airport database'],
+      ['Weather', has('oatC') && has('qnhHpa'), has('oatC') ? `${esc(state.oatC)}°C · QNH ${esc(state.qnhHpa)} hPa` : 'OAT and QNH'],
+      ['Runway', has('runway') || has('runwayLengthFt'), has('runway') ? 'selected' : 'not selected'],
+      ['Wind', has('windFromDeg') && has('windKt'), has('windKt') ? `${esc(state.windFromDeg)}° / ${esc(state.windKt)} kt` : 'from the observation'],
+      ['Weight', has('weight'), has('weight') ? `${esc(state.weight)} ${unit}` : 'from the plan, or enter it'],
+      ['Dataset', datasetForType, datasetForType ? 'loaded for this variant' : 'none for this variant'],
+    ];
+  }
+
+  function readinessCard() {
+    const rows = readinessRows();
+    const missing = rows.filter(([, ok]) => !ok).map(([label]) => label.toLowerCase());
+    const suggestion = suggestedRunway();
+    const suggestionLine = suggestion ? `<div class="e-notice" style="margin-top:9px">
+        <b>Runway ${esc(suggestion.row.id.split('/')[0])}</b> has the most headwind: ${suggestion.components.headwindKt >= 0
+          ? `${suggestion.components.headwindKt} kt head`
+          : `${suggestion.components.tailwindKt} kt tail`}, ${suggestion.components.crosswindKt} kt crosswind${suggestion.components.crosswindSide !== 'none' ? ` from the ${suggestion.components.crosswindSide}` : ''}. Suggested from the wind — this is not a report of which runway is in use.
+        <div class="e-row" style="margin-top:7px"><button class="e-btn small" type="button" data-suggest-runway="${suggestion.row.heading}">Use runway ${esc(suggestion.row.id.split('/')[0])}</button></div>
+      </div>` : '';
+    return `<div class="e-card" style="margin-bottom:12px;background:var(--efb-panel-2)">
+      <h3>What this needs <span class="e-spacer"></span>${missing.length
+        ? `<span class="e-badge warn">${missing.length} to go</span>`
+        : '<span class="e-badge good">Complete</span>'}</h3>
+      <div class="e-perf-ready">
+        ${rows.map(([label, ok, detail]) => `<span class="e-perf-ready-row"><i class="${ok ? 'is-ok' : 'is-missing'}" aria-hidden="true">${ok ? '✓' : '○'}</i><b>${esc(label)}</b><em>${esc(detail)}</em></span>`).join('')}
+      </div>
+      <div class="e-small ${missing.length ? 'e-muted' : 'e-faint'}" style="margin-top:9px">${missing.length
+        ? `Still needed: ${esc(missing.join(', '))}.`
+        : 'Every input is present. Results below use only this dataset plus the conditions shown.'}</div>
+      ${observedAt ? `<div class="e-small e-faint" style="margin-top:4px">Weather observed ${esc(fmtAge(observedAt))}.</div>` : ''}
+      ${datasetError ? `<div class="e-notice bad" style="margin-top:8px">${esc(datasetError)}</div>` : ''}
+      <div class="e-row" style="margin-top:10px">
+        <button class="e-btn small primary" type="button" data-fill>Fill from plan, airport and weather</button>
+        <button class="e-btn small ghost" type="button" data-refresh-weather>Refresh weather</button>
+      </div>
+      ${suggestionLine}
+    </div>`;
+  }
+
+  /** The readiness card's own actions, rewired whenever it is redrawn. */
+  function wireReady() {
+    const host = formEl.querySelector('#perf-ready');
+    if (!host) return;
+    host.querySelector('[data-fill]')?.addEventListener('click', async () => {
+      const touched = await fillFromSources();
+      if (destroyed) return;
+      if (touched.length) render();
+      else renderResults();
+    });
+    host.querySelector('[data-refresh-weather]')?.addEventListener('click', async () => {
+      await fillFromSources({ refresh: true });
+      if (!destroyed) render();
+    });
+    host.querySelector('[data-suggest-runway]')?.addEventListener('click', event => {
+      const button = event.target.closest('[data-suggest-runway]');
+      if (!button) return;
+      set('runway', button.dataset.suggestRunway);
+      const row = runwayRows.find(item => String(item.heading) === String(button.dataset.suggestRunway));
+      if (row && row.lengthFt && !String(state.runwayLengthFt || '').trim()) set('runwayLengthFt', row.lengthFt, 'airport');
+      render();
+    });
+  }
+
+  /** Redraw just the readiness card, after the runway list arrives. */
+  function refreshReady() {
+    const host = formEl.querySelector('#perf-ready');
+    if (!host) return;
+    host.innerHTML = readinessCard();
+    wireReady();
+  }
+
   function renderForm() {
-    const airportRunwaysList = [];
     formEl.innerHTML = `
+      <div id="perf-ready">${readinessCard()}</div>
       <h3>Analysis <span class="e-spacer"></span><span class="e-badge">${esc(aircraftLabel(state.aircraft))}</span></h3>
       <div class="e-row" style="margin-bottom:10px">
         <div class="e-seg" role="group" aria-label="Phase">
@@ -205,16 +386,21 @@ export async function mount(root, ctx) {
 
     const runwaySelect = formEl.querySelector('#perf-runway');
     function fillRunways() {
-      const rows = airportRunwaysList;
-      runwaySelect.innerHTML = ['<option value="">Not selected</option>', ...rows.map(row => `<option value="${row.heading}" ${String(row.heading) === String(state.runway) ? 'selected' : ''}>${esc(row.id)}${row.lengthFt ? ` · ${row.lengthFt.toLocaleString('en-US')} ft` : ''}</option>`)].join('');
+      runwaySelect.innerHTML = ['<option value="">Not selected</option>', ...runwayRows.map(row => `<option value="${row.heading}" ${String(row.heading) === String(state.runway) ? 'selected' : ''}>${esc(row.id)}${row.lengthFt ? ` · ${row.lengthFt.toLocaleString('en-US')} ft` : ''}</option>`)].join('');
     }
     fillRunways();
 
     (async () => {
-      const airport = state.airport ? await airportByCode(state.airport).catch(() => null) : null;
-      if (destroyed || !airport) return;
-      airportRunwaysList.push(...airportRunways(airport));
+      if (!runwayRows.length) {
+        const airport = state.airport ? await airportByCode(state.airport).catch(() => null) : null;
+        if (destroyed || !airport) return;
+        runwayRows = airportRunways(airport);
+      }
+      if (destroyed) return;
       fillRunways();
+      // The wind suggestion needs the published runway list, which arrives after
+      // the first paint; the card is redrawn so it can offer it.
+      refreshReady();
     })();
 
     formEl.querySelectorAll('[data-key]').forEach(input => {
@@ -229,10 +415,23 @@ export async function mount(root, ctx) {
     });
     formEl.querySelector('#perf-runway').addEventListener('change', event => {
       set('runway', event.target.value);
-      const rows = airportRunwaysList.find(row => String(row.heading) === event.target.value);
+      const rows = runwayRows.find(row => String(row.heading) === event.target.value);
       if (rows && rows.lengthFt) {
         // Only fill an empty length: a value the pilot typed is theirs.
-        if (!String(state.runwayLengthFt || '').trim()) set('runwayLengthFt', rows.lengthFt);
+        if (!String(state.runwayLengthFt || '').trim()) {
+          set('runwayLengthFt', rows.lengthFt, 'airport');
+        }
+      }
+      render();
+    });
+    wireReady();
+    formEl.querySelector('#perf-airport').addEventListener('change', async event => {
+      set('airport', String(event.target.value || '').toUpperCase());
+      // A different airport invalidates its runway list and the weather that came
+      // with it; the values themselves are left for the pilot to replace.
+      runwayRows = [];
+      for (const key of ['runway', 'runwayLengthFt', 'elevationFt', 'qnhHpa', 'oatC', 'windFromDeg', 'windKt', 'gustKt']) {
+        if (state.prefill[key]) { delete state[key]; delete state.prefill[key]; }
       }
       render();
     });
@@ -463,49 +662,10 @@ export async function mount(root, ctx) {
 
   render();
 
-  /* Prefill from the plan and the departure METAR, clearly labelled. */
+  /* First paint fills from the plan, the airport and the observation. */
   (async () => {
-    if (!ofp) return;
-    const origin = ofp.origin && ofp.origin.icao;
-    if (origin && !state.airport) { state.airport = origin; state.prefill.airport = 'OFP'; }
-    if (ofp.weights && ofp.weights.tow && !String(state.weight || '').trim()) {
-      const value = unit === (ofp.units || 'kg') ? ofp.weights.tow : convertWeight(ofp.weights.tow, ofp.units || 'kg', unit);
-      state.weight = Math.round(value);
-      state.prefill.weight = 'OFP';
-    }
-    if (origin) {
-      const airport = await airportByCode(origin).catch(() => null);
-      if (airport && Number(airport.elev) && !String(state.elevationFt || '').trim()) {
-        state.elevationFt = Number(airport.elev);
-        state.prefill.elevationFt = 'airport';
-      }
-      const runwayId = ofp.origin.rwy;
-      if (runwayId && !state.runway) {
-        const row = airportRunways(airport).find(item => item.id.split('/').includes(runwayId));
-        if (row) { state.runway = String(row.heading); state.prefill.runway = 'OFP'; }
-      }
-      const weather = await weatherFor(origin).catch(() => null);
-      const metar = weather && weather.metar ? parseMetar(weather.metar) : null;
-      if (metar) {
-        if (metar.altimeter != null && !String(state.qnhHpa || '').trim()) {
-          state.qnhHpa = metar.altimeterUnit === 'inHg' ? Math.round(metar.altimeter * 33.8639) : Math.round(metar.altimeter);
-          state.prefill.qnhHpa = 'METAR';
-        }
-        if (metar.temperatureC != null && !String(state.oatC || '').trim()) {
-          state.oatC = metar.temperatureC;
-          state.prefill.oatC = 'METAR';
-        }
-        if (metar.wind && !String(state.windKt || '').trim()) {
-          if (metar.wind.direction != null) { state.windFromDeg = metar.wind.direction; state.prefill.windFromDeg = 'METAR'; }
-          state.windKt = metar.wind.speedKt;
-          state.prefill.windKt = 'METAR';
-          if (metar.wind.gustKt) { state.gustKt = metar.wind.gustKt; state.prefill.gustKt = 'METAR'; }
-        }
-      }
-    }
-    if (destroyed) return;
-    saveInputs(state);
-    render();
+    await fillFromSources();
+    if (!destroyed) render();
   })();
 
   return {

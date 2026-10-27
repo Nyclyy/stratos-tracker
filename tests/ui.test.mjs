@@ -1054,6 +1054,18 @@ test('map tiles need no API key and credit the provider that serves them', async
   assert.match(minimap, /© Esri, HERE, Garmin · © OpenStreetMap contributors/, 'the minimap credits Esri');
 });
 
+test('the map bitmap follows the canvas box, not just the window', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  // The shell collapses the rail after the first paint, so the canvas gets
+  // wider without a window resize. A bitmap left at the old width stretches
+  // the whole chart — most visible on a tall, narrow monitor.
+  assert.match(page, /let sizedW=0,sizedH=0;/, 'the last size the bitmap was built for is remembered');
+  assert.match(page, /if\(w===sizedW&&h===sizedH&&cv\.width===Math\.round\(w\*\(devicePixelRatio\|\|1\)\)/, 'a resize that changes nothing is skipped');
+  assert.match(page, /new ResizeObserver\(\(\)=>\{const before=W\+'x'\+H;size\(\);if\(W\+'x'\+H!==before\)render\(\)\}\)\.observe\(cv\)/, 'the canvas box itself is observed, and the chart is redrawn when it moves');
+  assert.match(page, /cv\.width=Math\.round\(W\*dpr\);cv\.height=Math\.round\(H\*dpr\)/, 'the bitmap is the box in device pixels');
+});
+
 test('the aircraft card works out a registration its feed did not report', async () => {
   const fs = await import('node:fs');
   const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
@@ -1160,7 +1172,9 @@ test('the flight trail starts from the track the bridge recorded', async () => {
   assert.match(page, /seedTrail\(live\.d\.currentFlight\)/, 'each snapshot offers the recorded track');
   // A landing ends the bridge's record and the rollout opens a new one; the line
   // must not break under the aircraft when it touches down.
-  assert.match(page, /if\(join\)trailBase=prev\.slice\(\)/, 'a record that begins where the trail stopped keeps the drawn path');
+  assert.match(page, /const here=first\|\|\(Number\.isFinite\(own\.lat\)&&Number\.isFinite\(own\.lon\)/, 'a new record with no point of its own yet is judged by where the aircraft now is');
+  assert.match(page, /const keep=!prev\.length\?false:!here\?true:\(window\.TRAILP&&window\.TRAILP\.trailContinues/, 'a record that begins where the trail stopped keeps the drawn path');
+  assert.match(page, /if\(keep\)trailBase=prev\.slice\(\)/, 'the drawn path becomes the base the rollout is appended to');
   assert.match(page, /else\{TRL\.delete\('own'\);trailBase=null\}/, 'a flight starting elsewhere clears the trail instead of joining it');
   assert.match(page, /const joined=trailBase&&window\.TRAILP\?window\.TRAILP\.appendTrack\(trailBase,seeded\):seeded/, 'the new recording is appended to the drawn path');
   assert.match(page, /TRL\.set\('own',joined\.slice\(-cap\)\)/, 'the recorded points replace an empty trail');
@@ -1332,6 +1346,12 @@ test('the flight-plan card replaces the pencil and never invents a value', async
   assert.match(page, /<b>CRZ '\+\(cruise\?esc\(cruise\):'—'\)/, 'the minimized card shows CRZ, or a dash');
   assert.match(page, /cruiseAltFt:\(planTocTod\(\)\|\|\{\}\)\.cruise\|\|null/, 'the planned profile supplies the level when the plan does not');
   assert.match(page, /nm left/, 'progress is stated in the compact card');
+  // One flight, one box: while the live card is up the plan card stands down,
+  // and the OFP it would have offered moves onto the live card.
+  assert.match(page, /const ownCard=liveOk\(\)&&\(!sel\|\|sel\.k=='own'\)/, 'the live card owns the flight while it is on screen');
+  assert.match(page, /if\(has&&ownCard\)/, 'the plan card stands down only when it would repeat a loaded plan');
+  assert.match(page, /const ofpBtn=fpOfp\(\)\?'<button type="button" data-fc-act="ofp"/, 'the live card offers the OFP when the plan has one');
+  assert.match(page, /else if\(act=='ofp'\)\{openOfpDoc\(\)\}/, 'the live card\'s OFP action opens the same document');
 });
 
 test('a phone reaches the PC map in one tap and never loses Stratos when the PC is off', async () => {
@@ -1412,4 +1432,81 @@ test('every page offers the same five destinations', async () => {
   for (const href of ['weather.html', 'pilot.html#airports', 'pilot.html#charts', 'pilot.html#career', 'live.html']) {
     assert.ok(discover.includes(`href="${href}"`), `${href} is reachable from Explore`);
   }
+});
+
+test('the phone wears the airline the callsign files for', async () => {
+  const fs = await import('node:fs');
+  const read = name => fs.readFileSync(new URL(`../app/${name}`, import.meta.url), 'utf8');
+  const page = read('live.html');
+  const live = read('js/live.js');
+  assert.match(page, /<span class="live-airline" id="live-airline" hidden><\/span>/, 'the phone header has a slot for the mark');
+  assert.match(page, /\.live-airline img \{ display: block; height: 15px/, 'the mark is a small inline image, not a banner');
+  // One table of airlines for the whole product: the phone reads the EFB's.
+  assert.match(live, /import \{ resolveAirline \} from '\.\/lib\/airlines\.js'/, 'the EFB airline table is reused');
+  assert.match(live, /paintAirline\(flight\?\.callsign \|\| telemetry\?\.callsign \|\| ''\)/, 'the callsign from the bridge or the live frame decides');
+  assert.match(live, /root\.style\.setProperty\('--acc', day \? `color-mix\(in srgb, \$\{air\.accent\} 72%, #06121a\)` : air\.accent\)/, 'the accent is deepened where a light theme would make it unreadable');
+  assert.match(live, /root\.style\.removeProperty\('--acc'\)/, 'an unrecognised callsign returns the house colours');
+  assert.match(live, /airlineChip\.hidden = true/, 'and hides the mark rather than guessing one');
+  assert.match(live, /const AIRLINE_PREFS_KEY = 'stratos\.efb\.prefs'/, 'a manual choice made in the EFB is honoured on the phone');
+  assert.match(live, /paintAirline\(''\)/, 'nothing is branded before a flight exists');
+});
+
+/* The tracker map is the EFB's globe with the same surfaces: one shared module,
+   one projection call that follows the mode, and layers that ask whether a
+   point is on the near side before drawing or accepting a tap. These checks pin
+   the wiring that a copy of the module would silently break. */
+test('the tracker map runs the same globe module and surfaces as the EFB', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+
+  // The engine is shared, not reimplemented: the same orthographic arithmetic
+  // and the same publisher table the Flight Planner uses.
+  assert.ok(page.includes(`import * as GLOBE from './js/lib/globeview.js';`), 'the projection arithmetic is the EFB module');
+  assert.ok(page.includes(`import { EARTH_STYLES, GIBS, TERRAIN, earthStyle, EarthView } from './js/lib/earthview.js';`), 'so are the surfaces and their publishers');
+  assert.ok(page.includes('window.STRATOS_GLOBE = { ...GLOBE, EARTH_STYLES, GIBS, TERRAIN, earthStyle, EarthView };'), 'a classic script reaches them through one global');
+  assert.ok(page.includes(`window.dispatchEvent(new Event('stratos-globe-ready'));`), 'and announces that it is ready');
+
+  // One projection, two modes. Lines use the clamped call so a leg crossing the
+  // horizon stops at the limb; symbols use the strict one, because a point on
+  // the far side must not be drawn or accept a tap.
+  assert.ok(page.includes(`const sc=(lon,lat)=>{if(V.mode==='globe')`), 'lines project through sc, which follows the mode');
+  assert.ok(page.includes('g.globeProjectClamped(Number(lat),Number(lon),globeCam())'), 'a leg crossing the horizon is folded onto the limb');
+  assert.ok(page.includes(`function vis(lon,lat){if(V.mode!=='globe')return mercator(lon,lat);`), 'symbols have their own near-side test');
+  assert.ok((page.match(/vis\(/g) || []).length >= 12, 'every draw and hit-test asks where the point really is');
+  assert.match(page, /function unvis\(x,y\)\{if\(V\.mode==='globe'\)/, 'a drag back to a coordinate goes through the sphere too');
+  assert.match(page, /function moveWp\(i,x,y\)\{[^\n]*unvis\(x,y\)/, 'moving a waypoint uses that inverse, not the flat one');
+
+  // The raster is the publisher's, fetched per frame only while it is needed.
+  assert.ok(page.includes('if(!style.source)return false;'), 'a surface with no public raster never makes a request');
+  assert.ok(page.includes('const level=Math.max(size,Math.min(320,Math.round(r*2)));'), 'the tile level comes from the sphere, not from a transient cap');
+  assert.ok(page.includes('cache.share<.35'), 'a coarser rebuild cannot paint over a sharper frame');
+  assert.ok(page.includes(`localStorage.setItem('dl.mode',next)`) && page.includes(`localStorage.getItem('dl.mode')||'plane'`), 'the chosen projection is remembered');
+  assert.ok(page.includes(`localStorage.setItem('dl.globe',V.gs)`) && page.includes(`localStorage.getItem('dl.globe')||'vector'`), 'so is the surface');
+
+  // The controls, and the sentences that keep the display honest.
+  assert.ok(page.includes('<b>Projection</b><div id="pj"></div><div id="gwrap" hidden>'), 'the layers sheet carries the projection switch');
+  assert.ok(page.includes('globeStyles().map(s=>'), 'the surface list is the shared table');
+  assert.ok(page.includes('id="gReset"') && page.includes('id="gRead"'), 'reset and read-terrain are offered');
+  assert.ok(page.includes('e.readTerrain(V.lat,V.lon,{radiusNm:nm,rasterPx:globeCap()})'), 'terrain is read at the centre with the documented radius');
+  assert.ok(page.includes('terrain.displayOnly'), 'and reading elevation is not treated as licence to draw the tiles');
+  assert.ok(page.includes(`'Imagery: NASA Earth Observatory Blue Marble · NASA GIBS/ESDIS'`), 'imagery is credited to its publisher');
+  assert.ok(page.includes(`'Globe outlines: Natural Earth 1:110m (public domain)'`), 'and the outline fallback to its own');
+
+  // A georeferenced chart is a flat sheet: opening one leaves the globe, and
+  // closing it comes back to where the pilot was.
+  assert.ok(page.includes(`if(V.mode==='globe')globeMode('plane');`), 'opening a chart leaves the globe');
+  assert.ok(page.includes(`if(CH.prev.mode==='globe'){globeMode('globe');if(route.length>1)fitRoute()}`), 'closing it returns to the globe and reframes the route');
+  assert.ok(page.includes(`GV.msg='A charted approach is a flat chart: close the chart to use the globe.'`), 'asking for the globe during a chart says why it is refused');
+
+  // Framing and label density follow the sphere rather than a Web Mercator
+  // tile level, and the flat zoom integrals are switched off.
+  assert.ok(page.includes('V.gz=Math.max(1,Math.min(40,.8/Math.max(.02,Math.sin(theta))));'), 'fitting a route turns the sphere to it and zooms from its span');
+  assert.ok(page.includes(`function lblZ(){return V.mode==='globe'?2.6+`), 'labels are placed by pixels per degree');
+  assert.ok(page.includes(`if(V.mode!=='globe'&&V.tz!=null){`), 'the flat zoom integral is not run on the sphere');
+  assert.ok(page.includes(`V.z<12&&!CH.on&&V.mode!=='globe'`), 'and the graticule is not drawn over imagery');
+
+  // The place badge names the nearest labelled feature to the view centre. On
+  // the sphere that has to be projected with the sphere's camera and limited to
+  // the near side, or it reads the place behind the globe.
+  assert.ok(page.includes('const p=g.globeProject(it.y,it.x,cam);if(!p)continue;'), 'the place badge names a feature on the near side');
 });

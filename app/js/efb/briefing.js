@@ -8,7 +8,7 @@
  */
 
 import {
-  esc, fmtAge, fmtDateUtc, fmtFl, fmtFt, fmtMinutes, fmtNum, fmtUtc,
+  esc, fmtAge, fmtDateUtc, fmtFl, fmtFt, fmtMinutes, fmtNum, fmtUtc, fmtVisibility,
   plannedRouteFromOfp, refreshPlan, weatherFor,
 } from './common.js';
 import { buildSummary } from '../lib/flightsummary.js';
@@ -106,7 +106,7 @@ function weatherCards(summary, metars) {
       ${station.metar ? `<code class="e-code" style="margin-top:9px">${esc(station.metar)}</code>` : '<div class="e-small e-muted" style="margin-top:8px">No METAR is published for this station.</div>'}
       ${decoded ? `<dl class="e-kv" style="margin-top:9px">
         <dt>Wind</dt><dd>${decoded.wind ? `${decoded.wind.direction == null ? 'VRB' : String(decoded.wind.direction).padStart(3, '0')}° / ${decoded.wind.speedKt} kt${decoded.wind.gustKt ? ` G${decoded.wind.gustKt}` : ''}` : '—'}</dd>
-        <dt>Visibility</dt><dd>${decoded.visibilitySm != null ? `${decoded.visibilitySm} SM` : '—'}</dd>
+        <dt>Visibility</dt><dd>${esc(fmtVisibility(decoded))}</dd>
         <dt>Ceiling</dt><dd>${decoded.ceilingFt != null ? fmtFt(decoded.ceilingFt) : 'No ceiling'}</dd>
         <dt>Temp / dew</dt><dd>${decoded.temperatureC != null ? `${decoded.temperatureC}° / ${decoded.dewpointC}°C` : '—'}</dd>
         <dt>Altimeter</dt><dd>${decoded.altimeter != null ? `${decoded.altimeter} ${decoded.altimeterUnit === 'inHg' ? 'inHg' : 'hPa'}` : '—'}</dd>
@@ -278,7 +278,7 @@ export async function mount(root, ctx) {
       <h2 style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--efb-muted);margin:18px 2px 8px">Weather at the airports</h2>
       ${weatherCards(summary, metars)}
 
-      <h2 style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--efb-muted);margin:18px 2px 8px">Operational flight plan</h2>
+      <h2 style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--efb-muted);margin:18px 2px 8px">Document</h2>
       ${ofpDocument(summary)}
 
       <div class="e-small e-faint" style="margin:16px 2px 0">Simulator planning aid. SimBrief provides the plan; weather is NOAA METAR. Not for real-world flight.</div>`;

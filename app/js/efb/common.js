@@ -26,6 +26,12 @@ export const DEFAULT_PREFS = {
   aircraft: '',
   weatherRefresh: 300,
   chartSource: 'auto',
+  // Navigator's chart style, and the airline the bag is dressed as. Automatic
+  // takes the airline from the loaded SimBrief plan's callsign; manual always
+  // wins, and an empty choice means the house Stratos appearance.
+  chartTheme: 'night',
+  airlineMode: 'auto',
+  airline: '',
 };
 
 export function esc(value) {
@@ -46,6 +52,19 @@ export function fmtFt(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return '—';
   return `${fmtNum(Math.round(n))} ft`;
+}
+
+/* Visibility in the units the station actually reported: metres where the METAR
+   used metres ("9999" is 10 km or more, not a number to print), statute miles
+   where it used miles. Converting everything to one unit would be a quiet edit
+   of the observation. */
+export function fmtVisibility(decoded) {
+  if (!decoded) return '—';
+  const metres = Number(decoded.visibilityM);
+  if (Number.isFinite(metres)) return metres >= 9999 ? '10 km or more' : `${fmtNum(metres)} m`;
+  const miles = Number(decoded.visibilitySm);
+  if (Number.isFinite(miles)) return `${miles} SM`;
+  return '—';
 }
 
 export function fmtFl(value) {
@@ -108,45 +127,79 @@ export function savePrefs(patch) {
 
 /* ── the current plan ────────────────────────────────────────────────── */
 
-/** Flight Deck route points, as the map stored them. */
+/**
+ * Flight Deck route points, as the map stored them. The planned level and the
+ * procedure a point came from travel with it: the Navigator prints both, and
+ * dropping them here would make a planned SID look like an ordinary fix.
+ */
 export function loadRoute() {
+  const shape = p => ({
+    id: String(p.id || '').toUpperCase(),
+    name: String(p.name || p.id || ''),
+    lat: Number(p.lat),
+    lon: Number(p.lon),
+    kind: p.kind || p.k || 'fix',
+    elev: Number.isFinite(Number(p.elev)) ? Number(p.elev) : 0,
+    altFt: Number.isFinite(Number(p.altFt)) && Number(p.altFt) > 0 ? Number(p.altFt) : null,
+    ss: String(p.ss || ''),
+    aw: String(p.aw || ''),
+  });
+  const usable = p => p && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon));
   try {
     const raw = JSON.parse(localStorage.getItem('stratos.activeRoute') || 'null');
     const points = raw && Array.isArray(raw.points) ? raw.points : null;
-    if (points && points.length) {
-      return points
-        .filter(p => p && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon)))
-        .map(p => ({
-          id: String(p.id || '').toUpperCase(),
-          name: String(p.name || p.id || ''),
-          lat: Number(p.lat),
-          lon: Number(p.lon),
-          kind: p.kind || 'fix',
-        }));
-    }
+    if (points && points.length) return points.filter(usable).map(shape);
   } catch (_) { /* fall through */ }
   try {
     const legacy = JSON.parse(localStorage.getItem('dl.route') || 'null');
-    if (Array.isArray(legacy)) {
-      return legacy
-        .filter(p => p && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon)))
-        .map(p => ({
-          id: String(p.id || '').toUpperCase(),
-          name: String(p.name || p.id || ''),
-          lat: Number(p.lat),
-          lon: Number(p.lon),
-          kind: p.kind || p.k || 'fix',
-        }));
-    }
+    if (Array.isArray(legacy)) return legacy.filter(usable).map(shape);
   } catch (_) { /* no route */ }
   return [];
+}
+
+/** Name and cruise figures stored beside the points, or empty defaults. */
+export function loadRouteMeta() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('stratos.activeRoute') || 'null');
+    if (raw && typeof raw === 'object') {
+      return {
+        name: String(raw.name || ''),
+        cruiseKts: Number(raw.cruiseKts) > 0 ? Number(raw.cruiseKts) : null,
+        cruiseAlt: Number(raw.cruiseAlt) > 0 ? Number(raw.cruiseAlt) : null,
+        plan: raw.plan && typeof raw.plan === 'object' ? raw.plan : null,
+        id: raw.id || null,
+      };
+    }
+  } catch (_) { /* nothing stored */ }
+  return { name: '', cruiseKts: null, cruiseAlt: null, plan: null, id: null };
+}
+
+/* The point's symbol comes from the type SimBrief published. A point with no
+   type is an airport only when its identifier is the plan's own departure or
+   destination — never because of where it sits in the list. */
+export function fixKind(fix, ofp) {
+  const type = String((fix && fix.type) || '').toLowerCase();
+  if (type === 'apt' || type === 'airport') return 'apt';
+  if (type === 'vor' || type === 'ndb' || type === 'navaid' || type === 'dme' || type === 'vor/dme') return 'nav';
+  const ident = String((fix && fix.ident) || '').toUpperCase();
+  const origin = ofp && ofp.origin && ofp.origin.icao;
+  const destination = ofp && ofp.destination && ofp.destination.icao;
+  if (ident && (ident === origin || ident === destination)) return 'apt';
+  return 'fix';
 }
 
 export function plannedRouteFromOfp(ofp) {
   if (!ofp || !Array.isArray(ofp.fixes) || ofp.fixes.length < 2) return [];
   return ofp.fixes
     .filter(fix => Number.isFinite(fix.lat) && Number.isFinite(fix.lon))
-    .map(fix => ({ id: fix.ident, name: fix.name || fix.ident, lat: fix.lat, lon: fix.lon, kind: 'fix' }));
+    .map(fix => ({
+      id: fix.ident,
+      name: fix.name || fix.ident,
+      lat: fix.lat,
+      lon: fix.lon,
+      kind: fixKind(fix, ofp),
+      altFt: Number.isFinite(Number(fix.altFt)) ? Number(fix.altFt) : null,
+    }));
 }
 
 const planListeners = new Set();
@@ -302,6 +355,18 @@ export async function airportByCode(code) {
   return results.find(a => String(a.id).toUpperCase() === wanted) || null;
 }
 
+/**
+ * The magnetic heading a runway designator stands for: 03L is 030, 17 is 170.
+ * A designator carrying a parallel suffix still has a heading; a designator with
+ * no usable number has none, and null says so instead of 0 or NaN.
+ */
+function runwayHeading(designator) {
+  const match = String(designator == null ? '' : designator).trim().match(/^(\d{1,2})/);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) && value >= 1 && value <= 36 ? value * 10 : null;
+}
+
 export function airportRunways(airport) {
   if (!airport) return [];
   if (Array.isArray(airport.rws) && airport.rws.length) {
@@ -309,7 +374,7 @@ export function airportRunways(airport) {
       .filter(row => Array.isArray(row) && row.length >= 6)
       .map(row => ({
         id: `${row[0]}/${row[1]}`,
-        heading: Number(row[0]) * 10,
+        heading: runwayHeading(row[0]),
         lengthFt: Number(row[6]) || null,
         widthFt: Number(row[7]) || null,
         surface: row[8] || '',
@@ -320,7 +385,7 @@ export function airportRunways(airport) {
   const lengths = Array.isArray(airport.len) ? airport.len : [];
   return designators.map((number, index) => ({
     id: `${String(number).padStart(2, '0')}/${String(Number(number) <= 18 ? Number(number) + 18 : Number(number) - 18).padStart(2, '0')}`,
-    heading: Number(number) * 10,
+    heading: runwayHeading(number),
     lengthFt: Number(lengths[index]) || null,
     widthFt: null,
     surface: '',
@@ -517,9 +582,15 @@ async function refreshHealth() {
     liveState.health = null;
     if (liveState.status !== 'live') {
       liveState.status = 'offline';
+      // "Failed to fetch" is the browser's words, not an explanation a pilot can
+      // act on. A network-level failure means the bridge is not answering here.
+      const raw = String((error && error.message) || '');
+      const network = !raw || /failed to fetch|networkerror|load failed|terminated/i.test(raw);
       liveState.detail = isHostedPage()
-        ? 'This hosted page cannot reach the bridge directly.'
-        : (error && error.message) || 'The bridge is not reachable.';
+        ? 'This hosted page cannot reach the bridge directly. Open the Flight Deck on the PC or use the phone relay.'
+        : network
+          ? `The bridge did not answer at ${liveState.base}. Make sure Stratos is running on this PC.`
+          : raw;
     }
   }
   publishLive();
@@ -600,4 +671,54 @@ export function connectionText(status) {
     case 'waiting': return 'Waiting for sim';
     default: return 'Offline';
   }
+}
+
+/* ── flight phase ────────────────────────────────────────────────────── */
+
+/* The bridge records a phase for the flight it is logging. A page opened
+   before recording starts, or a track that is only being watched, has
+   telemetry but no flight record — the phase is then read from the position
+   itself (on the ground, climbing, descending) and marked as derived rather
+   than presented as something the aircraft reported. */
+const PHASE_LABELS = {
+  PARKED: 'Parked',
+  TAXI: 'Taxiing',
+  TAKEOFF: 'Takeoff',
+  CLIMB: 'Climb',
+  CRUISE: 'Cruise',
+  LEVEL: 'Level',
+  DESCENT: 'Descent',
+  APPROACH: 'Approach',
+  AIRBORNE: 'Airborne',
+  LANDED: 'Landed',
+  COMPLETE: 'Complete',
+};
+
+export function phaseLabel(code) {
+  if (!code) return '';
+  return PHASE_LABELS[code] || String(code);
+}
+
+/** The phase to show, or null when there is no position to read one from. */
+export function flightPhase(message) {
+  const t = message && message.telemetry;
+  if (!t) return null;
+  const recorded = message.currentFlight && message.currentFlight.phase;
+  if (recorded) return { code: String(recorded), label: phaseLabel(recorded), derived: false };
+
+  const gs = Number.isFinite(Number(t.gs)) ? Number(t.gs) : 0;
+  const vs = Number.isFinite(Number(t.vs)) ? Number(t.vs) : 0;
+  const agl = Number.isFinite(Number(t.agl)) ? Number(t.agl) : null;
+  const alt = Number.isFinite(Number(t.alt)) ? Number(t.alt) : null;
+  const derive = code => ({ code, label: phaseLabel(code), derived: true });
+
+  if (t.onGround) {
+    if (gs < 2) return derive('PARKED');
+    if (gs < 40) return derive('TAXI');
+    return derive('TAKEOFF');
+  }
+  if (vs > 200) return derive('CLIMB');
+  if (vs < -200) return derive(agl != null && agl <= 3000 ? 'APPROACH' : 'DESCENT');
+  // Level at a low height is not cruise, however steady the altitude is.
+  return derive(agl != null && agl <= 3000 ? 'LEVEL' : 'CRUISE');
 }

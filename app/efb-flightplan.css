@@ -1,0 +1,491 @@
+/* Stratos EFB — Flight Planner.
+ *
+ * The builder is a chart workspace with a step rail above it, not a form on a
+ * page: the plan is edited against the chart the whole time. Every rule here is
+ * sized for the 300 px panel and a tablet, and reads the tokens and the `e-*`
+ * component kit defined once in efb.css. Nothing new is invented: a planner
+ * surface is a card, a row is a row, and the accent is still the bag's.
+ */
+
+body.view-plan .efb-main { background: #04070b; }
+
+.fp-shell { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+/* ── step rail ───────────────────────────────────────────────────────── */
+
+.fp-steps {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--efb-line);
+  background: rgba(7, 11, 17, .94);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.fp-steps::-webkit-scrollbar { display: none; }
+.fp-step {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: none;
+  color: var(--efb-muted);
+  font-size: 10.5px;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+.fp-step:hover { color: var(--efb-text); background: rgba(148, 163, 184, .06); }
+.fp-step:focus-visible { outline: 2px solid var(--efb-accent); outline-offset: 1px; }
+.fp-step-n {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 1px solid var(--efb-line-strong);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+.fp-step.is-current { color: var(--efb-text); border-color: var(--efb-accent-line); background: var(--efb-accent-soft); }
+.fp-step.is-current .fp-step-n { border-color: var(--efb-accent); color: var(--efb-accent); }
+.fp-step.is-done .fp-step-n { border-color: rgba(52, 211, 153, .42); color: var(--efb-good); }
+.fp-step.is-muted { opacity: .55; }
+.fp-step.is-muted:hover { opacity: .85; }
+
+/* ── chart and panel ─────────────────────────────────────────────────── */
+
+.fp-view { position: relative; flex: 1; min-height: 0; background: #05080c; overflow: hidden; }
+.fp-map { position: absolute; inset: 0; }
+.fp-map canvas { touch-action: none; cursor: grab; }
+.fp-map canvas:active { cursor: grabbing; }
+
+.fp-panel { top: 56px; max-height: calc(100% - 68px); }
+.fp-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 9px 9px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scrollbar-width: thin;
+}
+.fp-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 8px;
+  border-top: 1px solid var(--efb-line);
+  background: rgba(6, 10, 16, .62);
+}
+
+/* ── search ──────────────────────────────────────────────────────────── */
+
+/* Inside the panel the results take their own space instead of covering the
+   rows below: a dropdown over a 300 px list hides the thing being edited. */
+.fp-search-block { position: relative; display: flex; flex-direction: column; gap: 5px; }
+.fp-search-label { font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--efb-faint); font-weight: 700; }
+.fp-search { flex: none; min-width: 0; }
+.fp-results { position: static; margin: 0; max-height: 232px; box-shadow: none; background: #0b121b; }
+.fp-results:empty { display: none; }
+.fp-result { display: flex !important; align-items: center; gap: 8px; }
+.fp-result-id { font-size: 11px; font-weight: 750; letter-spacing: .04em; min-width: 42px; }
+.fp-result-main { flex: 1; min-width: 0; margin: 0 !important; }
+.fp-result-main b { display: block; font-size: 10.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fp-result-main small { display: block; font-size: 9px; color: var(--efb-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fp-result .e-badge { flex: 0 0 auto; margin-left: 0 !important; }
+
+/* ── cards and rows ──────────────────────────────────────────────────── */
+
+.fp-card { padding: 10px 11px; }
+.fp-card h3 { margin-bottom: 8px; }
+.fp-empty-small { padding: 12px 10px; }
+.fp-empty-small b { font-size: 11.5px; }
+.fp-empty-small p { margin: 4px 0 0; font-size: 10.5px; }
+
+.fp-stop-head { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; margin-bottom: 7px; }
+.fp-stop-head b { font-size: 14px; letter-spacing: .04em; }
+.fp-tools { gap: 5px; }
+.fp-tools .e-btn svg { vertical-align: -2px; margin-right: 3px; }
+
+.fp-detail { padding: 8px 10px; border-radius: var(--efb-r-sm); border: 1px solid var(--efb-accent-line); background: var(--efb-accent-soft); }
+.fp-detail-head { display: flex; align-items: baseline; gap: 7px; margin-bottom: 6px; min-width: 0; }
+.fp-detail-head b { font-size: 12px; letter-spacing: .03em; }
+.fp-detail-head span { font-size: 9.5px; color: var(--efb-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.fp-route-list { display: flex; flex-direction: column; }
+.fp-route-row {
+  display: grid;
+  grid-template-columns: 18px 11px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 7px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.fp-route-row:hover { background: rgba(148, 163, 184, .07); }
+.fp-route-row.is-selected { background: var(--efb-accent-soft); box-shadow: inset 0 0 0 1px var(--efb-accent-line); }
+.fp-route-seq { font-size: 9px; color: var(--efb-faint); font-variant-numeric: tabular-nums; }
+.fp-route-main { min-width: 0; }
+.fp-route-main b { display: block; font-size: 11.5px; font-weight: 600; letter-spacing: .02em; }
+.fp-route-main span { display: block; font-size: 9px; color: var(--efb-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fp-route-alt { font-size: 9.5px; color: var(--efb-muted); font-variant-numeric: tabular-nums; }
+.fp-route-actions { display: flex; gap: 1px; }
+.fp-mini {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: var(--efb-faint);
+  font-size: 11px;
+  line-height: 1;
+}
+.fp-mini:hover { color: var(--efb-text); background: rgba(148, 163, 184, .14); }
+.fp-mini.danger:hover { color: #f7bdbd; background: rgba(248, 113, 113, .14); }
+.fp-leg-row {
+  margin: 0 0 0 25px;
+  padding: 0 7px;
+  font-size: 8.5px;
+  letter-spacing: .04em;
+  color: var(--efb-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.fp-summary-row { display: flex; gap: 14px; flex-wrap: wrap; padding: 2px 0; }
+.fp-summary-row > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.fp-summary-row em { font-style: normal; font-size: 8.5px; letter-spacing: .11em; text-transform: uppercase; color: var(--efb-faint); font-weight: 700; }
+.fp-summary-row b { font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+.fp-cruise { display: flex; gap: 7px; }
+.fp-cruise .e-field { flex: 1 1 0; min-width: 0; }
+
+/* ── procedures ──────────────────────────────────────────────────────── */
+
+.fp-proc-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--efb-line);
+  border-radius: var(--efb-r-sm);
+  max-height: 190px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.fp-proc {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-bottom: 1px solid var(--efb-line);
+  background: none;
+  color: var(--efb-text);
+  text-align: left;
+}
+.fp-proc:last-child { border-bottom: 0; }
+.fp-proc:hover { background: rgba(148, 163, 184, .07); }
+.fp-proc.is-selected { background: var(--efb-accent-soft); box-shadow: inset 2px 0 0 var(--efb-accent); }
+.fp-proc-id { font-size: 11.5px; font-weight: 700; letter-spacing: .04em; }
+.fp-proc-meta { margin-left: auto; font-size: 9px; color: var(--efb-faint); }
+.fp-proc-detail { margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--efb-line); }
+.fp-suggest { margin: 8px 0 0; color: #b6f4fd; }
+.fp-link {
+  margin-top: 7px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--efb-accent);
+  font-size: 10px;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── fuel, alternate and weather ─────────────────────────────────────── */
+
+.fp-fuel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.fp-fuel-head .e-seg { width: 100%; }
+.fp-fuel-head .e-seg button { flex: 1 1 0; }
+.fp-fuel-out .e-table { font-size: 10.5px; }
+.fp-fuel-out .e-table th { font-size: 8.5px; }
+.fp-notes { margin: 8px 0 0; padding-left: 16px; font-size: 10px; line-height: 1.5; color: var(--efb-muted); }
+
+.fp-alt-tools { display: flex; gap: 7px; margin: 9px 0 7px; }
+.fp-alt-tools .e-field { flex: 1 1 0; min-width: 0; }
+.fp-alt-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.fp-alt { padding: 8px 9px; border: 1px solid var(--efb-line); border-radius: var(--efb-r-sm); background: rgba(148, 163, 184, .03); }
+.fp-alt-head { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.fp-alt-head b { font-size: 12px; letter-spacing: .03em; }
+.fp-alt-head span { font-size: 10px; color: var(--efb-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-alt-facts { display: flex; flex-wrap: wrap; gap: 4px 8px; margin: 5px 0 0; }
+.fp-alt-facts span { font-size: 9.5px; color: var(--efb-faint); }
+.fp-alt-why { margin-top: 5px; font-size: 9.5px; color: var(--efb-faint); }
+.fp-alt-why summary { cursor: pointer; }
+.fp-alt-why ul { margin: 4px 0 0; padding-left: 15px; line-height: 1.5; }
+.fp-alt .e-row { margin-top: 7px; }
+
+.fp-wx { padding: 8px 0; border-top: 1px solid var(--efb-line); }
+.fp-wx:first-of-type { border-top: 0; padding-top: 0; }
+.fp-wx-head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
+.fp-wx-head b { font-size: 12px; letter-spacing: .05em; }
+.fp-wx-facts { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.fp-wx-facts > span { display: flex; flex-direction: column; gap: 1px; }
+.fp-wx-facts em { font-style: normal; font-size: 8px; letter-spacing: .1em; text-transform: uppercase; color: var(--efb-faint); font-weight: 700; }
+.fp-wx-facts b { font-size: 11px; font-variant-numeric: tabular-nums; }
+.fp-raw {
+  display: block;
+  margin: 5px 0 0;
+  padding: 6px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--efb-line);
+  background: rgba(6, 10, 16, .7);
+  font-size: 9.5px;
+  line-height: 1.5;
+  color: var(--efb-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.fp-wx-mini { display: flex; align-items: baseline; gap: 7px; padding: 4px 0; border-top: 1px solid var(--efb-line); }
+.fp-wx-mini:first-of-type { border-top: 0; }
+.fp-wx-mini b { font-size: 11px; letter-spacing: .04em; }
+.fp-wx-mini span { font-size: 10px; color: var(--efb-muted); }
+
+/* ── review ──────────────────────────────────────────────────────────── */
+
+.fp-check { margin: 6px 0 0; padding-left: 16px; font-size: 10.5px; line-height: 1.55; }
+.fp-check.warn { color: #f3dfb4; }
+.fp-check.bad { color: #f7cfcf; }
+
+.fp-saved { display: flex; flex-direction: column; }
+.fp-saved-row { display: flex; align-items: center; gap: 6px; padding: 5px 0; border-top: 1px solid var(--efb-line); }
+.fp-saved-row:first-child { border-top: 0; }
+.fp-saved-main { flex: 1; min-width: 0; }
+.fp-saved-main b { display: block; font-size: 11px; }
+.fp-saved-main span { display: block; font-size: 9px; color: var(--efb-faint); }
+
+/* ── responsive ──────────────────────────────────────────────────────── */
+
+@media (max-width: 1100px) {
+  .fp-panel { width: 292px; }
+}
+
+@media (max-width: 900px) {
+  .fp-steps { padding: 6px 8px; }
+  .fp-step { padding: 4px 8px; font-size: 10px; }
+  .fp-panel { top: 50px; max-height: calc(100% - 58px); width: 286px; right: 48px; }
+}
+
+@media (max-width: 640px) {
+  /* A phone gets the panel as a sheet over the lower half of the chart, the
+     same behaviour as the Navigator's route list. */
+  .fp-panel { top: auto; bottom: 10px; left: 10px; right: 10px; width: auto; max-height: 58%; }
+  .fp-step-label { display: none; }
+  .fp-step.is-current .fp-step-label { display: inline; }
+  .fp-fuel-grid { grid-template-columns: 1fr; }
+  .fp-summary-row { gap: 10px; }
+}
+
+/* ── the chart readout: centre, query radius, NM and altitude ─────────── */
+
+.map-readout {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 3;
+  width: 300px;
+  max-width: calc(100% - 28px);
+  max-height: 64%;
+  overflow: auto;
+  padding: 9px 11px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--efb-line-strong);
+  background: rgba(7, 11, 17, .86);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, .38);
+}
+.map-readout[hidden] { display: none; }
+.map-readout-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--efb-line);
+}
+.map-readout-head > b {
+  margin-right: auto;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--efb-faint);
+}
+.map-readout-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--efb-faint);
+}
+.map-readout-select {
+  height: 24px;
+  padding: 0 4px;
+  border-radius: 5px;
+  border: 1px solid var(--efb-line-strong);
+  background: var(--efb-panel-2);
+  color: var(--efb-text);
+  font: inherit;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+.map-readout-btn {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 5px;
+  border: 1px solid var(--efb-line-strong);
+  background: var(--efb-panel-2);
+  color: var(--efb-muted);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 650;
+}
+.map-readout-btn[aria-pressed='true'] {
+  border-color: var(--efb-accent);
+  background: var(--efb-accent);
+  color: #04121a;
+}
+.map-readout-facts { display: flex; flex-direction: column; gap: 5px; padding-top: 7px; }
+.map-readout-row {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  column-gap: 8px;
+  row-gap: 1px;
+  align-items: baseline;
+}
+.map-readout-row em {
+  font-style: normal;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--efb-faint);
+}
+.map-readout-row b { font-size: 11.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.map-readout-row i { grid-column: 2; font-style: normal; font-size: 9px; color: var(--efb-faint); }
+.map-readout-note { margin: 7px 0 0; font-size: 9px; line-height: 1.5; color: var(--efb-faint); }
+
+/* ── the globe's surface controls ───────────────────────────────────────
+   Shown only while the chart is a globe: what the sphere is drawn from, and
+   how to bring the camera back to the route. A reset of the whole builder sits
+   in the HUD instead, where it is reachable from every step. */
+
+.map-hud-btn {
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 5px;
+  border: 1px solid var(--efb-line-strong);
+  background: rgba(7, 11, 17, .82);
+  color: var(--efb-muted);
+  font: inherit;
+  font-size: 9.5px;
+  font-weight: 650;
+}
+.map-hud-btn:hover { color: #f7d8d8; border-color: rgba(248, 113, 113, .4); background: rgba(46, 12, 14, .82); }
+.map-hud-btn:focus-visible { outline: 2px solid var(--efb-accent); outline-offset: 1px; }
+
+.map-readout-globe { padding-top: 7px; }
+.map-readout-globe[hidden] { display: none; }
+.map-readout-label {
+  display: block;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--efb-faint);
+}
+.map-readout-seg { display: flex; gap: 3px; margin: 5px 0 6px; }
+.map-readout-seg button {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 26px;
+  padding: 0 4px;
+  border-radius: 5px;
+  border: 1px solid var(--efb-line-strong);
+  background: var(--efb-panel-2);
+  color: var(--efb-muted);
+  font: inherit;
+  font-size: 9.5px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.map-readout-seg button[aria-pressed='true'] { border-color: var(--efb-accent); background: var(--efb-accent); color: #04121a; }
+.map-readout-tools { display: flex; gap: 5px; }
+.map-readout-tools .map-readout-btn { flex: 1 1 0; }
+.map-readout-globe .map-readout-note { margin-top: 6px; }
+
+/* ── the card a chart tap opens when the record is not unique ─────────── */
+
+.map-pick {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 4;
+  width: 336px;
+  max-width: calc(100% - 28px);
+  max-height: 64%;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 11px;
+  border: 1px solid var(--efb-line-strong);
+  background: rgba(9, 14, 20, .95);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, .45);
+}
+.map-pick[hidden] { display: none; }
+.map-pick-head { padding: 3px 4px 7px; border-bottom: 1px solid var(--efb-line); }
+.map-pick-head > b { display: block; font-size: 11.5px; }
+.map-pick-head > span { display: block; margin-top: 2px; font-size: 9px; color: var(--efb-faint); }
+.map-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 6px;
+  border: 0;
+  border-top: 1px solid var(--efb-line);
+  background: none;
+  color: var(--efb-text);
+  font: inherit;
+  text-align: left;
+}
+.map-pick-row:hover { background: rgba(148, 163, 184, .07); }
+.map-pick-id {
+  min-width: 64px;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.map-pick-main { min-width: 0; }
+.map-pick-main > b { display: block; font-size: 11px; font-weight: 600; }
+.map-pick-main > small { display: block; font-size: 9px; color: var(--efb-faint); }
+.map-pick-row.is-custom .map-pick-id { color: var(--efb-muted); }
+.map-pick-row.is-ghost { justify-content: center; color: var(--efb-muted); font-size: 10.5px; }
+
+@media (max-width: 700px) {
+  /* On a phone the readout keeps the numbers a pilot is flying by and drops the
+     explanations, so it never covers the chart it is describing. */
+  .map-readout { width: 246px; padding: 8px 9px; }
+  .map-readout-row i { display: none; }
+  .map-readout-note { display: none; }
+}

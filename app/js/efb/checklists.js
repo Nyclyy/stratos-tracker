@@ -1,12 +1,12 @@
-/* EFB · Documents & Checklists.
+/* EFB · Checklists.
  *
  * Interactive normal, supplementary and emergency checklists from the same
  * community profiles the tracker ships, with the same disclaimer attached: these
  * are simulator aids derived from public procedures, not manufacturer manuals.
  *
- * Progress, bookmarks and the last opened PDF live on this device. A PDF the
- * pilot already owns can be opened here with the same viewer the charts use; it
- * is not uploaded, copied into the app or presented as approved documentation.
+ * Checked items and bookmarks stay on this device. There is no document library
+ * here — a checklist is a procedure, and nothing on this page is presented as an
+ * approved aircraft manual.
  */
 
 import { esc, currentPlan } from './common.js';
@@ -16,8 +16,9 @@ import {
 } from '../lib/checklists.js';
 
 const CHECK_KEY = 'stratos.efb.checklist.';
+// The storage key keeps its original name so bookmarks saved before this app was
+// renamed are still the pilot's bookmarks.
 const BOOKMARKS_KEY = 'stratos.efb.documents.bookmarks';
-const RECENT_KEY = 'stratos.efb.documents.recent';
 
 function loadJson(key, fallback) {
   try {
@@ -43,8 +44,6 @@ export async function mount(root, ctx) {
   let checks = loadJson(CHECK_KEY + profile.key, {}) || {};
   let bookmarks = loadJson(BOOKMARKS_KEY, []) || [];
   let query = '';
-  let recent = loadJson(RECENT_KEY, []) || [];
-  let viewer = null;
   let destroyed = false;
 
   root.innerHTML = `
@@ -73,18 +72,7 @@ export async function mount(root, ctx) {
     <div id="doc-progress"></div>
     <div id="doc-sections" class="e-grid" style="gap:10px;margin-top:10px"></div>
 
-    <h2 style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--efb-muted);margin:20px 2px 8px">Aircraft documents</h2>
-    <div class="e-card">
-      <h3>Open a PDF from this device</h3>
-      <p class="e-small e-muted" style="margin-top:0">Stratos does not bundle manufacturer manuals or pretend a community document is an approved one. Open a PDF you already have — an FCOM, QRH or operator document — and it is rendered here without being uploaded.</p>
-      <div class="e-row">
-        <button class="e-btn small primary" type="button" data-open-pdf>Open PDF…</button>
-        ${recent.length ? `<span class="e-small e-faint">Recent: ${recent.map(name => esc(name)).join(' · ')}</span>` : ''}
-      </div>
-      <input type="file" accept="application/pdf,.pdf" id="doc-file" hidden>
-      <div id="doc-viewer" style="margin-top:10px"></div>
-      <div class="e-small e-faint" style="margin-top:8px">A local document carries no verified source or revision. Check its applicability yourself.</div>
-    </div>`;
+    <div class="e-small e-faint" style="margin:18px 2px 0">Checklists are simulator aids derived from publicly documented procedures. They are not manufacturer or operator manuals and are not for real-world flight.</div>`;
 
   const sectionsEl = root.querySelector('#doc-sections');
   const progressEl = root.querySelector('#doc-progress');
@@ -229,46 +217,11 @@ export async function mount(root, ctx) {
     render();
   });
 
-  root.querySelector('[data-open-pdf]').addEventListener('click', () => root.querySelector('#doc-file').click());
-  root.querySelector('#doc-file').addEventListener('change', async event => {
-    const file = event.target.files && event.target.files[0];
-    if (!file) return;
-    const host = root.querySelector('#doc-viewer');
-    if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
-      host.innerHTML = '<div class="e-notice bad">Choose a PDF file.</div>';
-      return;
-    }
-    if (Number(file.size) > 25 * 1024 * 1024) {
-      host.innerHTML = '<div class="e-notice bad">That file is larger than 25 MB.</div>';
-      return;
-    }
-    try {
-      const bytes = await file.arrayBuffer();
-      if (bytes.byteLength < 5 || new Uint8Array(bytes, 0, 5)[0] !== 0x25) throw new Error('That file does not start with a PDF header.');
-      if (viewer) { viewer.destroy(); viewer = null; }
-      host.innerHTML = '<div class="e-row" style="margin-bottom:6px"><b class="e-small"></b><span class="e-spacer"></span><span class="e-small e-faint"></span></div><div class="chart-host" style="height:420px" id="doc-pdf"></div>';
-      host.querySelector('b').textContent = file.name;
-      host.querySelector('.e-faint').textContent = `${(file.size / 1048576).toFixed(1)} MB · local file`;
-      const { ChartViewer } = await import('../pilot/charts.js');
-      viewer = new ChartViewer(host.querySelector('#doc-pdf'), {
-        onState: state => {
-          if (state.error) host.querySelector('#doc-pdf').innerHTML = `<div class="e-notice bad" style="margin:12px">${esc(state.error)}</div>`;
-        },
-      });
-      await viewer.load(bytes);
-      recent = [file.name, ...recent.filter(name => name !== file.name)].slice(0, 5);
-      saveJson(RECENT_KEY, recent);
-    } catch (error) {
-      host.innerHTML = `<div class="e-notice bad">${esc(error.message)}</div>`;
-    }
-  });
-
   render();
 
   return {
     destroy() {
       destroyed = true;
-      if (viewer) { try { viewer.destroy(); } catch (_) { /* gone */ } viewer = null; }
     },
   };
 }

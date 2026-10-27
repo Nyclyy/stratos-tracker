@@ -60,6 +60,11 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 #lay{width:240px}#ms{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 #lay select{width:100%;padding:8px 9px;border-radius:9px;border:1px solid var(--ui2);background:var(--ui2);color:var(--txt);font:inherit;font-size:12.5px}
 #lay option:disabled{color:var(--mut)}
+#pj,#gs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#pj button,#gs button{font-size:12.5px;padding:7px 8px}
+#pj button[disabled]{opacity:.45;cursor:not-allowed}
+#gn{margin-top:6px;line-height:1.45}
+#gwrap .row{margin-top:7px}
 
 :root[data-theme=night]{--bg:#0a1421;--land:#0d1721;--coast:#28425a;--grid:rgba(140,180,220,.08);--ap:#f6c453;--nav:#5eead4;--route:#22d3ee;--own:#f8b84e;--txt:#e8f1fa;--ui:rgba(9,16,25,.96);--ui2:#152230;--mut:#8b9db3;--trf:#8fb8ff;--acc:#38bdf8}
 #tel{display:none!important}.live #sheet{bottom:76px}
@@ -353,7 +358,7 @@ td,th{border-bottom:1px solid color-mix(in srgb,var(--ui2) 70%,transparent);padd
 <div id="online" class="box"><b id="olPlace">–</b><span id="olCount">–</span></div>
 <div id="fab"><button id="bTheme" class="fab" title="Theme">Day</button>
 <button id="bLay" class="fab" title="Layers and tools">&#9776;</button><button id="bFol" class="fab" title="Follow aircraft">&#9992;</button><button id="bZi" class="fab" title="Zoom in">+</button><button id="bZo" class="fab" title="Zoom out">−</button>
-</div><div id="lay"><b>Map layers</b><button data-l="apt" class="on">Airports</button><button data-l="nav" class="on">Navaids</button><button data-l="trf" class="on">Traffic</button><button data-l="trl">All trails</button><button data-l="rte" class="on">Route</button><button data-l="grid">Grid</button><b>Traffic source</b><select id="trs" aria-label="Traffic source"><option value="vatsim">VATSIM — live pilots</option><option value="adsb">ADS-B — community feeds</option></select><div class="m" id="trsnote" style="max-width:220px;margin-top:2px">Both sources are keyless and free.</div><b>Map style</b><div id="ms"></div><b>Workspaces</b><div id="mwtools"><button id="bLive" type="button">Live tracking</button><button id="bCh" type="button">Charts</button><button id="bWx" type="button">Weather</button><button id="bData" type="button">Data</button><button id="bEfb" type="button" title="Electronic flight bag">Stratos EFB</button></div></div>
+</div><div id="lay"><b>Map layers</b><button data-l="apt" class="on">Airports</button><button data-l="nav" class="on">Navaids</button><button data-l="trf" class="on">Traffic</button><button data-l="trl">All trails</button><button data-l="rte" class="on">Route</button><button data-l="grid">Grid</button><b>Traffic source</b><select id="trs" aria-label="Traffic source"><option value="vatsim">VATSIM — live pilots</option><option value="adsb">ADS-B — community feeds</option></select><div class="m" id="trsnote" style="max-width:220px;margin-top:2px">Both sources are keyless and free.</div><b>Map style</b><div id="ms"></div><b>Projection</b><div id="pj"></div><div id="gwrap" hidden><b>Globe surface</b><div id="gs"></div><div class="m" id="gn"></div><div class="row"><button type="button" id="gReset" title="Centre the globe on the route again">Reset view</button><button type="button" id="gRead" title="Read terrain elevations around the centre">Read terrain</button></div></div><b>Workspaces</b><div id="mwtools"><button id="bLive" type="button">Live tracking</button><button id="bCh" type="button">Charts</button><button id="bWx" type="button">Weather</button><button id="bData" type="button">Data</button><button id="bEfb" type="button" title="Electronic flight bag">Stratos EFB</button></div></div>
 
 <div id="cv"><div class="cvh"><button id="cvx" aria-label="Back">&#8592;</button><div class="cvt"><b id="cvi"></b><span id="cvn"></span><span id="cvm"></span></div><button id="cvf">Fit</button></div><div class="seg" id="cvs"></div></div><div id="ci"></div>
 <div id="chart"></div>
@@ -389,6 +394,17 @@ function aircraftIcon(type, color) {
 }
 spriteAtlas.addEventListener('load', () => { spriteCache.clear(); window.dispatchEvent(new Event('aircraft-atlas-ready')); });
 window.aircraftIcon = aircraftIcon;
+</script>
+<script type="module">
+/* The globe's geometry and its two tile sources are shared modules — the same
+   ones the EFB draws from — and the engine below is a classic script, so it
+   reads them off `window` exactly as it already reads the aircraft icon and the
+   bundled world outlines. The event is what tells the page the globe can be
+   switched on, including a projection the pilot left on last visit. */
+import * as GLOBE from './js/lib/globeview.js';
+import { EARTH_STYLES, GIBS, TERRAIN, earthStyle, EarthView } from './js/lib/earthview.js';
+window.STRATOS_GLOBE = { ...GLOBE, EARTH_STYLES, GIBS, TERRAIN, earthStyle, EarthView };
+window.dispatchEvent(new Event('stratos-globe-ready'));
 </script>
 <script>
 const A=`KSFO|San Francisco Intl|37.619|-122.375|13|10,1|120.5|135.1|29012KT 10SM FEW015 16/11 A3002
@@ -578,13 +594,317 @@ const RL={KSFO:[11870,8650],KOAK:[10520],KSJC:[11000],KSAC:[8600],KRNO:[11002],K
 function pairs(a){const o=[];a.rw.forEach(n=>{if(!o.some(p=>p[0]==n||p[1]==n))o.push([n,(n+17)%36+1])});return o}
 function liveOk(){return live.on&&live.d&&live.d.lat!=null&&live.d.age<3&&performance.now()-live.at<3000}
 const cv=$('#map'),cx=cv.getContext('2d');let W,H,dpr,C={};
-const V={lon:-119.5,lat:38.8,z:6,fol:false},L={apt:1,nav:1,trf:1,grid:0,rte:1,style:(function(){try{return localStorage.getItem('dl.style')||'sat'}catch(e){return'sat'}})()};
+const V={lon:-119.5,lat:38.8,z:6,fol:false,mode:'plane',gz:1,gs:'vector'},L={apt:1,nav:1,trf:1,grid:0,rte:1,style:(function(){try{return localStorage.getItem('dl.style')||'sat'}catch(e){return'sat'}})()};
 let plan=false,panel=null,sel=null,route=[],trav=0,own={lat:0,lon:0,hdg:0,alt:0,vs:0};
 const byId=id=>A.find(a=>a.id==id)||N.find(a=>a.id==id);
 const wp=o=>({id:o.id,name:o.name,lat:o.lat,lon:o.lon,k:o.k||'fix',elev:o.elev||0,ss:o.ss||'',aw:o.aw||''});
 const wpx=(lon,lat,z)=>{const zoom=z!==undefined?z:V.z,k=SZ*2**zoom,s=Math.sin(lat*R);return[(lon+180)/360*k,(.5-Math.log((1+s)/(1-s))/(4*Math.PI))*k]};
 const wun=(X,Y,z)=>{const zoom=z!==undefined?z:V.z,k=SZ*2**zoom;return[X/k*360-180,Math.atan(Math.sinh(Math.PI-2*Math.PI*Y/k))/R]};
-const sc=(lon,lat)=>{const c=wpx(V.lon,V.lat,V.z),p=wpx(lon,lat,V.z);return[p[0]-c[0]+W/2,p[1]-c[1]+H/2]};
+/* ── The globe ────────────────────────────────────────────────────────
+   The Flight Deck is the same chart in either projection. Every layer —
+   airports, navaids, traffic, the route, the aircraft — is projected through
+   the two functions below, so switching projection changes how the world is
+   drawn and nothing else: the same plan, the same live data, the same tap.
+
+   The sphere is painted from a surface the pilot chooses. **Outlines** is the
+   bundled Natural Earth 1:110m data (already loaded for the World style) and
+   asks the network for nothing at all. **Imagery** is NASA's Blue Marble
+   mosaic; **Relief** and **Elevation** are shaded from the real AWS/Mapzen
+   terrain tiles, and an elevation reading comes from the same tiles. Those
+   three read the publisher directly through the shared EarthView store — no
+   key, no proxy, nothing mirrored or bundled — and the publisher is named in
+   the attribution line and on the sphere for as long as it is showing.
+
+   The arithmetic is `js/lib/globeview.js`, shared with the EFB's own map, and
+   this engine reads that module off `window` the way it already reads the
+   aircraft icon and the world outlines: this is a classic script. Until it
+   arrives the chart stays flat, and the Globe button says so. */
+const GV={earth:null,rings:null,cache:null,moved:0,read:null,noteAt:0,msg:'',cacheAt:0,capAt:0,capVal:320};
+function globeModule(){return (typeof window!=='undefined'&&window.STRATOS_GLOBE)||null}
+function globeStyles(){const g=globeModule();return g?g.EARTH_STYLES:[]}
+function globeStyle(id){const g=globeModule();return g?g.earthStyle(id):{id:'vector',label:'Outlines',hint:'',source:''}}
+function globePicture(){return !!globeStyle(V.gs).source}
+const mercator=(lon,lat)=>{const c=wpx(V.lon,V.lat,V.z),p=wpx(lon,lat,V.z);return[p[0]-c[0]+W/2,p[1]-c[1]+H/2]};
+/* The chart's one projection. A point on the far side of the sphere is placed
+   on the limb in its own direction, so a line crossing the horizon runs to it
+   and stops there instead of streaking to a corner. `vis` is the same call with
+   the far side reported as null, which is what a symbol, a label or a tap must
+   use: a marker drawn on the limb is a place the pilot cannot see. */
+const sc=(lon,lat)=>{if(V.mode==='globe'){const g=globeModule(),p=g&&g.globeProjectClamped(Number(lat),Number(lon),globeCam());if(p)return[p.x,p.y]}return mercator(lon,lat)};
+function vis(lon,lat){if(V.mode!=='globe')return mercator(lon,lat);const g=globeModule();if(!g)return mercator(lon,lat);const p=g.globeProject(Number(lat),Number(lon),globeCam());return p?[p.x,p.y]:null}
+/* The inverse of vis() for the same two projections, so anything dragged back
+   from a screen point — a waypoint being moved, say — lands under the pointer
+   on the sphere as well as on the flat chart. */
+function unvis(x,y){if(V.mode==='globe'){const g=globeModule(),p=g&&g.globeUnproject(x,y,globeCam());return p?[p.lon,p.lat]:null}const c=wpx(V.lon,V.lat,V.z),p=wun(c[0]+x-W/2,c[1]+y-H/2,V.z);return[p[0],p[1]]}
+function globeCam(){const g=globeModule();return g?g.cameraFor({lat:V.lat,lon:V.lon},globeR(),W/2,H/2):null}
+function globeR(){const g=globeModule();return g?g.globeRadiusFor(W,H,26,V.gz):120}
+/* Label density, in the flat chart's own zoom units, so every threshold below
+   keeps working in both projections without a second set of numbers. */
+function lblZ(){return V.mode==='globe'?2.6+Math.log2(Math.max(1,V.gz))*1.9:V.z}
+/* Symbol size, in whichever projection is on: the flat chart's own scale, and on
+   the globe one that grows with the sphere — at one sphere per screen a marker
+   is at its smallest, and by the time a country fills it, at its largest. `mkR`
+   itself stays the flat chart's rule. */
+function mkRz(){return V.mode==='globe'?Math.max(11.2,Math.min(18,11.5+Math.log2(Math.max(1,V.gz))*1.5)):mkR()}
+
+/* The bundled coastlines as unit vectors, so the horizon test is a sign check.
+   Natural Earth when the world file loaded, the coarse outlines this page
+   always ships otherwise — never a coastline that was not in the data. */
+function globeRings(){
+  if(GV.rings)return GV.rings;
+  const g=globeModule();if(!g)return[];
+  const out=[];
+  const push=flat=>{if(!flat||flat.length<6)return;const ring=[];for(let i=0;i<flat.length;i+=2)ring.push(g.unitVector(flat[i+1],flat[i]));out.push(ring)};
+  if(WD&&WD.countries)for(const co of WD.countries)for(const ring of co.p)push(ring);
+  else{[LAND,...EX,PL].forEach(push)}
+  if(out.length)GV.rings=out;
+  return out;
+}
+
+/* Land and coastlines, filled to the limb: the cut runs along the horizon, so
+   the closed loop is exactly the visible part of the land. */
+function globeOutlines(){
+  const g=globeModule();if(!g)return;
+  const rings=globeRings();if(!rings.length)return;
+  const light=document.documentElement.dataset.theme==='day';
+  const cam=g.cameraDirection({lat:V.lat,lon:V.lon}),camera=globeCam();
+  cx.lineJoin='round';
+  for(const ring of rings){
+    const clipped=g.clipToHemisphere(ring,cam);
+    if(clipped.length<3)continue;
+    cx.beginPath();let pen=false;
+    for(const v of clipped){const p=g.globeProjectVector(v,camera);if(!p){pen=false;continue}if(pen)cx.lineTo(p.x,p.y);else cx.moveTo(p.x,p.y);pen=true}
+    if(!pen)continue;
+    cx.closePath();
+    cx.fillStyle=light?'#c3d5e3':'#152838';cx.fill();
+    cx.strokeStyle=light?'rgba(30,58,84,.5)':'rgba(126,178,214,.5)';cx.lineWidth=.8;cx.stroke();
+  }
+}
+
+/* Meridians and parallels every 15 degrees, each cut where it passes the limb
+   and wherever the projection jumps across the far side. */
+function globeGraticule(r){
+  const g=globeModule();if(!g)return;
+  const light=document.documentElement.dataset.theme==='day';
+  const cam=globeCam(),gap=r*.35;
+  cx.strokeStyle=light?'rgba(30,58,84,.16)':'rgba(126,178,214,.15)';cx.lineWidth=.6;cx.beginPath();
+  const line=points=>{let pen=false,last=null;for(const[lat,lon]of points){const p=g.globeProject(lat,lon,cam);if(!p||(pen&&last&&Math.hypot(p.x-last.x,p.y-last.y)>gap)){pen=false;if(!p)continue}if(pen)cx.lineTo(p.x,p.y);else cx.moveTo(p.x,p.y);pen=true;last=p}};
+  for(let lon=-180;lon<180;lon+=15){const meridian=[];for(let lat=-88;lat<=88;lat+=2)meridian.push([lat,lon]);line(meridian)}
+  for(let lat=-75;lat<=75;lat+=15){const parallel=[];for(let lon=-180;lon<=180;lon+=3)parallel.push([lat,lon]);line(parallel)}
+  cx.stroke();
+}
+
+/* Who supplied what is on the globe, written on the globe. */
+function globeCredit(r){
+  const style=globeStyle(V.gs);
+  if(!style.source)return;
+  const text=style.source==='nasa'?'Imagery: NASA Earth Observatory Blue Marble · NASA GIBS/ESDIS':'Terrain: AWS Open Data Terrain Tiles (Mapzen) · 3DEP/SRTM/GMTED2010/ETOPO1';
+  cx.save();cx.font='9.5px system-ui, sans-serif';cx.textAlign='center';cx.textBaseline='middle';
+  const w=cx.measureText(text).width,x=W/2,y=Math.min(H/2+r*.84,H/2+r-7);
+  cx.fillStyle='rgba(2,6,12,.58)';cx.fillRect(x-w/2-6,y-7,w+12,14);
+  cx.fillStyle='rgba(233,242,250,.92)';cx.fillText(text,x,y);
+  cx.restore();
+}
+
+/* The tile store, built the first time a surface needs one: an outlines globe
+   never builds it, makes no request and decodes nothing. */
+function globeEarth(){
+  if(!GV.earth){const g=globeModule();GV.earth=new g.EarthView({style:V.gs,onTiles:()=>{GV.cache=null}})}
+  return GV.earth;
+}
+/* A bounded raster, and a coarser one while the sphere is being turned: the
+   pilot is watching geography move, not reading pixels. While tiles are still
+   arriving the middle size is used as well, because the pass is repeated the
+   moment they land and paying full price twice for one picture is the whole
+   cost of the feature. */
+function globeCap(){
+  const now=performance.now();
+  // `stats()` walks the whole tile store, so the answer is kept briefly rather
+  // than rebuilt on every frame for a choice that changes over seconds.
+  if(GV.capAt&&now-GV.capAt<150)return GV.capVal;
+  GV.capAt=now;
+  GV.capVal=now-GV.moved<240?168:(GV.earth&&GV.earth.stats().waiting>0?224:320);
+  return GV.capVal;
+}
+function buildGlobeRaster(e,size){
+  if(typeof document==='undefined')return{canvas:null,share:0};
+  const host=document.createElement('canvas');host.width=host.height=size;
+  const image=host.getContext('2d').createImageData(size,size);
+  const light=document.documentElement.dataset.theme==='day';
+  const stats=globeModule().rasteriseGlobe({size,center:{lat:V.lat,lon:V.lon},base:light?[214,228,240]:[10,22,34],data:image.data,sample:(lat,lon,out)=>e.sample(lat,lon,out)});
+  host.getContext('2d').putImageData(image,0,0);
+  return{canvas:host,share:stats.share,painted:stats.painted,asked:stats.asked};
+}
+/* Real imagery or real terrain, one output pixel at a time, rebuilt only when
+   the camera, the size, the surface or the loaded tiles changed. Returns false
+   when too little of the visible face is read, so the caller draws the bundled
+   outlines instead rather than a sphere of unread background. */
+function globeRaster(r){
+  const style=globeStyle(V.gs);
+  if(!style.source)return false;
+  const e=globeEarth();
+  const size=Math.max(48,Math.min(globeCap(),Math.round(r*2)));
+  /* The level the tiles are read at follows the size of the sphere on screen,
+     never the transient coarseness of a frame mid-turn. Letting it follow the
+     frame would change which tiles a hemisphere needs the moment a drag starts,
+     so every drag would fetch and hillshade a second set of tiles — the same
+     ground, twice, for a picture that is moving too fast to read either. */
+  const level=Math.max(size,Math.min(320,Math.round(r*2)));
+  e.setResolution(level);
+  e.ensureAround(V.lat,V.lon,size);
+  const now=performance.now();
+  const key=style.id+'|'+size+'|'+V.lat.toFixed(3)+'|'+V.lon.toFixed(3);
+  const ready=e.readyCount();
+  // The camera or the surface changed: rebuild now. Tiles merely arriving are
+  // quoted at most five times a second — a face filling in tile by tile would
+  // otherwise rebuild the whole sphere in the same frame each image lands.
+  const stale=!GV.cache||GV.cache.key!==key;
+  const filling=ready!==(GV.cache&&GV.cache.ready)&&now-(GV.cacheAt||0)>200;
+  if(stale||filling){GV.cache={key,ready,...buildGlobeRaster(e,size)};GV.cacheAt=now}
+  const cache=GV.cache;
+  if(!cache.canvas||cache.share<.35)return false;
+  cx.save();cx.imageSmoothingEnabled=true;
+  cx.drawImage(cache.canvas,W/2-r,H/2-r,r*2,r*2);
+  cx.restore();
+  return true;
+}
+
+/* Ocean, land and a graticule, all from real data or from geometry. */
+function globeBase(){
+  const light=document.documentElement.dataset.theme==='day',r=globeR();
+  cx.save();cx.beginPath();cx.arc(W/2,H/2,r,0,Math.PI*2);
+  cx.fillStyle=light?'#dce8f2':'#081420';cx.fill();
+  cx.save();cx.clip();
+  if(!globeRaster(r))globeOutlines();
+  globeGraticule(r);
+  globeCredit(r);
+  cx.restore();
+  cx.beginPath();cx.arc(W/2,H/2,r,0,Math.PI*2);
+  cx.strokeStyle=light?'rgba(15,23,42,.35)':'rgba(148,178,205,.45)';cx.lineWidth=1.2;cx.stroke();
+  cx.restore();
+  gNote();
+}
+
+/* How far from the centre the ground on screen reaches: one pixel at the middle
+   of a sphere is 3437.75/radius nautical miles, so the reading scans the area
+   the pilot can actually see, capped at the same 320 NM the flight planner
+   uses. Stated in the note, never implied. */
+function gProbeNm(){
+  const g=globeModule();if(!g)return 40;
+  const edge=Math.max(24,Math.min(W/2,H/2));
+  return Math.max(20,Math.min(320,Math.round(g.nmPerPixelAtCentre(globeR())*edge)));
+}
+/* Elevations from the terrain tiles around the centre. This reads tiles even on
+   an outlines globe: the reading is asked for explicitly, and it is the ground
+   the question is about, not the surface currently being drawn. */
+function globeRead(){
+  if(V.mode!=='globe'||!globeModule())return null;
+  const nm=gProbeNm(),e=globeEarth();
+  e.readTerrain(V.lat,V.lon,{radiusNm:nm,rasterPx:globeCap()});
+  GV.read={at:Date.now(),nm};
+  GV.noteAt=0;gNote();
+  return nm;
+}
+function feet(metres){return Math.round(Number(metres)*3.280839895).toLocaleString()}
+/* What the sphere is drawn from, what is loaded, and what a terrain reading
+   actually measured — composed from the module's own report so the app cannot
+   describe a surface differently from the code that paints it. */
+function gNote(){
+  if(V.mode!=='globe')return;
+  const now=performance.now();
+  if(now-GV.noteAt<700)return;
+  GV.noteAt=now;
+  const parts=[];
+  if(GV.msg)parts.push(GV.msg);
+  const g=globeModule();
+  if(!g){
+    parts.push('The globe module has not loaded, so this chart is still flat. A globe draws the same plan from the same coordinates once it does.');
+  }else{
+    const style=globeStyle(V.gs);
+    parts.push(style.hint);
+    if(!style.source)parts.push('Nothing is fetched for this surface: no imagery and no terrain, so no request leaves the app.');
+    else if(GV.earth)parts.push(...GV.earth.notes());
+    else parts.push('Its tiles are read from the publisher only while this surface is showing.');
+    const terrain=g.TERRAIN;
+    if(GV.read&&GV.earth){
+      const st=GV.earth.stats();
+      const here=GV.earth.elevationAt(V.lat,V.lon);
+      const hi=GV.earth.highestNear(V.lat,V.lon,GV.read.nm);
+      parts.push(here==null
+        ?`Ground at the centre: not read yet${st.waiting?` — ${st.waiting} terrain tile${st.waiting==1?' is':'s are'} on the way.`:' — the tiles have not arrived.'}`
+        :`Ground at the centre: ${feet(here)} ft, read at level ${st.pointZoom} (about ${Math.round(st.pointMetresPerPixel)} m per pixel).`);
+      if(hi)parts.push(`Highest of ${hi.read} samples within ${GV.read.nm} NM of the centre: ${feet(hi.maxMetres)} ft${hi.partial?` (${hi.total-hi.read} of ${hi.total} samples still unread)`:''}.`);
+      /* A terrain surface has already been described by its own notes above;
+         this line is for a reading taken while something else is being drawn. */
+      if(terrain&&style.source!=='terrain')parts.push(`The tiles were read for this elevation only, so the sphere is still drawn as ${style.label.toLowerCase()}. ${terrain.displayOnly} Source terms vary by region and by data source; ETOPO1 states it is not suitable for navigation.`);
+    }
+  }
+  const text=parts.filter(Boolean).join(' ');
+  const el=$('#gn');
+  if(el&&el.textContent!==text)el.textContent=text;
+}
+/* Attribution follows the surface: the flat chart's tiles are OpenStreetMap and
+   Esri, the globe's are NASA and AWS/Mapzen, and the line names whichever is
+   actually on screen. */
+function globeAttr(){
+  const a=$('#attr');if(!a)return;
+  const style=globeStyle(V.gs);
+  const text=V.mode!=='globe'?'© OpenStreetMap contributors · Esri imagery'
+    :style.source==='nasa'?'Imagery: NASA Earth Observatory Blue Marble · NASA GIBS/ESDIS'
+    :style.source?'Terrain: AWS Open Data Terrain Tiles (Mapzen) · 3DEP/SRTM/GMTED2010/ETOPO1'
+    :'Globe outlines: Natural Earth 1:110m (public domain)';
+  if(a.textContent!==text)a.textContent=text;
+}
+/* Flat chart or globe. The place in view is kept across the switch, and the
+   plan is never touched by it. */
+function globeMode(mode){
+  const next=mode==='globe'?'globe':'plane';
+  if(next===V.mode)return V.mode;
+  GV.msg='';
+  if(next==='globe'&&!globeStyles().length){GV.msg='The globe module has not loaded yet, so the chart is still flat. Switch again in a moment.';GV.noteAt=0;gNote();return V.mode}
+  if(next==='globe'&&CH.on){GV.msg='A charted approach is a flat chart: close the chart to use the globe.';GV.noteAt=0;gNote();return V.mode}
+  V.mode=next;V.in=null;V.tz=null;V.anchor=null;drag=null;pinch=null;GV.cache=null;GV.read=null;
+  if(next==='globe'){V.gz=1;globeRings()}
+  try{localStorage.setItem('dl.mode',next)}catch(_){}
+  GV.noteAt=0;pjUi();gsUi();globeAttr();gNote();
+  return V.mode;
+}
+/* Centre the globe on the route again, at the zoom that frames it. */
+function globeReset(){
+  const g=globeModule();if(!g||V.mode!=='globe')return;
+  const centre=(route.length>1&&g.vectorMeanCentre(route))||(liveOk()?{lat:own.lat,lon:own.lon}:null)||{lat:40,lon:-95};
+  V.lon=centre.lon;V.lat=centre.lat;V.gz=1;GV.cache=null;GV.read=null;setFol(false);V.tz=null;V.in=null;
+  if(route.length>1)fitRoute();
+  GV.noteAt=0;globeAttr();gNote();
+}
+/* Which surface the sphere is painted with. A surface that reads tiles builds
+   the store only when it is chosen. */
+function setGlobeSurface(id){
+  const style=globeStyle(id);
+  if(style.id===V.gs)return V.gs;
+  V.gs=style.id;GV.cache=null;
+  try{localStorage.setItem('dl.globe',V.gs)}catch(_){}
+  if(style.source){const e=globeEarth();e.setResolution(globeCap());e.ensureAround(V.lat,V.lon,e.rasterPx);e.setStyle(style.id);e.ensureAround(V.lat,V.lon,e.rasterPx)}
+  GV.noteAt=0;gsUi();globeAttr();gNote();
+  return V.gs;
+}
+/* Zoom about a point on the sphere, so the place under the pointer or the middle
+   of the screen stays under it — the same anchor the flat chart's zoom keeps. */
+function globeZoomAbout(x,y,factor){
+  const g=globeModule();if(!g)return;
+  const before=g.globeUnproject(x,y,globeCam());
+  const next=Math.max(1,Math.min(40,V.gz*factor));
+  if(next===V.gz)return;
+  V.gz=next;GV.moved=performance.now();GV.cache=null;V.tz=null;V.in=null;
+  if(before){const after=g.globeUnproject(x,y,globeCam());if(after){V.lon=((V.lon+(before.lon-after.lon)+540)%360)-180;V.lat=Math.max(-89.5,Math.min(89.5,V.lat+(before.lat-after.lat)))}}
+}
+/* The chart's own zoom, in globe units, for the places that focus on a point:
+   a search result, a route waypoint, a region button. */
+function focusZoom(z){if(V.mode==='globe'){V.gz=Math.max(1,Math.min(40,2**((z-6)/3)));V.tz=null;V.in=null;return}V.z=z;V.tz=null}
+/* The same, for the places that zoom in only if they are further out than a
+   named scale — focusing an airport, or the first live position. */
+function focusAtLeast(z){if(V.mode==='globe'){V.gz=Math.max(V.gz,Math.min(40,2**((z-6)/3)));V.tz=null;V.in=null;return}V.z=Math.max(V.z,z);V.tz=null}
+
 const dist=(a,b)=>{const dl=(b.lat-a.lat)*R,dn=(b.lon-a.lon)*R,h=Math.sin(dl/2)**2+Math.cos(a.lat*R)*Math.cos(b.lat*R)*Math.sin(dn/2)**2;return 6880.13*Math.asin(Math.sqrt(h))};
 const brg=(a,b)=>{const y=Math.sin((b.lon-a.lon)*R)*Math.cos(b.lat*R),x=Math.cos(a.lat*R)*Math.sin(b.lat*R)-Math.sin(a.lat*R)*Math.cos(b.lat*R)*Math.cos((b.lon-a.lon)*R);return(Math.atan2(y,x)/R+360)%360};
 const fwd=(a,h,d)=>{const r=d/3440.065,l1=a.lat*R,o1=a.lon*R,l2=Math.asin(Math.sin(l1)*Math.cos(r)+Math.cos(l1)*Math.sin(r)*Math.cos(h*R)),o2=o1+Math.atan2(Math.sin(h*R)*Math.sin(r)*Math.cos(l1),Math.cos(r)-Math.sin(l1)*Math.sin(l2));return{lat:l2/R,lon:o2/R}};
@@ -593,7 +913,22 @@ const hm=h=>{if(!isFinite(h))return'–';const m=Math.round(h*60);return Math.fl
 function theme(t){try{localStorage.setItem('dl.theme',t)}catch(_){}document.documentElement.dataset.theme=t;$('#bTheme').textContent={day:'Day',night:'Night',contrast:'High'}[t];const cs=getComputedStyle(document.documentElement);['bg','land','coast','grid','ap','nav','route','own','txt','trf','mut'].forEach(n=>C[n]=cs.getPropertyValue('--'+n).trim())}
 theme((function(){try{return localStorage.getItem('dl.theme')||'night'}catch(e){return'night'}})());
 $('#bTheme').onclick=()=>{const o=['day','night','contrast'];theme(o[(o.indexOf(document.documentElement.dataset.theme)+1)%3])};
-function size(){dpr=devicePixelRatio||1;W=cv.clientWidth;H=cv.clientHeight;cv.width=W*dpr;cv.height=H*dpr}addEventListener('resize',size);size();
+/* The bitmap must always match the canvas box. A window resize is not the only
+   thing that moves it: the shell collapses the rail after the first paint, a
+   card can open, and on a vertical monitor the box is tall enough that a stale
+   width shows as a stretched chart. So the box itself is observed, and W/H are
+   only taken from it when it has actually changed. */
+let sizedW=0,sizedH=0;
+function size(){
+  const w=cv.clientWidth,h=cv.clientHeight;
+  if(w<1||h<1)return
+  if(w===sizedW&&h===sizedH&&cv.width===Math.round(w*(devicePixelRatio||1))&&cv.height===Math.round(h*(devicePixelRatio||1)))return;
+  sizedW=w;sizedH=h;dpr=devicePixelRatio||1;W=w;H=h;
+  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr)
+}
+addEventListener('resize',size);
+if(window.ResizeObserver)new ResizeObserver(()=>{const before=W+'x'+H;size();if(W+'x'+H!==before)render()}).observe(cv);
+size();
 /* traffic (simulated) */
 const T=[],WT={n:0,src:'',busy:0,fail:0,last:'',okAt:0};
 /* route */
@@ -604,7 +939,7 @@ const T=[],WT={n:0,src:'',busy:0,fail:0,last:'',okAt:0};
 function save(){try{localStorage.setItem('dl.route',JSON.stringify(route));mirrorRoute()}catch(e){}}
 function mirrorRoute(){try{
   const a=JSON.parse(localStorage.getItem('stratos.activeRoute')||'null')||{};
-  localStorage.setItem('stratos.activeRoute',JSON.stringify({...a,points:route.map(p=>({id:p.id,name:p.name||p.id,lat:p.lat,lon:p.lon,kind:p.k||'fix',elev:Number(p.elev)||0,ss:p.ss||'',aw:p.aw||''}))}));
+  localStorage.setItem('stratos.activeRoute',JSON.stringify({...a,points:route.map(p=>({id:p.id,name:p.name||p.id,lat:p.lat,lon:p.lon,kind:p.k||'fix',elev:Number(p.elev)||0,altFt:Number(p.altFt)||null,ss:p.ss||'',aw:p.aw||''}))}));
 }catch(e){}}
 function load(){
   try{const a=JSON.parse(localStorage.getItem('stratos.activeRoute')||'null');
@@ -625,6 +960,18 @@ function routeKindName(kind){const k=String(kind||'fix').toLowerCase();return k=
    wherever it was last left. */
 function fitRoute(){
   if(route.length<2||!W||!H)return false;
+  // On the sphere the framing is an angle: the route's own centre, then the zoom
+  // at which its farthest point lands well inside the visible disc.
+  if(V.mode==='globe'&&globeModule()){
+    const g=globeModule(),centre=g.vectorMeanCentre(route);
+    if(!centre)return false;
+    V.lon=centre.lon;V.lat=centre.lat;V.tz=null;V.in=null;setFol(false);
+    const farthest=Math.max(...route.map(p=>dist(centre,p)),1);
+    const theta=Math.min(Math.PI/2.05,(farthest/60)*R);
+    V.gz=Math.max(1,Math.min(40,.8/Math.max(.02,Math.sin(theta))));
+    GV.cache=null;
+    return true;
+  }
   // Normalised Web Mercator (0..1 across the world), so the same numbers work at
   // every zoom level.
   const pts=route.map(p=>{const q=wpx(p.lon,p.lat,0);return[q[0]/SZ,q[1]/SZ]});
@@ -658,7 +1005,7 @@ function addWp(o){route.push(wp(o));save();panel='route';trav=Math.min(trav,tota
 /* own-ship sim */
 function pos(d){const l=legs();let i=0;while(i<l.length-1&&d>l[i]){d-=l[i];i++}if(!route[i+1])return{lat:V.lat,lon:V.lon,hdg:0};const a=route[i],b=route[i+1],h=brg(a,b);return{...fwd(a,h,Math.min(d,l[i])),hdg:h}}
 function alt(d){const t=total();return Math.max(route[0]?.elev||0,Math.min(6500,route[0].elev+d*180,(route.at(-1).elev||0)+(t-d)*260))}
-function step(dt){fpTick();if(V.tz!=null){const diff=V.tz-V.z;if(Math.abs(diff)>0.001){const dz=diff*Math.min(1,dt*14);const newZ=Math.abs(diff)<0.002?V.tz:V.z+dz;if(V.anchor){const pNew=wpx(V.anchor.geo[0],V.anchor.geo[1],newZ);const dx=V.anchor.sx-W/2,dy=V.anchor.sy-H/2;const cNew=[pNew[0]-dx,pNew[1]-dy];const p=wun(cNew[0],cNew[1],newZ);V.lon=p[0];V.lat=p[1];V.z=newZ}else{V.z=newZ}if(V.z===V.tz){V.tz=null;V.anchor=null}}else{V.z=V.tz;V.tz=null;V.anchor=null}}if(V.in){const c=wpx(V.lon,V.lat,V.z),p=wun(c[0]-V.in[0]*dt,c[1]-V.in[1]*dt,V.z),f=Math.exp(-4*dt);V.lon=p[0];V.lat=p[1];V.in=[V.in[0]*f,V.in[1]*f];if(Math.hypot(V.in[0],V.in[1])<8)V.in=null}const ok=!!liveOk();$('#app').classList.toggle('live',ok);const tx=ok?'● Live from '+(live.d.src||'simulator'):(deskStatus&&deskStatus.state==='error'?'Bridge: '+(deskStatus.detail||'error — see Pilot → Settings'):deskStatus&&deskStatus.state!=='connected'&&deskStatus.state!=='stopped'?'Bridge: '+(deskStatus.detail||deskStatus.state):wtTxt());if($('#st').textContent!=tx)$('#st').textContent=tx;if(deskStatus)$('#st').title=deskStatus.detail||deskStatus.state;if(ok)liveStep(dt);else wtStep(dt);fcRender(ok);olTick();return;trav+=CRUISE/3600*dt*WARP;if(trav>=t)trav=0;const p=pos(trav);own.lat=p.lat;own.lon=p.lon;own.hdg=p.hdg;own.alt=alt(trav);own.vs=(alt(trav+.1)-own.alt)*CRUISE/6;
+function step(dt){fpTick();if(V.mode!=='globe'&&V.tz!=null){const diff=V.tz-V.z;if(Math.abs(diff)>0.001){const dz=diff*Math.min(1,dt*14);const newZ=Math.abs(diff)<0.002?V.tz:V.z+dz;if(V.anchor){const pNew=wpx(V.anchor.geo[0],V.anchor.geo[1],newZ);const dx=V.anchor.sx-W/2,dy=V.anchor.sy-H/2;const cNew=[pNew[0]-dx,pNew[1]-dy];const p=wun(cNew[0],cNew[1],newZ);V.lon=p[0];V.lat=p[1];V.z=newZ}else{V.z=newZ}if(V.z===V.tz){V.tz=null;V.anchor=null}}else{V.z=V.tz;V.tz=null;V.anchor=null}}if(V.mode!=='globe'&&V.in){const c=wpx(V.lon,V.lat,V.z),p=wun(c[0]-V.in[0]*dt,c[1]-V.in[1]*dt,V.z),f=Math.exp(-4*dt);V.lon=p[0];V.lat=p[1];V.in=[V.in[0]*f,V.in[1]*f];if(Math.hypot(V.in[0],V.in[1])<8)V.in=null}const ok=!!liveOk();$('#app').classList.toggle('live',ok);const tx=ok?'● Live from '+(live.d.src||'simulator'):(deskStatus&&deskStatus.state==='error'?'Bridge: '+(deskStatus.detail||'error — see Pilot → Settings'):deskStatus&&deskStatus.state!=='connected'&&deskStatus.state!=='stopped'?'Bridge: '+(deskStatus.detail||deskStatus.state):wtTxt());if($('#st').textContent!=tx)$('#st').textContent=tx;if(deskStatus)$('#st').title=deskStatus.detail||deskStatus.state;if(ok)liveStep(dt);else wtStep(dt);fcRender(ok);olTick();return;trav+=CRUISE/3600*dt*WARP;if(trav>=t)trav=0;const p=pos(trav);own.lat=p.lat;own.lon=p.lon;own.hdg=p.hdg;own.alt=alt(trav);own.vs=(alt(trav+.1)-own.alt)*CRUISE/6;
 T.forEach(a=>{const p=fwd(a,a.hdg,a.gs/3600*dt*WARP);a.lat=p.lat;a.lon=p.lon});
 const el=route.length>1?t-trav:0;$('#tGS').textContent=CRUISE;$('#tAL').textContent=Math.round(own.alt/10)*10;$('#tHD').textContent=String(Math.round(own.hdg)%360).padStart(3,'0');$('#tVS').textContent=Math.round(own.vs/50)*50;$('#tDS').textContent=el.toFixed(1);$('#tEt').textContent=hm(el/CRUISE);
 if(V.fol){V.lon=own.lon;V.lat=own.lat}}
@@ -666,22 +1013,22 @@ if(V.fol){V.lon=own.lon;V.lat=own.lat}}
 const ACI=new Map();function acImg(t,col){const key=t+'|'+col;if(ACI.has(key))return ACI.get(key);const icon=window.aircraftIcon?.(t,col);if(icon)ACI.set(key,icon);return icon}
 function drawAircraft(type,x,y,heading,color,size){const im=type&&acImg(type,color);cx.save();cx.translate(x,y);cx.rotate(((Number(heading)||0)*R));if(im){cx.drawImage(im,-size/2,-size/2,size,size)}else{cx.strokeStyle=color;cx.lineWidth=2;cx.beginPath();PL.forEach((p,i)=>i?cx.lineTo(p[0]*.7,p[1]*.7):cx.moveTo(p[0]*.7,p[1]*.7));cx.closePath();cx.fillStyle=color;cx.fill()}cx.restore()}
 function draw(){procTick();if(wpCard){const ck=V.lon.toFixed(5)+','+V.lat.toFixed(5)+','+V.z.toFixed(4)+','+W+'x'+H;if(ck!==cardView){cardView=ck;positionRouteCard()}}cx.setTransform(dpr,0,0,dpr,0,0);cx.fillStyle=C.bg;cx.fillRect(0,0,W,H);
-if(CH.on&&CH.pg!='sat'){cx.fillStyle='#fbfaf6';cx.fillRect(0,0,W,H)}else if(L.style=='world'){worldLayer()}else{cx.beginPath();[LAND,...EX].forEach(po=>{po.forEach((p,i)=>{const[x,y]=sc(p[0],p[1]);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.closePath()});if(!SAT()){cx.fillStyle=C.land;cx.fill();cx.strokeStyle=C.coast;cx.lineWidth=1.5;cx.stroke()}else drawTiles()}
+if(CH.on&&CH.pg!='sat'){cx.fillStyle='#fbfaf6';cx.fillRect(0,0,W,H)}else if(V.mode==='globe'){globeBase()}else if(L.style=='world'){worldLayer()}else{cx.beginPath();[LAND,...EX].forEach(po=>{po.forEach((p,i)=>{const[x,y]=sc(p[0],p[1]);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.closePath()});if(!SAT()){cx.fillStyle=C.land;cx.fill();cx.strokeStyle=C.coast;cx.lineWidth=1.5;cx.stroke()}else drawTiles()}
 const tl=wpx(V.lon,V.lat);
-if(L.grid&&V.z<12&&!CH.on){const s=V.z<4?10:V.z<5.5?5:V.z<7?2:V.z<8.5?1:V.z<10?.5:.1,a=wun(tl[0]-W/2,tl[1]-H/2),b=wun(tl[0]+W/2,tl[1]+H/2);cx.strokeStyle=C.grid;cx.lineWidth=1;cx.fillStyle=C.coast;cx.font='10px sans-serif';cx.beginPath();
+if(L.grid&&V.z<12&&!CH.on&&V.mode!=='globe'){const s=V.z<4?10:V.z<5.5?5:V.z<7?2:V.z<8.5?1:V.z<10?.5:.1,a=wun(tl[0]-W/2,tl[1]-H/2),b=wun(tl[0]+W/2,tl[1]+H/2);cx.strokeStyle=C.grid;cx.lineWidth=1;cx.fillStyle=C.coast;cx.font='10px sans-serif';cx.beginPath();
 for(let o=Math.ceil(a[0]/s)*s;o<b[0];o+=s){const x=sc(o,0)[0];cx.moveTo(x,0);cx.lineTo(x,H);cx.fillText(o.toFixed(s<1?1:0)+'°',x+2,H-100)}
 for(let t=Math.ceil(b[1]/s)*s;t<a[1];t+=s){const y=sc(0,t)[1];cx.moveTo(0,y);cx.lineTo(W,y);cx.fillText(t.toFixed(s<1?1:0)+'°',4,y-2)}cx.stroke()}
 const ppn=lat=>SZ*2**V.z/360/(60*Math.cos(lat*R));MKL.length=0;
-if(L.nav&&!CH.on)N.forEach(n=>{const[x,y]=sc(n.lon,n.lat);if(V.z<6)return;if(x<-20||x>W+20||y<-20||y>H+20)return;const t=String(n.type||'').toUpperCase(),kind=/NDB/.test(t)?'ndb':/VOR|TACAN|DME/.test(t)?'vor':'int';mkDraw(kind,x,y,mkR()*.8);if(V.z>5.5)mkText(n.id,x+Math.round(mkR()*.55)-4,y+4,mkColor(kind),11,false)});
-if(L.apt)A.forEach(a=>{if(CH.on&&a!==CH.a)return;const[x,y]=sc(a.lon,a.lat);if(a.x&&V.z<6)return;const mg=V.z>10?4000:60;if(x<-mg||x>W+mg||y<-mg||y>H+mg)return;
-if(V.z>8.5)drawReal(a,x,y);else a.det=false;if(0)pairs(a).forEach(pr=>{const n=pr[0],h=n*10,p=ppn(a.lat)*1.4,dx=Math.sin(h*R)*p,dy=-Math.cos(h*R)*p;cx.strokeStyle=C.ap;cx.lineWidth=Math.max(3,p/9);cx.lineCap='butt';cx.beginPath();cx.moveTo(x-dx,y-dy);cx.lineTo(x+dx,y+dy);cx.stroke()});
-if(a.det){}else if(V.z>8.5){cx.beginPath();cx.arc(x,y,3,0,7);cx.fillStyle=C.land;cx.fill();cx.strokeStyle=C.ap;cx.lineWidth=2.2;cx.stroke()}else mkRing(x,y,mkR()*.9,mkColor('apt'),1);
-if(V.z>(a.x?7:4.8)&&x>-40&&x<W+40&&y>-40&&y<H+40&&!(L.rte&&planTocTod().ids.has(String(a.id).toUpperCase())))mkText(a.id,x+Math.round(mkR()*.62)-3,y-6,SAT()?(DKM()?'#fff':'#111'):C.txt,12.5,true)});
+if(L.nav&&!CH.on)N.forEach(n=>{const q=vis(n.lon,n.lat);if(!q||lblZ()<6)return;const[x,y]=q;if(x<-20||x>W+20||y<-20||y>H+20)return;const t=String(n.type||'').toUpperCase(),kind=/NDB/.test(t)?'ndb':/VOR|TACAN|DME/.test(t)?'vor':'int';mkDraw(kind,x,y,mkRz()*.8);if(lblZ()>5.5)mkText(n.id,x+Math.round(mkRz()*.55)-4,y+4,mkColor(kind),11,false)});
+if(L.apt)A.forEach(a=>{if(CH.on&&a!==CH.a)return;const q=vis(a.lon,a.lat);if(!q)return;const[x,y]=q;if(a.x&&lblZ()<6)return;const mg=lblZ()>10?4000:60;if(x<-mg||x>W+mg||y<-mg||y>H+mg)return;
+if(V.mode!=='globe'&&V.z>8.5)drawReal(a,x,y);else a.det=false;if(0)pairs(a).forEach(pr=>{const n=pr[0],h=n*10,p=ppn(a.lat)*1.4,dx=Math.sin(h*R)*p,dy=-Math.cos(h*R)*p;cx.strokeStyle=C.ap;cx.lineWidth=Math.max(3,p/9);cx.lineCap='butt';cx.beginPath();cx.moveTo(x-dx,y-dy);cx.lineTo(x+dx,y+dy);cx.stroke()});
+if(a.det){}else if(V.mode!=='globe'&&V.z>8.5){cx.beginPath();cx.arc(x,y,3,0,7);cx.fillStyle=C.land;cx.fill();cx.strokeStyle=C.ap;cx.lineWidth=2.2;cx.stroke()}else mkRing(x,y,mkRz()*.9,mkColor('apt'),1);
+if(lblZ()>(a.x?7:4.8)&&x>-40&&x<W+40&&y>-40&&y<H+40&&!(L.rte&&planTocTod().ids.has(String(a.id).toUpperCase())))mkText(a.id,x+Math.round(mkRz()*.62)-3,y-6,SAT()?(DKM()?'#fff':'#111'):C.txt,12.5,true)});
 drawProcedurePaths();if(route.length&&!CH.on&&L.rte){cx.save();cx.globalAlpha=.35;cx.strokeStyle=C.route;cx.lineWidth=12;cx.lineCap='round';cx.lineJoin='round';cx.beginPath();route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke();if(liveOk()&&route.length>1){const pr=routeProg(),pts=[route[0]];let acc=0;for(let i=0;i<route.length-1;i++){acc+=dist(route[i],route[i+1]);if(acc<pr)pts.push(route[i+1])}pts.push(pos(pr));cx.globalAlpha=.6;cx.beginPath();pts.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke()}cx.restore()
 drawRouteMarkers();}
-trails();if(L.trf&&!CH.on)T.forEach(a=>{const[x,y]=sc(a.lon,a.lat);drawAircraft(a.type,x,y,a.hdg,C.trf,32);if(V.z>6&&x>-40&&x<W+40&&y>-20&&y<H+20)mkText(a.id+' '+Math.round(a.alt/100),x+4,y+4,C.trf,10,false)});
-if(liveOk()){const[x,y]=sc(own.lon,own.lat);cx.beginPath();cx.arc(x,y,19,0,7);cx.strokeStyle=C.own;cx.globalAlpha=.38;cx.lineWidth=1.5;cx.stroke();cx.globalAlpha=1;drawAircraft(live.d?.type||live.d?.aircraft||live.d?.aircraftType,x,y,own.hdg,C.own,40)}
-if(CH.on)chartFx();if(sel&&!CH.on){const q=sel.k=='own'?own:sel,[x,y]=sc(q.lon,q.lat);cx.strokeStyle=C.txt;cx.lineWidth=2;cx.beginPath();cx.arc(x,y,16+(tk?3*Math.sin(performance.now()/260):0),0,7);cx.stroke()}}
+trails();if(L.trf&&!CH.on)T.forEach(a=>{const q=vis(a.lon,a.lat);if(!q)return;const[x,y]=q;drawAircraft(a.type,x,y,a.hdg,C.trf,32);if(lblZ()>6&&x>-40&&x<W+40&&y>-20&&y<H+20)mkText(a.id+' '+Math.round(a.alt/100),x+4,y+4,C.trf,10,false)});
+if(liveOk()){const q=vis(own.lon,own.lat);if(q){const[x,y]=q;cx.beginPath();cx.arc(x,y,19,0,7);cx.strokeStyle=C.own;cx.globalAlpha=.38;cx.lineWidth=1.5;cx.stroke();cx.globalAlpha=1;drawAircraft(live.d?.type||live.d?.aircraft||live.d?.aircraftType,x,y,own.hdg,C.own,40)}}
+if(CH.on)chartFx();if(sel&&!CH.on){const s0=sel.k=='own'?own:sel,p0=vis(s0.lon,s0.lat);if(p0){const[x,y]=p0;cx.strokeStyle=C.txt;cx.lineWidth=2;cx.beginPath();cx.arc(x,y,16+(tk?3*Math.sin(performance.now()/260):0),0,7);cx.stroke()}}}
 
 /* ── Waypoint markers ─────────────────────────────────────────────────
    One chart-style symbol per aeronautical meaning: a blue crosshair for an
@@ -914,7 +1261,7 @@ function drawProcedurePaths(){
   const list=[PROCG.sid,PROCG.star].filter(item=>item&&item.points&&item.points.length>1);
   if(!list.length)return;
   cx.save();cx.globalAlpha=.8;cx.strokeStyle=C.route;cx.lineWidth=9;cx.lineCap='round';cx.lineJoin='round';
-  list.forEach(item=>{cx.beginPath();item.points.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke()});
+  list.forEach(item=>{cx.beginPath();let pen=false;item.points.forEach(p=>{const q=vis(p.lon,p.lat);if(!q){pen=false;return}if(pen)cx.lineTo(q[0],q[1]);else cx.moveTo(q[0],q[1]);pen=true});cx.stroke()});
   cx.restore()
 }
 function mkPlanLabel(kind,x,y,r,alt,source){
@@ -926,9 +1273,11 @@ function mkPlanLabel(kind,x,y,r,alt,source){
 function drawRouteMarkers(){
   if(!route.length||CH.on||!L.rte)return;
   if(wpIdx!=null&&!route[wpIdx])wpIdx=null;
-  const plan=planTocTod(),n=route.length,r=mkR();
+  const plan=planTocTod(),n=route.length,r=mkRz();
   for(let i=0;i<n;i++){
-    const p=route[i],[x,y]=sc(p.lon,p.lat);
+    const p=route[i],q=vis(p.lon,p.lat);
+    if(!q)continue;
+    const[x,y]=q;
     if(x<-30||x>W+30||y<-30||y>H+30)continue;
     const kind=routeKind(p),end=i===0||i===n-1,chosen=wpIdx===i,col=chosen?mkSelColor():null;
     if(kind=='toc'||kind=='tod'){
@@ -938,7 +1287,7 @@ function drawRouteMarkers(){
     if(chosen)mkSelHalo(x,y,kind=='apt'?r*1.05:r);
     mkDraw(kind,x,y,kind=='apt'?r*1.05:r,col);
     if(V.z>=4||end||chosen)mkText(String(p.id||'').toUpperCase(),x+Math.round(r*.55)-4,y+14,col||mkColor(kind),12,end||chosen)}
-  const planPoint=(kind,m,alt,src)=>{const[x,y]=sc(m.lon,m.lat);if(x<-30||x>W+30||y<-30||y>H+30)return;mkPlanLabel(kind,x,y,r*1.05,alt,src)};
+  const planPoint=(kind,m,alt,src)=>{const q=vis(m.lon,m.lat);if(!q)return;const[x,y]=q;if(x<-30||x>W+30||y<-30||y>H+30)return;mkPlanLabel(kind,x,y,r*1.05,alt,src)};
   if(plan.toc&&!plan.hasToc)planPoint('toc',plan.toc,plan.toc.altFt||plan.cruise,plan.toc.source);
   if(plan.tod&&!plan.hasTod)planPoint('tod',plan.tod,plan.tod.altFt||Number(route[n-1].elev)||0,plan.tod.source);
   /* Every leg of LEG_MIN_NM or more carries its distance and initial heading.
@@ -947,8 +1296,9 @@ function drawRouteMarkers(){
   for(let i=0;i<n-1;i++){
     const a=route[i],b=route[i+1],nm=dist(a,b);
     if(!(nm>=LEG_MIN_NM))continue;
-    const[ax,ay]=sc(a.lon,a.lat),[bx,by]=sc(b.lon,b.lat);
-    mkLegTag(ax,ay,bx,by,nm,brg(a,b))}}
+    const qa=vis(a.lon,a.lat),qb=vis(b.lon,b.lat);
+    if(!qa||!qb)continue;
+    mkLegTag(qa[0],qa[1],qb[0],qb[1],nm,brg(a,b))}}
 window.addEventListener('aircraft-atlas-ready', draw);
 let last=performance.now(),lastDraw=0;
 const frameMs=1000/RP.fps;
@@ -964,14 +1314,14 @@ requestAnimationFrame(function loop(t){
 /* interaction */
 let drag=null,pinch=null;
 cv.onpointerdown=e=>{V.in=null;V.tz=null;V.anchor=null;cv.setPointerCapture(e.pointerId);drag={startX:e.clientX,startY:e.clientY,startLon:V.lon,startLat:V.lat,m:0,t:performance.now(),px:e.clientX,py:e.clientY,wp:plan&&!CH.on?wpAt(e.clientX,e.clientY):-1}};
-cv.onpointermove=e=>{if(!drag||pinch)return;const nw=performance.now();if(drag.t){const k=Math.max(1,nw-drag.t);drag.vx=(e.clientX-drag.px)/k*1000;drag.vy=(e.clientY-drag.py)/k*1000}drag.t=nw;drag.px=e.clientX;drag.py=e.clientY;const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;drag.m=Math.max(drag.m,Math.hypot(dx,dy));if(drag.wp>=0&&drag.m>4){moveWp(drag.wp,e.clientX,e.clientY);return}if(drag.m>4){setFol(false);tk=false;const c0=wpx(drag.startLon,drag.startLat,V.z),p=wun(c0[0]-dx,c0[1]-dy,V.z);V.lon=p[0];V.lat=p[1]}};
+cv.onpointermove=e=>{if(!drag||pinch)return;const nw=performance.now();if(drag.t){const k=Math.max(1,nw-drag.t);drag.vx=(e.clientX-drag.px)/k*1000;drag.vy=(e.clientY-drag.py)/k*1000}drag.t=nw;drag.px=e.clientX;drag.py=e.clientY;const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;drag.m=Math.max(drag.m,Math.hypot(dx,dy));if(drag.wp>=0&&drag.m>4){moveWp(drag.wp,e.clientX,e.clientY);return}if(drag.m>4){setFol(false);tk=false;if(V.mode==='globe'){GV.moved=performance.now();const g=globeModule(),c=g&&g.orbitBy({lat:drag.startLat,lon:drag.startLon},dx,dy,globeR());if(c){V.lon=c.lon;V.lat=c.lat}}else{const c0=wpx(drag.startLon,drag.startLat,V.z),p=wun(c0[0]-dx,c0[1]-dy,V.z);V.lon=p[0];V.lat=p[1]}}};
 cv.onpointerup=e=>{if(drag&&drag.wp>=0&&drag.m>4){moveWp(drag.wp,e.clientX,e.clientY);save();render();drag=null;return}if(drag&&drag.m>4&&drag.vx!=null&&performance.now()-drag.t<90)V.in=[drag.vx,drag.vy];if(drag&&drag.m<=4&&!pinch&&drag.wp>=0&&route[drag.wp]){wpIdx=drag.wp;openRouteCard({kind:'wp',index:drag.wp},e.clientX,e.clientY)}else if(drag&&drag.m<=4&&!pinch)tap(e.clientX,e.clientY);drag=null};
-cv.addEventListener('touchstart',e=>{if(e.touches.length==2){drag=null;V.in=null;V.tz=null;V.anchor=null;const t1=e.touches[0],t2=e.touches[1],d=Math.max(1,Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY)),mx=(t1.clientX+t2.clientX)/2,my=(t1.clientY+t2.clientY)/2,c=wpx(V.lon,V.lat,V.z);pinch={d,mx,my,z:V.z,geo:wun(c[0]+mx-W/2,c[1]+my-H/2,V.z)}}},{passive:true});
-cv.addEventListener('touchmove',e=>{if(e.touches.length==2){const t1=e.touches[0],t2=e.touches[1],d=Math.max(1,Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY)),mx=(t1.clientX+t2.clientX)/2,my=(t1.clientY+t2.clientY)/2;if(!pinch){const c=wpx(V.lon,V.lat,V.z);pinch={d,mx,my,z:V.z,geo:wun(c[0]+mx-W/2,c[1]+my-H/2,V.z)};return}setFol(false);tk=false;const newZ=Math.max(2.5,Math.min(17.5,pinch.z+Math.log2(d/pinch.d))),pNew=wpx(pinch.geo[0],pinch.geo[1],newZ),dx=mx-W/2,dy=my-H/2,cNew=[pNew[0]-dx,pNew[1]-dy],p=wun(cNew[0],cNew[1],newZ);V.lon=p[0];V.lat=p[1];V.z=newZ}},{passive:true});
+cv.addEventListener('touchstart',e=>{if(e.touches.length==2){drag=null;V.in=null;V.tz=null;V.anchor=null;const t1=e.touches[0],t2=e.touches[1],d=Math.max(1,Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY)),mx=(t1.clientX+t2.clientX)/2,my=(t1.clientY+t2.clientY)/2,c=wpx(V.lon,V.lat,V.z);pinch={d,mx,my,z:V.z,gz:V.gz,geo:wun(c[0]+mx-W/2,c[1]+my-H/2,V.z)}}},{passive:true});
+cv.addEventListener('touchmove',e=>{if(e.touches.length==2){const t1=e.touches[0],t2=e.touches[1],d=Math.max(1,Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY)),mx=(t1.clientX+t2.clientX)/2,my=(t1.clientY+t2.clientY)/2;if(!pinch){const c=wpx(V.lon,V.lat,V.z);pinch={d,mx,my,z:V.z,gz:V.gz,geo:wun(c[0]+mx-W/2,c[1]+my-H/2,V.z)};return}setFol(false);tk=false;if(V.mode==='globe'){const target=Math.max(1,Math.min(40,(pinch.gz||1)*(d/pinch.d)));globeZoomAbout(mx,my,target/V.gz);return}const newZ=Math.max(2.5,Math.min(17.5,pinch.z+Math.log2(d/pinch.d))),pNew=wpx(pinch.geo[0],pinch.geo[1],newZ),dx=mx-W/2,dy=my-H/2,cNew=[pNew[0]-dx,pNew[1]-dy],p=wun(cNew[0],cNew[1],newZ);V.lon=p[0];V.lat=p[1];V.z=newZ}},{passive:true});
 cv.addEventListener('touchend',e=>{if(e.touches.length<2){pinch=null;drag=null}});
-cv.onwheel=e=>{e.preventDefault();V.in=null;setFol(false);const base=V.tz==null?V.z:V.tz,targetZ=Math.max(2.5,Math.min(17.5,base-e.deltaY*0.0025)),c=wpx(V.lon,V.lat,V.z),geo=wun(c[0]+e.clientX-W/2,c[1]+e.clientY-H/2,V.z);V.anchor={sx:e.clientX,sy:e.clientY,geo};V.tz=targetZ};
-$('#bZi').onclick=()=>{V.in=null;setFol(false);V.anchor={sx:W/2,sy:H/2,geo:[V.lon,V.lat]};V.tz=Math.min(17.5,(V.tz==null?V.z:V.tz)+.7)};
-$('#bZo').onclick=()=>{V.in=null;setFol(false);V.anchor={sx:W/2,sy:H/2,geo:[V.lon,V.lat]};V.tz=Math.max(2.5,(V.tz==null?V.z:V.tz)-.7)};
+cv.onwheel=e=>{e.preventDefault();V.in=null;setFol(false);if(V.mode==='globe'){globeZoomAbout(e.clientX,e.clientY,2**(-e.deltaY*0.0025));return}const base=V.tz==null?V.z:V.tz,targetZ=Math.max(2.5,Math.min(17.5,base-e.deltaY*0.0025)),c=wpx(V.lon,V.lat,V.z),geo=wun(c[0]+e.clientX-W/2,c[1]+e.clientY-H/2,V.z);V.anchor={sx:e.clientX,sy:e.clientY,geo};V.tz=targetZ};
+$('#bZi').onclick=()=>{V.in=null;setFol(false);if(V.mode==='globe'){globeZoomAbout(W/2,H/2,1.4);return}V.anchor={sx:W/2,sy:H/2,geo:[V.lon,V.lat]};V.tz=Math.min(17.5,(V.tz==null?V.z:V.tz)+.7)};
+$('#bZo').onclick=()=>{V.in=null;setFol(false);if(V.mode==='globe'){globeZoomAbout(W/2,H/2,1/1.4);return}V.anchor={sx:W/2,sy:H/2,geo:[V.lon,V.lat]};V.tz=Math.max(2.5,(V.tz==null?V.z:V.tz)-.7)};
 function setFol(v){V.fol=v;$('#bFol').classList.toggle('on',v)}
 function askSimbriefId(){return new Promise(res=>{const b=document.createElement('div');b.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999';b.innerHTML='<form style="background:#111a24;color:#e6edf4;padding:18px;border-radius:10px;min-width:280px;font:14px system-ui"><div style="margin-bottom:10px">Enter your SimBrief Username or Pilot ID</div><input name="v" autocomplete="off" style="width:100%;box-sizing:border-box;padding:6px"><div style="margin-top:12px;text-align:right"><button type="button" data-c>Cancel</button> <button type="submit">OK</button></div></form>';document.body.appendChild(b);const done=v=>{b.remove();res(v)};b.querySelector('form').onsubmit=e=>{e.preventDefault();done(b.querySelector('input').value.trim()||null)};b.querySelector('[data-c]').onclick=()=>done(null);b.querySelector('input').focus();});}
 // Planning descent gradient in ft per nm. Calibrated to a real sim descent that started ~2 nm after NOSIT
@@ -1064,11 +1414,11 @@ function applyTrafficSource(next,save){
   const st=document.getElementById('st');if(st&&!liveOk()&&!deskStatus)st.textContent=t;
 }
 /* Index of the route waypoint under a screen point, or -1. */
-function wpAt(x,y){const r=cv.getBoundingClientRect();x-=r.left;y-=r.top;let best=-1,bd=Math.max(18,mkR()+9);route.forEach((p,i)=>{const[a,b]=sc(p.lon,p.lat),d=Math.hypot(a-x,b-y);if(d<bd){bd=d;best=i}});return best}
+function wpAt(x,y){const r=cv.getBoundingClientRect();x-=r.left;y-=r.top;let best=-1,bd=Math.max(18,mkRz()+9);route.forEach((p,i)=>{const q=vis(p.lon,p.lat);if(!q)return;const d=Math.hypot(q[0]-x,q[1]-y);if(d<bd){bd=d;best=i}});return best}
 /* Move one waypoint to the point under the pointer (live, no undo stack here). */
-function moveWp(i,x,y){const r=cv.getBoundingClientRect();x-=r.left;y-=r.top;const c=wpx(V.lon,V.lat,V.z);const p=wun(c[0]+x-W/2,c[1]+y-H/2,V.z);route[i]={...route[i],lat:p[1],lon:p[0]};trav=Math.min(trav,total());if(panel=='route')render()}
+function moveWp(i,x,y){const r=cv.getBoundingClientRect();x-=r.left;y-=r.top;const p=unvis(x,y);if(!p)return;route[i]={...route[i],lat:p[1],lon:p[0]};trav=Math.min(trav,total());if(panel=='route')render()}
 /* Index of the route leg under a screen point (its start waypoint), or -1. */
-function legAt(x,y){const r=cv.getBoundingClientRect();x-=r.left;y-=r.top;let best=-1,bd=10;for(let i=0;i<route.length-1;i++){const[ax,ay]=sc(route[i].lon,route[i].lat),[bx,by]=sc(route[i+1].lon,route[i+1].lat),dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy,t=l2?Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/l2)):0,d=Math.hypot(ax+dx*t-x,ay+dy*t-y);if(d<bd){bd=d;best=i}}return best}
+function legAt(x,y){const r=cv.getBoundingClientRect();x-=r.left;y-=r.top;let best=-1,bd=10;for(let i=0;i<route.length-1;i++){const pa=vis(route[i].lon,route[i].lat),pb=vis(route[i+1].lon,route[i+1].lat);if(!pa||!pb)continue;const[ax,ay]=pa,[bx,by]=pb,dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy,t=l2?Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/l2)):0,d=Math.hypot(ax+dx*t-x,ay+dy*t-y);if(d<bd){bd=d;best=i}}return best}
 /* ── Route card ──────────────────────────────────────────────────────────
    Clicking a waypoint, or the line between two waypoints, opens a small
    floating card next to that point. It is the only thing a route click does:
@@ -1130,7 +1480,9 @@ function routeCardHtml(){
 function positionRouteCard(){
   const el=document.getElementById('wpcard'),host=$('#app');
   if(!el||!wpCard||!host)return;
-  const [sx,sy]=sc(wpCard.anchor.lon,wpCard.anchor.lat);
+  // The card points at its waypoint when that waypoint faces the camera; after a
+  // turn of the globe it falls back to the middle rather than to the limb.
+  const [sx,sy]=vis(wpCard.anchor.lon,wpCard.anchor.lat)||[W/2,H/2];
   const bw=el.offsetWidth||320,bh=el.offsetHeight||0,rw=host.clientWidth,rh=host.clientHeight;
   let left=sx+22,top=sy-16;
   if(left+bw>rw-8)left=sx-bw-22;
@@ -1179,19 +1531,19 @@ if(route.length&&L.rte){const wi=wpAt(x,y);if(wi>=0){wpIdx=wi;openRouteCard({kin
 closeRouteCard();wpIdx=null;sel=null;
 x-=rect.left;y-=rect.top;let best=null,bestD=Infinity;
 const items=[...(L.trf?T.map(o=>[o,18]):[]),...(L.apt?A.filter(a=>!a.x||V.z>=6).map(o=>[o,14]):[]),...(L.nav&&V.z>=6?N.map(o=>[o,12]):[]),...(liveOk()?[[{k:'own',id:'Own-ship',...own},22]]:[])];
-items.forEach(([o,rad])=>{const[a,b]=sc(o.lon,o.lat);let d=Math.hypot(a-x,b-y);if(o.det&&o.rpx)d=Math.max(d-o.rpx,0);if(d<=rad&&d<bestD){bestD=d;best=o}});
+items.forEach(([o,rad])=>{const q=vis(o.lon,o.lat);if(!q)return;let d=Math.hypot(q[0]-x,q[1]-y);if(o.det&&o.rpx)d=Math.max(d-o.rpx,0);if(d<=rad&&d<bestD){bestD=d;best=o}});
 if(best){sel=best;if(best.k=='trf'){tk=true;setFol(false);trafficBackfill(best)}panel=null;render();fCard()}
 else{panel=null;render()}}
 /* search */
 $('#q').oninput=e=>{const q=e.target.value.trim().toLowerCase(),r=$('#res');if(!q){r.style.display='none';return}
 const m=[...A,...N].filter(o=>o.id.toLowerCase().includes(q)||o.name.toLowerCase().includes(q)).sort((a,b)=>b.id.toLowerCase().startsWith(q)-a.id.toLowerCase().startsWith(q)).slice(0,8);
 r.innerHTML=m.map(o=>`<div data-id="${esc(o.id)}" data-k="${esc(o.k)}"><b>${esc(o.id)}</b> ${esc(o.name)} <span class="m">${o.k=='apt'?'airport':esc(o.type||'')}</span></div>`).join('')||'<div class="m">No match in bundled data</div>';r.style.display='block'};
-$('#res').onclick=e=>{const d=e.target.closest('[data-id]');if(!d)return;const o=[...A,...N].find(x=>x.id==d.dataset.id&&x.k==d.dataset.k);setFol(false);V.lon=o.lon;V.lat=o.lat;V.tz=null;V.z=o.k=='apt'?11.5:9;sel=o;panel='sel';$('#res').style.display='none';$('#q').value='';render();if(o.k=='apt')openCharts(o)};
+$('#res').onclick=e=>{const d=e.target.closest('[data-id]');if(!d)return;const o=[...A,...N].find(x=>x.id==d.dataset.id&&x.k==d.dataset.k);setFol(false);V.lon=o.lon;V.lat=o.lat;V.tz=null;focusZoom(o.k=='apt'?11.5:9);sel=o;panel='sel';$('#res').style.display='none';$('#q').value='';render();if(o.k=='apt')openCharts(o)};
 /* flight summary: built from the route and the saved SimBrief plan (flightpanel.js) */
 let fsTab='overview';
 function fsumHtml(){const stored=window.FP?FP.loadOfp(localStorage):null;const metars={};A.forEach(a=>{if(a.metar&&a.mt)metars[a.id]={metar:a.metar,fetchedAt:a.mt,source:'METAR'}});const position=liveOk()?{lat:own.lat,lon:own.lon}:null;const body=window.FP?FP.flightSummaryHtml({route,ofp:stored?stored.ofp:null,cruiseKts:CRUISE,weightUnit:'kg',metars,position,tab:fsTab}):'<div class="m">The summary is still loading. Try again in a moment.</div>';return'<h3>Flight summary</h3>'+body+'<div class="row"><button onclick="fsRefresh()">Refresh OFP</button><button onclick="panel=\'route\';render()">Back to route</button></div>'}
 async function fsRefresh(){await importSB();panel='fsum';render()}
-function fsFocus(id){const p=route.find(x=>x.id==id)||[...A,...N].find(x=>x.id==id);if(!p)return;setFol(false);V.lon=p.lon;V.lat=p.lat;V.tz=null;if(p.k=='apt')V.z=Math.max(V.z,11.5);if(innerWidth<768)panel=null;render()}
+function fsFocus(id){const p=route.find(x=>x.id==id)||[...A,...N].find(x=>x.id==id);if(!p)return;setFol(false);V.lon=p.lon;V.lat=p.lat;V.tz=null;if(p.k=='apt')focusAtLeast(11.5);if(innerWidth<768)panel=null;render()}
 $('#sheet').addEventListener('click',e=>{const b=e.target.closest('[data-fs-focus]');if(b){fsFocus(b.dataset.fsFocus);return}const t=e.target.closest('[data-ov-tab]');if(t){fsTab=t.dataset.ovTab;panel='fsum';render()}});
 /* panels */
 function wind(m){const r=m.match(/(\d{3}|VRB)(\d{2,3})(G(\d{2,3}))?KT/);return r?{d:r[1]=='VRB'?null:+r[1],s:+r[2],g:r[4]?+r[4]:0}:null}
@@ -1307,8 +1659,11 @@ $('#bLay').onclick=()=>{const l=$('#lay');l.style.display=l.style.display=='flex
 $('#bMap').onclick=()=>{panel=null;sel=null;tk=false;render()};
 $('#st').onclick=()=>{panel='live';render()};
 function TILED(){if(!RP.tiles)return false;if(CH.on)return CH.pg=='sat'&&!(TS.ok==0&&TS.err>6);return L.style!='vec'&&L.style!='world'&&!(TS.ok==0&&TS.err>6)}
-function SAT(){return TILED()}
-function DKM(){return TILED()&&(L.style=='sat'||L.style=='hyb'||L.style=='dk')}
+/* A globe painted from imagery or terrain is the same situation as a satellite
+   chart: labels must be light with a dark halo, and the night marker palette is
+   the readable one. An outlines globe is vector land, so it follows the theme. */
+function SAT(){return V.mode==='globe'?globePicture():TILED()}
+function DKM(){return V.mode==='globe'?globePicture():(TILED()&&(L.style=='sat'||L.style=='hyb'||L.style=='dk'))}
 function PVC(){const s=L.style;return !TILED()?C.txt:(s=='sat'||s=='hyb')?'#d8d8d8':s=='dk'?'#a9b4bd':'#4a4f55'}
 function PVA(){const s=L.style;return !TILED()?1:(s=='sat'||s=='hyb')?.45:.92}
 function TWC(){const s=L.style;return !TILED()?C.coast:(s=='sat'||s=='hyb')?'#ffe27a':s=='dk'?'#5d6872':'#8a8f96'}
@@ -1429,6 +1784,40 @@ function drawTiles(){const l=L.style;tl(l=='hyb'?'sat':l);if(l=='hyb')tl('lab');
 function msUi(){const e=$('#ms');if(!e)return;e.innerHTML=Object.keys(MS).map(k=>'<button data-ms="'+k+'" class="'+(L.style==k?'on':'')+'">'+MS[k].n+'</button>').join('')}
 $('#ms').onclick=e=>{const k=e.target.dataset&&e.target.dataset.ms;if(!k)return;L.style=k;try{localStorage.setItem('dl.style',k)}catch(_){}TS.err=0;msUi()};
 msUi();
+/* Flat chart or globe, and what the globe is painted with. The buttons are built
+   from the module's own style table, so a surface cannot be offered here that
+   the code does not know how to paint. */
+function pjUi(){
+  const e=$('#pj');if(!e)return;
+  const ready=globeStyles().length>0;
+  e.innerHTML=[['plane','Flat chart'],['globe','Globe']].map(([m,n])=>
+    '<button type="button" data-pj="'+m+'" class="'+(V.mode===m?'on':'')+'" aria-pressed="'+(V.mode===m)+'"'+
+    (m==='globe'&&(!ready||CH.on)?' disabled':'')+' title="'+esc(!ready?'The globe module has not loaded yet':CH.on?'Close the chart to use the globe':m==='globe'?'A movable globe of the same plan':'The flat chart')+'">'+n+'</button>').join('');
+  const wrap=$('#gwrap');if(wrap)wrap.hidden=V.mode!=='globe';
+  gsUi();
+}
+function gsUi(){
+  const e=$('#gs');if(!e)return;
+  e.innerHTML=globeStyles().map(s=>'<button type="button" data-gs="'+s.id+'" class="'+(s.id===V.gs?'on':'')+'" aria-pressed="'+(s.id===V.gs)+'" title="'+esc(s.hint)+'">'+esc(s.label)+'</button>').join('');
+}
+$('#pj').onclick=e=>{const m=e.target.dataset&&e.target.dataset.pj;if(!m)return;globeMode(m)};
+$('#gs').onclick=e=>{const id=e.target.dataset&&e.target.dataset.gs;if(!id)return;setGlobeSurface(id)};
+$('#gReset').onclick=()=>globeReset();
+$('#gRead').onclick=()=>{if(!globeRead())GV.msg='Read terrain needs the globe: press Globe first.';GV.noteAt=0;gNote()};
+/* A remembered projection and surface are applied when the module arrives — and
+   the module arriving is what makes the Globe button usable at all. */
+function restoreGlobe(){
+  if(!globeModule())return false;
+  let mode='plane',surface='vector';
+  try{mode=localStorage.getItem('dl.mode')||'plane';surface=localStorage.getItem('dl.globe')||'vector'}catch(_){}
+  V.gs=globeStyle(surface).id;
+  if(mode==='globe')globeMode('globe');
+  pjUi();gsUi();globeAttr();gNote();
+  return true;
+}
+addEventListener('stratos-globe-ready',()=>{if(restoreGlobe()&&V.mode==='globe'&&route.length>1)fitRoute()});
+restoreGlobe();
+pjUi();gsUi();globeAttr();
 
 function tileImg(z,x,y){const k=z+'/'+x+'/'+y;let t=TC.get(k);if(!t){t={i:new Image(),ok:0,t:0};t.i.onload=()=>{t.ok=1;t.t=performance.now();TS.ok++};t.i.onerror=()=>{TS.err++};t.i.src=location.protocol=='http:'?'/tile/'+k+'.jpg':'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/'+z+'/'+y+'/'+x;TC.set(k,t);if(TC.size>500)TC.delete(TC.keys().next().value)}return t}
 function drawSat(){const Z=Math.min(18,Math.max(0,Math.ceil(V.z-.25))),s=256*2**(V.z-Z),c=wpx(V.lon,V.lat),n=2**Z,now=performance.now(),x0=Math.max(0,Math.floor((c[0]-W/2)/s)),x1=Math.min(n-1,Math.floor((c[0]+W/2)/s)),y0=Math.max(0,Math.floor((c[1]-H/2)/s)),y1=Math.min(n-1,Math.floor((c[1]+H/2)/s));
@@ -1483,7 +1872,7 @@ function trafficBackfill(o){
    survive the refresh instead of being replaced by new objects. */
 function vatsimTraffic(){
   if(TRS!='vatsim'||!vatsimFeed||vatsimFeed.error||!window.VATSIM){WT.n=T.length;return}
-  const pilots=window.VATSIM.parsePilots(vatsimFeed);const pad=.75,inView=p=>{if(!W||!H)return true;const[x,y]=sc(p.lon,p.lat);return x>=-W*pad&&x<=W*(1+pad)&&y>=-H*pad&&y<=H*(1+pad)};
+  const pilots=window.VATSIM.parsePilots(vatsimFeed);const pad=.75,inView=p=>{if(!W||!H)return true;const q=vis(p.lon,p.lat);if(!q)return false;const[x,y]=q;return x>=-W*pad&&x<=W*(1+pad)&&y>=-H*pad&&y<=H*(1+pad)};
   const seen=new Map();
   pilots.filter(inView).forEach(p=>{trlAdd(p.id,p.lat,p.lon,p.alt,400);seen.set(p.id,p)});
   const known=new Map();T.forEach(a=>{if(a.source=='vatsim')known.set(a.id,a)});
@@ -1608,7 +1997,7 @@ function openStream(base){
   live.base=base;
   try{
     const es=new EventSource(base+'/stream');
-    es.onmessage=e=>{try{            live.d=JSON.parse(e.data);live.at=performance.now();seedTrail(live.d.currentFlight);if(live.d.trt!==live.trt){live.trt=live.d.trt;T.length=0;(live.d.tr||[]).forEach(a=>{T.push({k:'trf',seen:Date.now(),...a});trlAdd(a.hx||a.id,a.lat,a.lon,a.alt,400)});if(sel&&sel.k=='trf'){const n=T.find(a=>a.id==sel.id);if(n)sel=n}}if(live.d.lat!=null&&!live.seen){live.seen=1;V.lon=live.d.lon;V.lat=live.d.lat;V.tz=null;V.z=Math.max(V.z,9);setFol(true);if(panel=='live')render()}}catch(_){}};
+    es.onmessage=e=>{try{            live.d=JSON.parse(e.data);live.at=performance.now();seedTrail(live.d.currentFlight);if(live.d.trt!==live.trt){live.trt=live.d.trt;T.length=0;(live.d.tr||[]).forEach(a=>{T.push({k:'trf',seen:Date.now(),...a});trlAdd(a.hx||a.id,a.lat,a.lon,a.alt,400)});if(sel&&sel.k=='trf'){const n=T.find(a=>a.id==sel.id);if(n)sel=n}}if(live.d.lat!=null&&!live.seen){live.seen=1;V.lon=live.d.lon;V.lat=live.d.lat;V.tz=null;focusAtLeast(9);setFol(true);if(panel=='live')render()}}catch(_){}};
     es.onerror=()=>{if(live.es===es)live.at=0};
     live.es=es
   }catch(_){live.on=false}}
@@ -1672,7 +2061,7 @@ EX.push([[26,40.8],[29,41],[36,41.5],[41,41],[41.5,43],[37.5,45],[39,47],[40,47.
 [[-77.3,8.7],[-75.5,10.5],[-72,12],[-71.5,10.8],[-68,10.6],[-64,10.6],[-61,10.5],[-60,8.5],[-57,6],[-54,5.8],[-52,4.8],[-50,1.8],[-50,0],[-48,-1],[-44.5,-2.5],[-41,-2.9],[-38,-4],[-35,-5.5],[-34.8,-8],[-37,-11.5],[-38.9,-14],[-39,-17.7],[-41,-22],[-43.2,-23],[-46.5,-24],[-48.5,-26],[-48.6,-28.5],[-52,-32],[-53.5,-34],[-56,-34.8],[-57.3,-36.5],[-57.5,-38.2],[-62,-39],[-62.3,-41],[-65,-41],[-64.5,-42.6],[-65.5,-45],[-67.5,-46.5],[-66,-48],[-68.5,-50.5],[-69,-52.5],[-65.5,-55],[-71,-54.5],[-74.5,-52],[-75.5,-47.5],[-73.5,-42.5],[-73.8,-37],[-71.6,-33],[-71.5,-30],[-70.2,-26],[-70.3,-18.5],[-75.5,-14.5],[-77.5,-11],[-79.5,-7.5],[-81.3,-5.5],[-80.2,-3.5],[-80,-1],[-80.2,1],[-78.9,1.5],[-77.5,4],[-77.4,6.5]]);
 const RGN={'N. America':[-98,39,4.3],Europe:[12,49,4.6],Asia:[105,28,3.7],'S. America':[-60,-17,3.6],Oceania:[145,-27,4]};
 $('#lay').insertAdjacentHTML('beforeend','<b>Go to region</b><div id="rg" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>');
-Object.keys(RGN).forEach(k=>{const b=document.createElement('button');b.textContent=k;b.onclick=()=>{const r=RGN[k];setFol(false);V.in=null;V.lon=r[0];V.lat=r[1];V.tz=null;V.z=r[2];$('#lay').style.display='none'};$('#rg').appendChild(b)});
+Object.keys(RGN).forEach(k=>{const b=document.createElement('button');b.textContent=k;b.onclick=()=>{const r=RGN[k];setFol(false);V.in=null;V.lon=r[0];V.lat=r[1];V.tz=null;focusZoom(r[2]);$('#lay').style.display='none'};$('#rg').appendChild(b)});
 const AIP={Y:['Australia AIP','https://www.airservicesaustralia.com/aip/aip.asp'],NZ:['New Zealand AIP','https://www.aip.net.nz'],SB:['Brazil AIS','https://aisweb.decea.mil.br'],SD:['Brazil AIS','https://aisweb.decea.mil.br'],SI:['Brazil AIS','https://aisweb.decea.mil.br'],SJ:['Brazil AIS','https://aisweb.decea.mil.br'],SN:['Brazil AIS','https://aisweb.decea.mil.br'],SS:['Brazil AIS','https://aisweb.decea.mil.br'],SW:['Brazil AIS','https://aisweb.decea.mil.br'],VI:['India AIP','https://aim-india.aai.gov.in'],RJ:['Japan AIP','https://www.aisjapan.mlit.go.jp'],RO:['Japan AIP','https://www.aisjapan.mlit.go.jp']};
 {const trs=document.getElementById('trs');if(trs){trs.value=TRS;trs.onchange=()=>applyTrafficSource(trs.value,true)}}
 if(TRS=='vatsim')startVatsimTraffic();else wtPoll();
@@ -1730,7 +2119,15 @@ else if(location.protocol=='https:'&&phoneSized()&&!liveOk())pcMapOffer();
    is the nearest labelled feature to the view centre (country, continent or
    ocean) from the bundled world layer; the count is real traffic only. */
 let olAt=0,olKey='';
-function olPlace(){const wd=WD;if(!wd||!wd.countries)return'';const c=wpx(V.lon,V.lat,V.z);let best='',bd=Infinity;
+function olPlace(){const wd=WD;if(!wd||!wd.countries)return'';let best='',bd=Infinity;
+/* On the globe the label points are projected with the sphere's own camera and
+   only the near side counts, so the badge cannot name a place the pilot is
+   looking at the back of. `V.z` means nothing there, which is what made it read
+   the wrong ocean until this branch existed. */
+if(V.mode==='globe'){const g=globeModule();if(!g)return'';const cam=globeCam(),cx=W/2,cy=H/2;
+const scan=list=>{for(const it of list){const p=g.globeProject(it.y,it.x,cam);if(!p)continue;const d=(p.x-cx)**2+(p.y-cy)**2;if(d<bd){bd=d;best=it.n}}};
+scan(wd.countries);scan(wd.continents);scan(wd.oceans);return best}
+const c=wpx(V.lon,V.lat,V.z);
 const scan=list=>{for(const it of list){const q=wpx(it.x,it.y,V.z),dx=q[0]-c[0],dy=q[1]-c[1],d=dx*dx+dy*dy;if(d<bd){bd=d;best=it.n}}};
 scan(wd.countries);scan(wd.continents);scan(wd.oceans);return best}
 function olTick(){const now=performance.now();if(now-olAt<900)return;olAt=now;
@@ -1753,13 +2150,19 @@ function seedTrail(flight){
   const id=String(flight.id||'');
   if(id!==trailFlightId){
     /* Landing completes the bridge's flight and the rollout starts a new one, so
-       a new id is not a new journey. Keep the line when the new record begins
-       where the drawn trail stopped; drop it when the flight starts elsewhere. */
+       a new id is not a new journey. The bridge also opens that new record before
+       it has written a point into it, so when the track is still empty the test
+       uses where the aircraft is now: at the end of a rollout that is where the
+       drawn trail stopped, and the line must stay. A flight started somewhere
+       else (a reposition, a new session) is far from that point and still clears
+       the old line. With no position to judge by, the trail is kept rather than
+       erased on a guess. */
     const prev=TRL.get('own')||[],first=Array.isArray(flight.track)&&flight.track[0]?flight.track[0]:null;
-    const join=prev.length&&first&&window.TRAILP&&window.TRAILP.trailContinues?window.TRAILP.trailContinues(prev[prev.length-1],first):false;
+    const here=first||(Number.isFinite(own.lat)&&Number.isFinite(own.lon)?[own.lat,own.lon,own.alt||0,Date.now()]:null);
+    const keep=!prev.length?false:!here?true:(window.TRAILP&&window.TRAILP.trailContinues?window.TRAILP.trailContinues(prev[prev.length-1],here):false);
     /* The path drawn so far becomes the base the new recording is appended to,
        so a touchdown cannot erase the flight that just ended. */
-    if(join)trailBase=prev.slice();
+    if(keep)trailBase=prev.slice();
     else{TRL.delete('own');trailBase=null}
     trailFlightId=id;trailSeeded=''
   }
@@ -1835,7 +2238,6 @@ if(L.trl){cx.strokeStyle=col;cx.lineWidth=1.2;cx.globalAlpha=.35;TRL.forEach((a,
 if(sel&&sel.k=='trf'){const a=TRL.get(sel.hx||sel.id);if(a)drawTrail(a,sel,false,sel.hx||sel.id)}
 if(liveOk()){const a=TRL.get('own');if(a)drawTrail(a,own,true,'own')}}
 function trCenter(){if(!sel)return;setFol(false);const q=sel.k=='own'?own:sel;V.lon=q.lon;V.lat=q.lat;V.in=null}
-function trClear(){if(!sel)return;TRL.delete(sel.k=='own'?'own':(sel.hx||sel.id));fCard()}
 function spark(tr){if(tr.length<3)return '<div class="m">The altitude profile appears as the trail builds.</div>';const W2=300,H2=56,al=tr.map(p=>p[2]||0),mn=Math.min(...al),mx=Math.max(...al),r=Math.max(mx-mn,500),pts=al.map((v,i)=>(i/(al.length-1)*W2).toFixed(1)+','+(H2-4-(v-mn)/r*(H2-8)).toFixed(1)).join(' ');
 return '<svg class="spark" viewBox="0 0 '+W2+' '+H2+'" preserveAspectRatio="none"><polyline points="'+pts+'" fill="none" stroke="var(--acc)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg><div class="m" style="display:flex;justify-content:space-between"><span>'+Math.round(mn).toLocaleString()+' ft</span><span>altitude profile</span><span>'+Math.round(mx).toLocaleString()+' ft</span></div>'}
 /* The one aircraft card, top-left over the map. Clicking a target fills it with
@@ -2027,8 +2429,8 @@ function fcAircraftHtml(o){
     +'</div>';
   const actions='<div class="fca">'
     +(io?'':'<button type="button" class="'+(tk?'on':'')+'" data-fc-act="track">'+(tk?'Stop tracking':'Track')+'</button>')
+    +(io&&fpOfp()?'<button type="button" data-fc-act="ofp" title="Open the Operational Flight Plan SimBrief generated for this flight">OFP</button>':'')
     +'<button type="button" data-fc-act="center">Center</button>'
-    +'<button type="button" data-fc-act="clear">Clear trail</button>'
     +'</div>';
   if(!fExp){
     return header+compact+fcProcHtml(o)+actions;
@@ -2090,7 +2492,7 @@ function clampCard(){
     if(act=='track'){tk=!tk;if(tk)setFol(false);fCard()}
     else if(act=='expand'){fExp=true;try{localStorage.setItem('stratos.cardExpanded','1')}catch(_){}fCard()}
     else if(act=='center'){trCenter();fCard()}
-    else if(act=='clear'){trClear()}
+    else if(act=='ofp'){openOfpDoc()}
     else if(act=='close'){sel=null;tk=false;render();fCard()}
   });
 })();
@@ -2126,10 +2528,13 @@ function fcRender(ok){
     const routeLine=(org||dst)?'<div class="fr"><span>'+esc(org||'—')+'</span><span class="arw"></span><span>'+esc(dst||'—')+'</span></div>'
       +'<div class="ft"><span>off <b>'+zTime(cf.takeoffTime||cf.startTime)+'</b></span><span>eta <b>'+etaZ(g('tEt'))+'</b></span></div>':'';
     const compact='<div class="fcs"><span><b>'+g('tAL')+'</b> ft</span><span><b>'+g('tGS')+'</b> kt</span><span><b>'+g('tHD')+'&deg;</b> hdg</span>'+(left!=null?'<span><b>'+left+'</b> nm left</span>':'')+'</div>';
+    /* The plan card stands down while this one is up, so the one action a
+       pilot needs in the air — the OFP itself — moves onto this card. */
+    const ofpBtn=fpOfp()?'<button type="button" data-fc-act="ofp" title="Open the Operational Flight Plan SimBrief generated for this flight">OFP</button>':'';
     if(!fExp){
       s=header+routeLine+compact+fcProcHtml({k:'own'})
         +(rt?'<div class="fbm"><div class="pb"><u style="width:'+pct.toFixed(1)+'%"></u><s style="left:'+pct.toFixed(1)+'%">&#9992;</s></div></div>':'')
-        +'<div class="fca"><button type="button" data-fc-act="expand">Show details</button></div>';
+        +'<div class="fca"><button type="button" data-fc-act="expand">Show details</button>'+ofpBtn+'</div>';
     }else{
       const proc=fcProcedures({k:'own'});
       const rows=[['Registration',ownReg?esc(ownReg):'Not reported'],['Aircraft',d.aircraft?esc(d.aircraft):'Not reported'],['Flight phase',d.flightPhase?esc(String(d.flightPhase).replace(/_/g,' ')):'Not reported'],['Transponder source',esc(d.src||'Simulator')]];
@@ -2140,7 +2545,8 @@ function fcRender(ok){
         +'<div class="fg">'+fcField(g('tAL'),'ALT FT')+fcField(g('tGS'),'GS KT')+fcField(g('tHD')+'°','HDG')+fcField(g('tVS'),'VS FPM')
         +fcField(left==null?'–':left,'DEST NM')+'</div>'
         +fcProcHtml({k:'own'})
-        +'<div class="fcm">'+rows.map(r=>'<div><span>'+r[0]+'</span><b>'+r[1]+'</b></div>').join('')+'</div>';
+        +'<div class="fcm">'+rows.map(r=>'<div><span>'+r[0]+'</span><b>'+r[1]+'</b></div>').join('')+'</div>'
+        +(ofpBtn?'<div class="fca">'+ofpBtn+'</div>':'');
     }
   }
   if(s!==fcS){fcS=s;e.innerHTML=s;e.style.display='block';clampCard()}}
@@ -2224,6 +2630,13 @@ function fpRender(){
   const e=document.getElementById('fp');if(!e)return;
   if(panel){if(fpS){fpS=''}e.classList.remove('show');return}
   const ofp=fpOfp(),has=route.length>1||Boolean(ofp);
+  /* Two boxes describing one flight is one box too many. The live card already
+     carries the callsign, route, ETA, distance and SID/STAR, so the plan card
+     stands down while it is on screen — and comes back the moment tracking
+     stops. With no plan at all it stays: importing is the point of it then,
+     and the OFP shortcut on the live card keeps the document one click away. */
+  const ownCard=liveOk()&&(!sel||sel.k=='own');
+  if(has&&ownCard){if(fpS){fpS=''}e.classList.remove('show');e.classList.remove('fpexp');return}
   let s;
   if(!has){
     s='<div class="fptop"><span>Flight plan</span><span class="sp"></span><em>Not imported</em></div>'
@@ -2351,9 +2764,9 @@ function chHead(){const a=CH.a;if(!a)return;$('#cvi').textContent=a.id;$('#cvn')
 function chFit(){const a=CH.a;if(!a)return;let m=2000;rwList(a).forEach(r=>[r.a,r.b].forEach(p=>{m=Math.max(m,Math.abs(p[0]),Math.abs(p[1]))}));(a.osm||[]).forEach(o=>{if(o.t=='gate')return;o.p.forEach(q=>{m=Math.max(m,Math.abs(q[0]),Math.abs(q[1]))})});
 V.lon=a.lon;V.lat=a.lat;V.in=null;V.tz=null;V.anchor=null;V.z=Math.log2(Math.min(W,H-190)*.46/m*360*60*Math.cos(a.lat*R)*6076.12/SZ)}
 function chPage(p){CH.pg=p;L.style=p=='sat'?'sat':CH.prev.style;chPalette();$('#app').classList.toggle('chartinfo',p=='info');cvSeg();chHead()}
-function openCharts(a){if(!a)return;if(!CH.on)CH.prev={style:L.style,lon:V.lon,lat:V.lat,z:V.z};CH.on=true;CH.a=a;CH.hasFit=false;setFol(false);tk=false;panel=null;sel=null;
+function openCharts(a){if(!a)return;if(!CH.on)CH.prev={style:L.style,lon:V.lon,lat:V.lat,z:V.z,mode:V.mode};CH.on=true;/* A charted approach is a flat, georeferenced sheet, so opening one leaves the globe for the flat chart and closing it comes back. */if(V.mode==='globe')globeMode('plane');CH.a=a;CH.hasFit=false;setFol(false);tk=false;panel=null;sel=null;
 $('#chart').style.display='none';$('#res').style.display='none';$('#app').classList.add('chartmode');getMetar(a);getFaa(a);chPage('paper');chFit();CH.hasFit=true;render()}
-function closeCharts(){if(!CH.on)return;CH.on=false;L.style=CH.prev.style;V.lon=CH.prev.lon;V.lat=CH.prev.lat;V.tz=null;V.anchor=null;V.z=CH.prev.z;$('#app').classList.remove('chartmode','chartinfo');theme(document.documentElement.dataset.theme);render()}
+function closeCharts(){if(!CH.on)return;CH.on=false;L.style=CH.prev.style;V.lon=CH.prev.lon;V.lat=CH.prev.lat;V.tz=null;V.anchor=null;V.z=CH.prev.z;$('#app').classList.remove('chartmode','chartinfo');theme(document.documentElement.dataset.theme);if(CH.prev.mode==='globe'){globeMode('globe');if(route.length>1)fitRoute()}render()}
 function ciHtml(a){const f=a.fqs||{},ord=['ATIS','CLD','GND','TWR','APP','DEP','CTAF','UNICOM','A/D'],ks=ord.filter(k=>f[k]).concat(Object.keys(f).filter(k=>!ord.includes(k)));
 let h='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px"><div><h3 style="margin:0">'+a.id+' &middot; '+a.name+'</h3><div class="m">Elevation '+a.elev+' ft &middot; '+a.lat.toFixed(4)+', '+a.lon.toFixed(4)+'</div></div></div>';
 h+='<div class="row" style="margin-bottom:14px"><a href="pilot.html#charts?icao='+encodeURIComponent(a.id)+'"><button class="on">Open '+a.id+' charts</button></a></div>';

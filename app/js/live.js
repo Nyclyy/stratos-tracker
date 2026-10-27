@@ -16,6 +16,7 @@ import { findAirport } from './data/airports.js';
 import { distanceNm } from './lib/geo.js';
 import { trailContinues } from './lib/trailpath.js';
 import { VATSIM_FEED_URL, parsePilots } from './lib/vatsim.js';
+import { resolveAirline } from './lib/airlines.js';
 import { MiniMap } from './minimap.js';
 
 initTheme();
@@ -24,6 +25,59 @@ if (location.port === '8765') setTheme('night');
 const STORAGE_KEY = 'stratos.phoneRelay';
 const view = document.getElementById('live-view');
 const statusEl = document.getElementById('live-status');
+
+/* ── the airline this flight belongs to ─────────────────────────────────
+   The EFB already resolves an operator from the callsign (or a manual choice
+   saved in its own settings), so the phone reads the same table rather than
+   keeping a second list of airlines. A designator that is not in the table
+   leaves the Stratos colours and hides the chip: no guessed branding. */
+const AIRLINE_PREFS_KEY = 'stratos.efb.prefs';
+const airlineChip = document.getElementById('live-airline');
+let shownAirline = '';
+
+function airlinePrefs() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(AIRLINE_PREFS_KEY) || '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+/**
+ * Wear the operator's accent and mark, from the callsign the bridge reports.
+ * The accent is one token, so cards, links and the progress bar follow it; the
+ * mark is the bundled artwork the EFB uses. On a light theme the accent is
+ * deepened first, because a brand tint chosen for a dark deck is too pale to
+ * read as text on white.
+ */
+function paintAirline(callsign) {
+  const resolved = resolveAirline(airlinePrefs(), null, callsign || '');
+  const air = resolved.airline;
+  const key = air ? air.icao : '';
+  if (key === shownAirline) return;
+  shownAirline = key;
+  const root = document.documentElement;
+  if (!air) {
+    root.style.removeProperty('--acc');
+    delete root.dataset.airline;
+  } else {
+    const day = root.dataset.theme === 'day';
+    root.style.setProperty('--acc', day ? `color-mix(in srgb, ${air.accent} 72%, #06121a)` : air.accent);
+    root.dataset.airline = air.icao;
+  }
+  if (!airlineChip) return;
+  if (!air) {
+    airlineChip.hidden = true;
+    airlineChip.innerHTML = '';
+    airlineChip.removeAttribute('title');
+    return;
+  }
+  airlineChip.hidden = false;
+  airlineChip.title = `${air.name} (${air.icao}${air.iata ? ` / ${air.iata}` : ''})`;
+  airlineChip.innerHTML = (air.logo ? `<img src="${esc(air.logo)}" alt="" width="72" height="15">` : '')
+    + `<b>${esc(air.iata || air.icao)}</b><span>${esc(air.name)}</span>`;
+}
 
 let relayConfig = readRelay();
 let relayClient = null;
@@ -637,6 +691,8 @@ function progress(flight, telemetry) {
 function render() {
   const snapshot = lastState?.snapshot;
   if (!snapshot) {
+    // Nothing is flying yet, so nothing is branded.
+    paintAirline('');
     if (bridgeSource) {
       view.innerHTML = `<div class="card"><div class="card-head"><h1 style="font-size:20px">Waiting for telemetry</h1></div>
         <p class="muted small">The bridge is connected but the simulator has not sent a position yet. Start a flight in X-Plane or MSFS.</p></div>`;
@@ -645,6 +701,9 @@ function render() {
   }
   const telemetry = parseTelemetry(snapshot.telemetry);
   const flight = snapshot.flight;
+  /* The callsign is the only reliable airline source here: the flight record the
+     bridge writes, or the live frame when the record has not caught up yet. */
+  paintAirline(flight?.callsign || telemetry?.callsign || '');
   const phase = snapshot.phase || (flight && flight.phase) || 'UNKNOWN';
   const stats = snapshot.stats || {};
   const recent = Array.isArray(snapshot.recent) ? snapshot.recent : [];
