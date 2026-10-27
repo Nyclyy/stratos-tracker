@@ -383,9 +383,13 @@ jobs:
       # script fails the release if the bucket is configured but does not serve
       # the file, and it is skipped when the secrets are absent: a release still
       # publishes, with the release's own URLs.
+      #
+      # The presence of the secrets is decided in the shell, not in `if`: the
+      # `secrets` context is not available to a step condition, and referring to
+      # it there makes the whole workflow file invalid, so GitHub refuses to
+      # start any run of it at all rather than skipping one step.
       - name: Mirror the installers to our download host
         id: mirror
-        if: ${{ secrets.R2_ACCOUNT_ID != '' && secrets.R2_ACCESS_KEY_ID != '' && secrets.R2_SECRET_ACCESS_KEY != '' && secrets.R2_BUCKET != '' }}
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -394,6 +398,11 @@ jobs:
           R2_PUBLIC_BASE: ${{ vars.R2_PUBLIC_BASE || 'https://downloads.stratos-tracker.com' }}
         run: |
           set -euo pipefail
+          if [ -z "${R2_ACCOUNT_ID:-}" ] || [ -z "${R2_ACCESS_KEY_ID:-}" ] || [ -z "${R2_SECRET_ACCESS_KEY:-}" ] || [ -z "${R2_BUCKET:-}" ]; then
+            echo "No download-host secrets are configured, so this release keeps the release's own installer URLs."
+            echo "base=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           node scripts/publish-installers.mjs --dir dist --tag "$TAG"
           echo "base=${R2_PUBLIC_BASE%/}/$TAG" >> "$GITHUB_OUTPUT"
 
