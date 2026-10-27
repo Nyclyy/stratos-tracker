@@ -26,7 +26,32 @@
       ],
       "performance": [
         "The globe is painted at a level chosen from the sphere instead of from a temporary coarse frame, so turning it no longer fetches and shades a second set of tiles — measured zero image requests during a drag."
-      ]
+      ],
+      "ui": [],
+      "compatibility": [],
+      "other": []
+    },
+    "downloads": {
+      "windows": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.26/Stratos-Setup.exe",
+        "sha256": "98a41ba51ad3675593127e03b1d20057b962259c80a925a4c584c54ba3f28f54",
+        "size": 107755277
+      },
+      "mac-arm64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.26/Stratos-2.1.26-mac-arm64.dmg",
+        "sha256": "3907af2ba70b104acce70dee7d4abe8a8cb7dad75bd583bfa0dc417449672c73",
+        "size": 123613998
+      },
+      "mac-x64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.26/Stratos-2.1.26-mac-x64.dmg",
+        "sha256": "cb24a788d9835a92cc847c5856f7df1c2796ea665ad8299c713de48c8ea41712",
+        "size": 128911434
+      },
+      "linux-x64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.26/Stratos-2.1.26-linux-x64.AppImage",
+        "sha256": "5d6cd8a4f5004352fc3ad62e98e2b555e64c9314c9c56ead2eaff13864e35d89",
+        "size": 144489650
+      }
     }
   },
   "releases": [
@@ -54,7 +79,32 @@
         ],
         "performance": [
           "The globe is painted at a level chosen from the sphere instead of from a temporary coarse frame, so turning it no longer fetches and shades a second set of tiles — measured zero image requests during a drag."
-        ]
+        ],
+        "ui": [],
+        "compatibility": [],
+        "other": []
+      },
+      "downloads": {
+        "windows": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.26/Stratos-Setup.exe",
+          "sha256": "98a41ba51ad3675593127e03b1d20057b962259c80a925a4c584c54ba3f28f54",
+          "size": 107755277
+        },
+        "mac-arm64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.26/Stratos-2.1.26-mac-arm64.dmg",
+          "sha256": "3907af2ba70b104acce70dee7d4abe8a8cb7dad75bd583bfa0dc417449672c73",
+          "size": 123613998
+        },
+        "mac-x64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.26/Stratos-2.1.26-mac-x64.dmg",
+          "sha256": "cb24a788d9835a92cc847c5856f7df1c2796ea665ad8299c713de48c8ea41712",
+          "size": 128911434
+        },
+        "linux-x64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.26/Stratos-2.1.26-linux-x64.AppImage",
+          "sha256": "5d6cd8a4f5004352fc3ad62e98e2b555e64c9314c9c56ead2eaff13864e35d89",
+          "size": 144489650
+        }
       }
     },
     {
