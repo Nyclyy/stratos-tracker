@@ -141,8 +141,30 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
+      # The suite's own output is kept, because a failure that only the runner can
+      # reproduce is a failure nobody can fix from a check mark: the next step
+      # publishes the failing lines as annotations on the commit.
       - name: Run JavaScript and relay tests
-        run: npm test
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test-output.log
+
+      - name: Report a failing test suite
+        if: failure()
+        shell: bash
+        run: |
+          if [ -f test-output.log ]; then
+            echo '### npm test (last lines)' >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            tail -60 test-output.log >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            grep -aE 'not ok|^✖|AssertionError|Error:|expected|actual|^# (tests|pass|fail)|ℹ (tests|pass|fail)' test-output.log | tail -24 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+          else
+            echo '::error::the test run produced no output file'
+          fi
 
       - name: Run bridge tests
         run: python -m unittest -v tests.test_bridge
