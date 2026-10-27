@@ -282,7 +282,9 @@ test('EFB Navigator keeps the flight it drew when the rollout opens a new record
 
 test('Navigator describes the route it drew, not a plan left over from another flight', async () => {
   const fs = await import('node:fs');
-  const page = fs.readFileSync(new URL('../app/js/efb/navigator.js', import.meta.url), 'utf8');
+  // Matched line by line, so the file's line endings must not decide the result:
+  // a checkout on Windows may hand us CRLF where the repository holds LF.
+  const page = fs.readFileSync(new URL('../app/js/efb/navigator.js', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
   // The route built in the Flight Plan app carries its own airports, procedures
   // and cruise in the shared record, so it is described from itself.
@@ -339,7 +341,9 @@ test('the EFB installs as its own app on a tablet or phone home screen', async (
 test('the EFB opens on a deck of apps, and Checklists is its own app', async () => {
   const fs = await import('node:fs');
   const root = new URL('../', import.meta.url);
-  const shell = fs.readFileSync(new URL('app/js/efb.js', root), 'utf8');
+  // Line endings normalised: a checkout on Windows may hand us CRLF where the
+  // repository holds LF, and these tests match the source line by line.
+  const shell = fs.readFileSync(new URL('app/js/efb.js', root), 'utf8').replace(/\r\n/g, '\n');
   const page = fs.readFileSync(new URL('app/efb.html', root), 'utf8');
 
   assert.match(shell, /const HOME_ROUTE = 'home'/, 'the deck is a route, not a splash screen');
@@ -386,7 +390,9 @@ test('the flight phase comes from the bridge, or from the position when there is
 test('Navigator replaced Live: one map app, planned route, chart conventions', async () => {
   const fs = await import('node:fs');
   const root = new URL('../', import.meta.url);
-  const shell = fs.readFileSync(new URL('app/js/efb.js', root), 'utf8');
+  // Line endings normalised: a checkout on Windows may hand us CRLF where the
+  // repository holds LF, and these tests match the source line by line.
+  const shell = fs.readFileSync(new URL('app/js/efb.js', root), 'utf8').replace(/\r\n/g, '\n');
   const page = fs.readFileSync(new URL('app/js/efb/navigator.js', root), 'utf8');
   const html = fs.readFileSync(new URL('app/efb.html', root), 'utf8');
 
@@ -522,7 +528,9 @@ test('the SimBrief plan carries the airline, the codesign and the point types', 
 test('the Notepad types and draws, and keeps neither secret nor synced', async () => {
   const fs = await import('node:fs');
   const root = new URL('../', import.meta.url);
-  const shell = fs.readFileSync(new URL('app/js/efb.js', root), 'utf8');
+  // Line endings normalised: a checkout on Windows may hand us CRLF where the
+  // repository holds LF, and these tests match the source line by line.
+  const shell = fs.readFileSync(new URL('app/js/efb.js', root), 'utf8').replace(/\r\n/g, '\n');
   const module = fs.readFileSync(new URL('app/js/efb/notepad.js', root), 'utf8');
 
   assert.match(shell, /id: 'notepad'/, 'the notepad is an app on the deck');
@@ -550,7 +558,9 @@ test('the Notepad types and draws, and keeps neither secret nor synced', async (
 test('the deck widget reports the real flight and only shows numbers it has', async () => {
   const fs = await import('node:fs');
   const root = new URL('../', import.meta.url);
-  const shell = fs.readFileSync(new URL('app/js/efb.js', root), 'utf8');
+  // Line endings normalised: a checkout on Windows may hand us CRLF where the
+  // repository holds LF, and these tests match the source line by line.
+  const shell = fs.readFileSync(new URL('app/js/efb.js', root), 'utf8').replace(/\r\n/g, '\n');
   const page = fs.readFileSync(new URL('app/efb.html', root), 'utf8');
 
   assert.match(page, /id="home-widget"/, 'the widget is on the deck');
@@ -567,7 +577,9 @@ test('the deck widget reports the real flight and only shows numbers it has', as
 test('the airline dresses the whole bag, with a preview and a manual override', async () => {
   const fs = await import('node:fs');
   const root = new URL('../', import.meta.url);
-  const shell = fs.readFileSync(new URL('app/js/efb.js', root), 'utf8');
+  // Line endings normalised: a checkout on Windows may hand us CRLF where the
+  // repository holds LF, and these tests match the source line by line.
+  const shell = fs.readFileSync(new URL('app/js/efb.js', root), 'utf8').replace(/\r\n/g, '\n');
   const settings = fs.readFileSync(new URL('app/js/efb/settings.js', root), 'utf8');
   const page = fs.readFileSync(new URL('app/efb.html', root), 'utf8');
   const css = fs.readFileSync(new URL('app/efb.css', root), 'utf8');
