@@ -15,6 +15,17 @@ import handler, { resolveAsset, resolveDownload } from '../api/download.js';
 
 const manifest = JSON.parse(fs.readFileSync(new URL('../app/releases.json', import.meta.url), 'utf8'));
 
+/* The checked-in manifest can legitimately carry a newest release whose
+   installers are still being built: the release workflow runs this suite before
+   it uploads anything and writes the download table only once the assets exist,
+   so a version bump sits on main with no table for a few minutes. The offer and
+   endpoint tests below therefore run against the newest release that does carry
+   a table — still the published data from the same file — and the last test pins
+   that a release is never left half-filled. */
+const releases = [manifest.latest, ...manifest.releases].filter(Boolean);
+const newestWithTable = releases.find(release => release.downloads && Object.keys(release.downloads).length) || manifest.latest;
+const published = newestWithTable === manifest.latest ? manifest : { ...manifest, latest: newestWithTable };
+
 function memoryStorage() {
   const store = new Map();
   return {
@@ -61,10 +72,10 @@ test('the download offer is website-only, never the app or the bridge page', () 
 });
 
 test('the offer lists exactly the installers the published manifest carries', () => {
-  const result = installersFromManifest(manifest);
-  const downloads = manifest.latest.downloads;
+  const result = installersFromManifest(published);
+  const downloads = published.latest.downloads;
   assert.ok(downloads, 'the manifest on main carries the download table');
-  assert.equal(result.version, manifest.latest.version);
+  assert.equal(result.version, published.latest.version);
   assert.deepEqual(result.items.map(item => item.key), PLATFORMS.filter(platform => downloads[platform.key]).map(platform => platform.key));
   assert.equal(result.items.length, 4, 'Windows, both macOS builds and Linux');
   for (const item of result.items) {
@@ -124,7 +135,7 @@ test('the panel reads the manifest, closes to a Downloads control and reopens', 
     protocol: 'https:',
     hostname: 'www.stratos-tracker.com',
     desktop: null,
-    readInstallers: async () => installersFromManifest(manifest),
+    readInstallers: async () => installersFromManifest(published),
   });
   assert.ok(offer, 'the website gets the offer');
   const panel = document.getElementById('dlOffer');
@@ -142,7 +153,7 @@ test('the panel reads the manifest, closes to a Downloads control and reopens', 
   panel.querySelector('.dl-x').dispatchEvent(new window.Event('click'));
   assert.equal(panel.hidden, true, 'closing hides the panel without a reload');
   assert.equal(chip.hidden, false, 'and leaves a Downloads control');
-  assert.equal(storage.getItem('stratos.downloads.dismissed'), manifest.latest.version, 'the dismissal names the build');
+  assert.equal(storage.getItem('stratos.downloads.dismissed'), published.latest.version, 'the dismissal names the build');
 
   chip.dispatchEvent(new window.Event('click'));
   assert.equal(panel.hidden, false, 'the Downloads control reopens it');
@@ -152,10 +163,10 @@ test('the panel reads the manifest, closes to a Downloads control and reopens', 
 test('a dismissed build stays dismissed on the next visit', async () => {
   const { window, document } = mountable();
   const storage = memoryStorage();
-  storage.setItem('stratos.downloads.dismissed', manifest.latest.version);
+  storage.setItem('stratos.downloads.dismissed', published.latest.version);
   await initDownloadPrompt({
     window, document, storage, protocol: 'https:', hostname: 'stratos-tracker.com', desktop: null,
-    readInstallers: async () => installersFromManifest(manifest),
+    readInstallers: async () => installersFromManifest(published),
   });
   assert.equal(document.getElementById('dlOffer').hidden, true);
   assert.equal(document.getElementById('dlChip').hidden, false);
@@ -168,7 +179,7 @@ test('no panel is mounted inside the app or on the bridge page', async () => {
   ]) {
     const { window, document } = mountable();
     const result = await initDownloadPrompt({
-      window, document, storage: memoryStorage(), readInstallers: async () => installersFromManifest(manifest), ...options,
+      window, document, storage: memoryStorage(), readInstallers: async () => installersFromManifest(published), ...options,
     });
     assert.equal(result, null);
     assert.equal(document.getElementById('dlOffer'), null);
@@ -183,7 +194,7 @@ test('a manifest that cannot be read offers a retry that works', async () => {
     window, document, storage: memoryStorage(), protocol: 'https:', hostname: 'stratos-tracker.com', desktop: null,
     readInstallers: async () => {
       calls += 1;
-      return calls === 1 ? { version: '', items: [] } : installersFromManifest(manifest);
+      return calls === 1 ? { version: '', items: [] } : installersFromManifest(published);
     },
   });
   let panel = document.getElementById('dlOffer');
@@ -199,11 +210,11 @@ test('a manifest that cannot be read offers a retry that works', async () => {
 });
 
 test('the site endpoint resolves a platform to the published installer', async () => {
-  const asset = manifest.latest.downloads.windows.url;
-  assert.equal(resolveDownload(manifest, 'windows'), asset);
-  assert.equal(resolveDownload(manifest, 'linux-x64'), manifest.latest.downloads['linux-x64'].url);
+  const asset = published.latest.downloads.windows.url;
+  assert.equal(resolveDownload(published, 'windows'), asset);
+  assert.equal(resolveDownload(published, 'linux-x64'), published.latest.downloads['linux-x64'].url);
   assert.equal(resolveDownload({ latest: { downloads: null } }, 'windows'), null);
-  assert.equal(resolveDownload(manifest, 'amiga'), null);
+  assert.equal(resolveDownload(published, 'amiga'), null);
   assert.equal(resolveDownload({ latest: { downloads: { windows: { url: 'ftp://x/y' } } } }, 'windows'), null);
 
   const release = { assets: [{ name: 'Stratos-Setup.exe', browser_download_url: 'https://example.test/Setup.exe' }] };
@@ -213,7 +224,7 @@ test('the site endpoint resolves a platform to the published installer', async (
   // The handler answers with the manifest's own file, cached briefly at the edge.
   const original = globalThis.fetch;
   try {
-    globalThis.fetch = async () => fakeResponse(manifest);
+    globalThis.fetch = async () => fakeResponse(published);
     const res = fakeRes();
     await handler({ query: { p: 'windows' }, headers: { host: 'www.stratos-tracker.com' } }, res);
     assert.equal(res.statusCode, 302);
@@ -233,7 +244,7 @@ test('the endpoint rejects what it cannot resolve without inventing a file', asy
 
   const original = globalThis.fetch;
   try {
-    globalThis.fetch = async () => fakeResponse(manifest);
+    globalThis.fetch = async () => fakeResponse(published);
     const missing = fakeRes();
     await handler({ query: { p: 'mac-arm64' }, headers: { host: 'x.test' } }, missing);
     // The manifest does carry it, so this one resolves rather than 404s.
@@ -246,6 +257,26 @@ test('the endpoint rejects what it cannot resolve without inventing a file', asy
     assert.match(failed.body.error, /No installer is published/);
   } finally {
     globalThis.fetch = original;
+  }
+});
+
+test('a release carries either a complete download table or none at all', () => {
+  // Half a table is the one thing the site must never show: a version whose
+  // Windows build downloads and whose macOS build does not exist.
+  const expected = PLATFORMS.map(platform => platform.key).sort();
+  for (const release of releases) {
+    const table = release.downloads || {};
+    const filled = Object.keys(table);
+    // No table at all is normal: the releases before the site offered downloads
+    // never had one, and the release being built has none until its installers
+    // exist. What must never happen is a table that lists only some of them.
+    if (!filled.length) continue;
+    assert.deepEqual(filled.sort(), expected, `${release.version} lists every installer or none`);
+    for (const [key, entry] of Object.entries(table)) {
+      assert.match(entry.url, /^https:\/\//, `${release.version} ${key} has a web address`);
+      assert.match(entry.sha256, /^[0-9a-f]{64}$/, `${release.version} ${key} carries its hash`);
+      assert.ok(entry.size > 0, `${release.version} ${key} carries its size`);
+    }
   }
 });
 
