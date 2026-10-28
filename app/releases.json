@@ -23,6 +23,28 @@
       "ui": [],
       "compatibility": [],
       "other": []
+    },
+    "downloads": {
+      "windows": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.28/Stratos-Setup.exe",
+        "sha256": "32aa406f834faa3be320a9861a64ea76cfcbf2afeda4743f8f3c3397fe47709b",
+        "size": 108086794
+      },
+      "mac-arm64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.28/Stratos-2.1.28-mac-arm64.dmg",
+        "sha256": "bc1b0f8adc6fef791287c55eaffaa98186929e0950fa6f992b7a85f825ecce8f",
+        "size": 123993270
+      },
+      "mac-x64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.28/Stratos-2.1.28-mac-x64.dmg",
+        "sha256": "daa15b2df124aaf54644571b8fa2314e4ad5432960efa4b38f558728d92857df",
+        "size": 129266073
+      },
+      "linux-x64": {
+        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.28/Stratos-2.1.28-linux-x64.AppImage",
+        "sha256": "700acf97fc89f4513d877c91d32b3d3e05e6029b5eda3856c46e6479e1301a1f",
+        "size": 144854815
+      }
     }
   },
   "releases": [
@@ -47,6 +69,28 @@
         "ui": [],
         "compatibility": [],
         "other": []
+      },
+      "downloads": {
+        "windows": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.28/Stratos-Setup.exe",
+          "sha256": "32aa406f834faa3be320a9861a64ea76cfcbf2afeda4743f8f3c3397fe47709b",
+          "size": 108086794
+        },
+        "mac-arm64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.28/Stratos-2.1.28-mac-arm64.dmg",
+          "sha256": "bc1b0f8adc6fef791287c55eaffaa98186929e0950fa6f992b7a85f825ecce8f",
+          "size": 123993270
+        },
+        "mac-x64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.28/Stratos-2.1.28-mac-x64.dmg",
+          "sha256": "daa15b2df124aaf54644571b8fa2314e4ad5432960efa4b38f558728d92857df",
+          "size": 129266073
+        },
+        "linux-x64": {
+          "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.28/Stratos-2.1.28-linux-x64.AppImage",
+          "sha256": "700acf97fc89f4513d877c91d32b3d3e05e6029b5eda3856c46e6479e1301a1f",
+          "size": 144854815
+        }
       }
     },
     {
