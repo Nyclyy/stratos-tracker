@@ -497,6 +497,17 @@ test('airline callsigns are parsed strictly and only a known designator is appli
     assert.match(vars['--efb-accent-soft'], /^rgba\(/);
     assert.match(vars['--efb-accent-ink'], /^#[0-9a-f]{6}$/i);
   }
+  // A pilot can pick from a real list: at least thirty operators, each one a
+  // distinct designator with its own colours, and no duplicate keys to shadow
+  // another in the lookup map.
+  assert.ok(AIRLINES.length >= 30, `the table offers at least thirty airlines (${AIRLINES.length})`);
+  const designators = new Set(AIRLINES.map(airline => airline.icao));
+  assert.equal(designators.size, AIRLINES.length, 'every designator appears once');
+  const iataCodes = AIRLINES.map(airline => airline.iata).filter(Boolean);
+  assert.equal(new Set(iataCodes).size, iataCodes.length, 'every IATA code appears once');
+  assert.equal(airlineByIcao('UAE').name, 'Emirates');
+  assert.equal(airlineByIcao('SIA').name, 'Singapore Airlines');
+  assert.equal(searchAirlines('singapore')[0].icao, 'SIA', 'the selector searches by name');
   assert.equal(airlineByIcao('aca').name, 'Air Canada', 'lookups are case-insensitive');
   assert.equal(airlineByIcao('ZZZ'), null);
   assert.equal(searchAirlines('easy').length, 1);

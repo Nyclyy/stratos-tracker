@@ -2033,7 +2033,10 @@ body.view-nav .efb-main { background: #04070b; }
 }
 .air-list {
   margin-top: 8px;
-  max-height: 176px;
+  /* Grows with the window but never past a comfortable column: the table holds
+     more than fifty operators, and a four-row window makes one of them hard to
+     find even with the search field above it. */
+  max-height: clamp(176px, 42vh, 420px);
   overflow-y: auto;
   border: 1px solid var(--efb-line);
   border-radius: 7px;

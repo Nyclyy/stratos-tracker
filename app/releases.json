@@ -3,58 +3,62 @@
   "product": "stratos",
   "source": "https://github.com/Nyclyy/stratos-tracker",
   "latest": {
-    "version": "2.1.26",
-    "releasedAt": "2026-10-27",
+    "version": "2.1.27",
+    "releasedAt": "2026-10-28",
     "severity": "normal",
-    "summary": "The Flight Deck map gets the same globe as the Flight Planner — real NASA imagery and real terrain shading, with the ground under the centre read from the tiles — and the EFB gains a Flight Planner that builds an IFR route from published navigation data.",
+    "summary": "Route lines are drawn the way a chart draws them — great circles, and across the date line instead of over the continents in between — a Pacific plan is fitted across the Pacific with its panel beside it, and a shallow globe is sharp on its first still frame.",
     "changelog": {
       "features": [
-        "The EFB Flight Planner builds a route on a real chart: choose a departure airport, add waypoints, VORs and fixes that exist in the data around the view, then an arrival, and continue to a separate SID and STAR page.",
-        "Navigation points around the chart come from OurAirports and the simulator’s own navigation data. A tap resolves to the published record nearest it, or to an exact custom coordinate — never a generated W01.",
-        "Globe mode on both maps: the tracker and the planner share one movable globe with four surfaces — bundled outlines that make no request, NASA Blue Marble imagery through NASA GIBS, and terrain from the AWS terrain tiles.",
-        "An explicit Read terrain action reports the ground at the centre with the level and ground resolution it was read at, and how many samples inside the radius actually had data."
+        "A fitted view can show a plan that spans half the world: the chart may zoom out past the zoom buttons' own floor, so a Singapore–Newark plan is on one screen at once.",
+        "The route panel narrows the chart rather than covering it, and the plan is fitted into the space the panel leaves as soon as the panel has been measured."
       ],
       "improvements": [
-        "The tracker’s map gains Projection and Globe surface controls, a camera reset and its own attribution line, and remembers the projection and surface you chose.",
-        "The airline you are flying appears as its real mark in the EFB header and in Settings instead of its code text.",
-        "Reset plan clears the departure, route, procedures, fuel and alternate in one action, keeping your saved plans.",
-        "A georeferenced approach chart still opens flat on the tracker, and closing it returns to the globe with the route reframed."
+        "Each leg is drawn along its great circle, so a long oceanic leg bends the way it does on a chart instead of running ruler-straight.",
+        "A leg across the date line leaves one edge and re-enters on the other, rather than crossing every continent in between.",
+        "A plan that crosses the date line is centred on the ocean it crosses, not on the Atlantic.",
+        "A chart shifted to make room for a panel keeps looking at the same place: the offset is a drawing shift, not a change in longitude."
       ],
       "fixes": [
-        "Touching down at the arrival airport no longer erases the trail behind the flight, and the place badge on the globe names a feature on the near side of the sphere.",
-        "Moving a waypoint works on the globe as it does on the flat chart."
+        "The Flight Deck's plan line had the same fault and is drawn the same way — sampled, unwrapped at the date line and wrapped at the edges.",
+        "The Navigator no longer frames its first view as though the route panel were closed, which left the plan under the panel until the window was resized."
       ],
       "performance": [
-        "The globe is painted at a level chosen from the sphere instead of from a temporary coarse frame, so turning it no longer fetches and shades a second set of tiles — measured zero image requests during a drag."
+        "The globe is painted whole on the first still frame when its pane fits one frame's sampling — a shallow view is sharp with no settle — while a deep zoom still fills in a band at a time."
       ],
       "ui": [],
       "compatibility": [],
       "other": []
-    },
-    "downloads": {
-      "windows": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.26/Stratos-Setup.exe",
-        "sha256": "98a41ba51ad3675593127e03b1d20057b962259c80a925a4c584c54ba3f28f54",
-        "size": 107755277
-      },
-      "mac-arm64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.26/Stratos-2.1.26-mac-arm64.dmg",
-        "sha256": "3907af2ba70b104acce70dee7d4abe8a8cb7dad75bd583bfa0dc417449672c73",
-        "size": 123613998
-      },
-      "mac-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.26/Stratos-2.1.26-mac-x64.dmg",
-        "sha256": "cb24a788d9835a92cc847c5856f7df1c2796ea665ad8299c713de48c8ea41712",
-        "size": 128911434
-      },
-      "linux-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.26/Stratos-2.1.26-linux-x64.AppImage",
-        "sha256": "5d6cd8a4f5004352fc3ad62e98e2b555e64c9314c9c56ead2eaff13864e35d89",
-        "size": 144489650
-      }
     }
   },
   "releases": [
+    {
+      "version": "2.1.27",
+      "releasedAt": "2026-10-28",
+      "severity": "normal",
+      "summary": "Route lines are drawn the way a chart draws them — great circles, and across the date line instead of over the continents in between — a Pacific plan is fitted across the Pacific with its panel beside it, and a shallow globe is sharp on its first still frame.",
+      "changelog": {
+        "features": [
+          "A fitted view can show a plan that spans half the world: the chart may zoom out past the zoom buttons' own floor, so a Singapore–Newark plan is on one screen at once.",
+          "The route panel narrows the chart rather than covering it, and the plan is fitted into the space the panel leaves as soon as the panel has been measured."
+        ],
+        "improvements": [
+          "Each leg is drawn along its great circle, so a long oceanic leg bends the way it does on a chart instead of running ruler-straight.",
+          "A leg across the date line leaves one edge and re-enters on the other, rather than crossing every continent in between.",
+          "A plan that crosses the date line is centred on the ocean it crosses, not on the Atlantic.",
+          "A chart shifted to make room for a panel keeps looking at the same place: the offset is a drawing shift, not a change in longitude."
+        ],
+        "fixes": [
+          "The Flight Deck's plan line had the same fault and is drawn the same way — sampled, unwrapped at the date line and wrapped at the edges.",
+          "The Navigator no longer frames its first view as though the route panel were closed, which left the plan under the panel until the window was resized."
+        ],
+        "performance": [
+          "The globe is painted whole on the first still frame when its pane fits one frame's sampling — a shallow view is sharp with no settle — while a deep zoom still fills in a band at a time."
+        ],
+        "ui": [],
+        "compatibility": [],
+        "other": []
+      }
+    },
     {
       "version": "2.1.26",
       "releasedAt": "2026-10-27",

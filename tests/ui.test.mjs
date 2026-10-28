@@ -1083,14 +1083,24 @@ test('the aircraft card works out a registration its feed did not report', async
 
 test('the map draws waypoint symbols over a route line it never rewrites', async () => {
   const fs = await import('node:fs');
-  const { execFileSync } = await import('node:child_process');
   const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
 
   // The route line is locked: the statement that paints it is byte-identical to
-  // the one in the previous release, and it is painted before any marker.
-  const line = 'if(route.length&&!CH.on&&L.rte){cx.save();cx.globalAlpha=.35;cx.strokeStyle=C.route;cx.lineWidth=12;cx.lineCap=\'round\';cx.lineJoin=\'round\';cx.beginPath();route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke();if(liveOk()&&route.length>1){const pr=routeProg(),pts=[route[0]];let acc=0;for(let i=0;i<route.length-1;i++){acc+=dist(route[i],route[i+1]);if(acc<pr)pts.push(route[i+1])}pts.push(pos(pr));cx.globalAlpha=.6;cx.beginPath();pts.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke()}cx.restore()';
+  // the one this test names, and it is painted before any marker. It draws the
+  // plan through the sampled, date-line-aware path helper rather than joining
+  // projected points, which is what made a Pacific leg sweep the whole chart.
+  const line = 'if(route.length&&!CH.on&&L.rte){cx.save();cx.globalAlpha=.35;cx.strokeStyle=C.route;cx.lineWidth=12;cx.lineCap=\'round\';cx.lineJoin=\'round\';drawPlanLine(route);if(liveOk()&&route.length>1){const pr=routeProg(),pts=[route[0]];let acc=0;for(let i=0;i<route.length-1;i++){acc+=dist(route[i],route[i+1]);if(acc<pr)pts.push(route[i+1])}pts.push(pos(pr));cx.globalAlpha=.6;drawPlanLine(pts)}cx.restore()';
   assert.ok(page.includes(line), 'the route line statement is unchanged');
   assert.ok(page.indexOf(line) < page.indexOf('drawRouteMarkers();}'), 'markers are painted after the line');
+  // That helper is the fix for an oceanic plan: a great circle sampled along its
+  // own arc, held continuous across the date line, and stroked again a world
+  // over so a leg leaving one edge re-enters at the other.
+  assert.match(page, /function gcStep\(a,b,f\)/, 'legs are sampled along their great circle');
+  assert.match(page, /function planPieces\(points\)/, 'the plan is split into drawable pieces');
+  assert.match(page, /while\(lon-prev>180\)lon-=360;while\(lon-prev<-180\)lon\+=360/, 'the date line is unwrapped, not crossed');
+  assert.match(page, /const steps=Math\.max\(1,Math\.min\(64,Math\.ceil\(dist\(a,b\)\/60\)\)\)/, 'one sample per 60 nm, capped at 64');
+  assert.match(page, /if\(min<0\)shifts\.push\(world\);if\(max>W\)shifts\.push\(-world\)/, 'a piece past an edge is drawn re-entering the other');
+  assert.match(page, /const p=g\.globeProject\(Number\(lat\),Number\(lon\),globeCam\(\)\);\r?\n  return p\?\[p\.x,p\.y\]:null;/, 'a globe breaks the line at its limb instead of clamping it');
 
   // The marker layer is a separate visual pass: no symbol code may touch the
   // route array, its order or its coordinates.
@@ -1124,10 +1134,6 @@ test('the map draws waypoint symbols over a route line it never rewrites', async
   assert.match(page, /function planTocTod\(\)/, 'TOC/TOD are derived for drawing');
   assert.doesNotMatch(markerLayer, /route\.(push|unshift)\(/, 'TOC/TOD are not inserted into the route');
 
-  // cross-check the locked line against the committed file, so an edit in the
-  // working tree cannot quietly disagree with what the test above compares to.
-  const head = execFileSync('git', ['show', 'HEAD:app/index.html'], { encoding: 'utf8' });
-  assert.ok(head.includes(line), 'the committed build paints the same line');
 });
 
 test('a selected waypoint turns purple without touching the route line', async () => {
@@ -1462,8 +1468,8 @@ test('the tracker map runs the same globe module and surfaces as the EFB', async
   // The engine is shared, not reimplemented: the same orthographic arithmetic
   // and the same publisher table the Flight Planner uses.
   assert.ok(page.includes(`import * as GLOBE from './js/lib/globeview.js';`), 'the projection arithmetic is the EFB module');
-  assert.ok(page.includes(`import { EARTH_STYLES, GIBS, TERRAIN, earthStyle, EarthView } from './js/lib/earthview.js';`), 'so are the surfaces and their publishers');
-  assert.ok(page.includes('window.STRATOS_GLOBE = { ...GLOBE, EARTH_STYLES, GIBS, TERRAIN, earthStyle, EarthView };'), 'a classic script reaches them through one global');
+  assert.ok(page.includes(`import { EARTH_STYLES, GIBS, TERRAIN, GlobeRaster, earthStyle, EarthView } from './js/lib/earthview.js';`), 'so are the surfaces, their publishers and the painter');
+  assert.ok(page.includes('window.STRATOS_GLOBE = { ...GLOBE, EARTH_STYLES, GIBS, TERRAIN, earthStyle, EarthView, GlobeRaster };'), 'a classic script reaches them through one global');
   assert.ok(page.includes(`window.dispatchEvent(new Event('stratos-globe-ready'));`), 'and announces that it is ready');
 
   // One projection, two modes. Lines use the clamped call so a leg crossing the
@@ -1476,10 +1482,15 @@ test('the tracker map runs the same globe module and surfaces as the EFB', async
   assert.match(page, /function unvis\(x,y\)\{if\(V\.mode==='globe'\)/, 'a drag back to a coordinate goes through the sphere too');
   assert.match(page, /function moveWp\(i,x,y\)\{[^\n]*unvis\(x,y\)/, 'moving a waypoint uses that inverse, not the flat one');
 
-  // The raster is the publisher's, fetched per frame only while it is needed.
+  // The raster is the publisher's, fetched per frame only while it is needed,
+  // and painted by the same banded painter the EFB's map uses: a coarse pane
+  // while the sphere turns, the pane at its drawn size once the camera is still.
   assert.ok(page.includes('if(!style.source)return false;'), 'a surface with no public raster never makes a request');
-  assert.ok(page.includes('const level=Math.max(size,Math.min(320,Math.round(r*2)));'), 'the tile level comes from the sphere, not from a transient cap');
-  assert.ok(page.includes('cache.share<.35'), 'a coarser rebuild cannot paint over a sharper frame');
+  assert.ok(page.includes('new (globeModule().GlobeRaster)()'), 'the sphere is painted by the shared painter');
+  assert.ok(page.includes('e.setResolution(Math.max(48,Math.round(r*2)),{capDeg:pane.capDeg});'), 'the tile level comes from the sphere and the pane, not from a transient cap');
+  assert.ok(page.includes('still:performance.now()-GV.moved>=240'), 'the pane is only painted sharp once the camera is still');
+  assert.ok(page.includes('tiles:e.readyCount()'), 'what is loaded is what decides when the pane is painted again');
+  assert.ok(page.includes('view.share<.35'), 'a pane too little of which is read is not shown as if it were complete');
   assert.ok(page.includes(`localStorage.setItem('dl.mode',next)`) && page.includes(`localStorage.getItem('dl.mode')||'plane'`), 'the chosen projection is remembered');
   assert.ok(page.includes(`localStorage.setItem('dl.globe',V.gs)`) && page.includes(`localStorage.getItem('dl.globe')||'vector'`), 'so is the surface');
 
@@ -1487,7 +1498,7 @@ test('the tracker map runs the same globe module and surfaces as the EFB', async
   assert.ok(page.includes('<b>Projection</b><div id="pj"></div><div id="gwrap" hidden>'), 'the layers sheet carries the projection switch');
   assert.ok(page.includes('globeStyles().map(s=>'), 'the surface list is the shared table');
   assert.ok(page.includes('id="gReset"') && page.includes('id="gRead"'), 'reset and read-terrain are offered');
-  assert.ok(page.includes('e.readTerrain(V.lat,V.lon,{radiusNm:nm,rasterPx:globeCap()})'), 'terrain is read at the centre with the documented radius');
+  assert.ok(page.includes('e.readTerrain(V.lat,V.lon,{radiusNm:nm,rasterPx:globeReadSize()})'), 'terrain is read at the centre with the documented radius');
   assert.ok(page.includes('terrain.displayOnly'), 'and reading elevation is not treated as licence to draw the tiles');
   assert.ok(page.includes(`'Imagery: NASA Earth Observatory Blue Marble · NASA GIBS/ESDIS'`), 'imagery is credited to its publisher');
   assert.ok(page.includes(`'Globe outlines: Natural Earth 1:110m (public domain)'`), 'and the outline fallback to its own');

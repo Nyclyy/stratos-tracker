@@ -1,4 +1,27 @@
 {
+  "2.1.27": {
+    "summary": "Route lines are drawn the way a chart draws them — great circles, and across the date line instead of over the continents in between — a Pacific plan is fitted across the Pacific with its panel beside it, a shallow globe is sharp on its first still frame, and the EFB's airline picker now covers 53 operators.",
+    "changelog": {
+      "features": [
+        "A fitted view can show a plan that spans half the world: the chart may zoom out past the zoom buttons' own floor, so a Singapore–Newark plan is on one screen at once.",
+        "The route panel narrows the chart rather than covering it, and the plan is fitted into the space the panel leaves as soon as the panel has been measured.",
+        "Airline appearance offers 53 operators — searchable by name, ICAO or IATA code — so most SimBrief callsigns can wear their own colours instead of the Stratos default."
+      ],
+      "improvements": [
+        "Each leg is drawn along its great circle, so a long oceanic leg bends the way it does on a chart instead of running ruler-straight.",
+        "A leg across the date line leaves one edge and re-enters on the other, rather than crossing every continent in between.",
+        "A plan that crosses the date line is centred on the ocean it crosses, not on the Atlantic.",
+        "A chart shifted to make room for a panel keeps looking at the same place: the offset is a drawing shift, not a change in longitude."
+      ],
+      "fixes": [
+        "The Flight Deck's plan line had the same fault and is drawn the same way — sampled, unwrapped at the date line and wrapped at the edges.",
+        "The Navigator no longer frames its first view as though the route panel were closed, which left the plan under the panel until the window was resized."
+      ],
+      "performance": [
+        "The globe is painted whole on the first still frame when its pane fits one frame's sampling — a shallow view is sharp with no settle — while a deep zoom still fills in a band at a time."
+      ]
+    }
+  },
   "2.1.26": {
     "summary": "The Flight Deck map gets the same globe as the Flight Planner — real NASA imagery and real terrain shading, with the ground under the centre read from the tiles — and the EFB gains a Flight Planner that builds an IFR route from published navigation data.",
     "changelog": {

@@ -243,16 +243,89 @@ export function nmPerPixelAtCentre(radius) {
 }
 
 /**
+ * The part of a sphere one frame is painted from: which rectangle of the canvas
+ * holds the sphere, what scale to paint it at, and how much of the globe that
+ * rectangle can see.
+ *
+ * A globe zoomed in is drawn larger than the canvas, so only a pane of it is on
+ * screen, and a picture of that pane has to be painted at the size it is drawn
+ * or it is soft however fine the imagery is. Painting the pane whole would be
+ * millions of samples for one frame, so the scale is the largest that keeps the
+ * pane's own pixels inside `budget`; `capDeg` is the angular radius the pane can
+ * see, which is what bounds how many tiles a hemisphere-deep level would ask for.
+ */
+export function globeRasterPlan({ width, height, radius, cx, cy, dpr = 1, budget = 0 }) {
+  const r = Math.max(1, Number(radius) || 1);
+  const centreX = Number(cx) || 0;
+  const centreY = Number(cy) || 0;
+  const boxWidth = Math.max(1, Number(width) || 0);
+  const boxHeight = Math.max(1, Number(height) || 0);
+  // The pane is the sphere's own bounding box, cut to the canvas. A sphere
+  // smaller than the canvas is rasterised whole; a larger one is rasterised as
+  // much of itself as the canvas can show.
+  const x0 = Math.max(0, Math.min(boxWidth - 1, Math.floor(centreX - r)));
+  const y0 = Math.max(0, Math.min(boxHeight - 1, Math.floor(centreY - r)));
+  const x1 = Math.min(boxWidth, Math.max(x0 + 1, Math.ceil(centreX + r)));
+  const y1 = Math.min(boxHeight, Math.max(y0 + 1, Math.ceil(centreY + r)));
+  const spanX = x1 - x0;
+  const spanY = y1 - y0;
+  // A device pixel is the finest thing anything can be shown at, so a retina
+  // canvas is worth painting finer — up to the budget, and never beyond what the
+  // screen can display.
+  const finest = Math.max(1, Math.min(4, Number(dpr) || 1));
+  const affordable = budget > 0 ? Math.sqrt(budget / (spanX * spanY)) : finest;
+  const scale = Math.min(finest, affordable);
+  // Rounded down, so the pane never asks for a sample more than the budget it
+  // was given: every pixel of the pane is a sample, and the disc inside it is
+  // fewer still.
+  const columns = Math.max(1, Math.floor(spanX * scale));
+  const rows = Math.max(1, Math.floor(spanY * scale));
+  /* The farthest point the pane can show is its farthest corner, and a distance
+     of `r` from the middle is the limb: everything within that many pixels of
+     the camera's target is in front of it, and nothing else on the canvas is
+     nearer. */
+  const far = Math.max(
+    Math.hypot(centreX - x0, centreY - y0),
+    Math.hypot(centreX - x1, centreY - y0),
+    Math.hypot(centreX - x0, centreY - y1),
+    Math.hypot(centreX - x1, centreY - y1),
+  );
+  return {
+    x0,
+    y0,
+    width: spanX,
+    height: spanY,
+    columns,
+    rows,
+    scale: columns / spanX,
+    radius: r * scale,
+    cx: (centreX - x0) * scale,
+    cy: (centreY - y0) * scale,
+    capDeg: Math.asin(Math.min(1, far / r)) / DEG,
+  };
+}
+
+/**
  * One pass of the inverse projection into `data` — an ImageData buffer the
  * caller already owns. `sample(lat, lon, out)` writes the colour for a
  * coordinate into a four-slot array and returns null where nothing is loaded
  * yet, in which case the sphere's own flat base colour is written instead.
  *
+ * The raster is a pane of the sphere: `columns` x `rows` pixels of it, whose
+ * own centre sits at (`cx`, `cy`) and whose limb is `radius` pixels out. One
+ * `size` alone rasterises the whole disc, which is the same plan with the
+ * sphere in the middle at half the width — the shape every existing caller
+ * asks for. `rowOffset` starts the pass at a later row of the caller's buffer,
+ * so a picture too big for one frame is painted a band at a time.
+ *
  * Returns how many pixels asked for a colour and how many got one, so the
  * caller can decide whether the picture is complete enough to show rather than
  * showing a plausible-looking empty sphere.
  */
-export function rasteriseGlobe({ size, center, sample, base, data }) {
+export function rasteriseGlobe({ size, columns, rows, radius, cx, cy, rowOffset = 0, center, sample, base, data }) {
+  const cols = Math.max(1, Math.round(Number(columns ?? size) || 0));
+  const lines = Math.max(1, Math.round(Number(rows ?? size) || 0));
+  const firstRow = Math.max(0, Math.round(Number(rowOffset) || 0));
   const phi0 = center.lat * DEG;
   const lam0 = center.lon * DEG;
   const sin0 = Math.sin(phi0);
@@ -268,26 +341,31 @@ export function rasteriseGlobe({ size, center, sample, base, data }) {
   const acrossVec = [-sinLam, cosLam, 0];
   const upVec = [-sin0 * cosLam, -sin0 * sinLam, cos0];
   const forwardVec = [cos0 * cosLam, cos0 * sinLam, sin0];
-  const half = size / 2;
+  const limb = Number(radius) > 0 ? Number(radius) : cols / 2;
+  const centreX = Number.isFinite(Number(cx)) ? Number(cx) : cols / 2;
+  const centreY = Number.isFinite(Number(cy)) ? Number(cy) : lines / 2;
   const pixel = [0, 0, 0, 0];
   let painted = 0;
   let asked = 0;
-  for (let y = 0; y < size; y += 1) {
+  for (let y = 0; y < lines; y += 1) {
+    // A band starts at its own row of the pane, not at the top of the pane: the
+    // geometry has to be asked about the row the buffer row stands for.
+    const row = firstRow + y;
     // Only the rows inside the disc, and only the columns inside it on this
-    // row: the corners are a quarter of the square and are never drawn.
-    const ry = (half - y - 0.5) / half;
+    // row: the corners of the pane are never drawn.
+    const ry = (centreY - row - 0.5) / limb;
     const rhoY = ry * ry;
     if (!(rhoY < 1)) continue;
     const span = Math.sqrt(1 - rhoY);
-    const x0 = Math.max(0, Math.round(half - span * half));
-    const x1 = Math.min(size - 1, Math.round(half + span * half) - 1);
+    const x0 = Math.max(0, Math.round(centreX - span * limb));
+    const x1 = Math.min(cols - 1, Math.round(centreX + span * limb) - 1);
     // The row is fixed for the whole run of x, so its share of the up vector
     // is worked out once instead of per pixel.
     const upx = upVec[0] * ry;
     const upy = upVec[1] * ry;
     const upz = upVec[2] * ry;
     for (let x = x0; x <= x1; x += 1) {
-      const rx = (x + 0.5 - half) / half;
+      const rx = (x + 0.5 - centreX) / limb;
       const rho2 = rx * rx + rhoY;
       if (rho2 > 1) continue;
       const zc = Math.sqrt(1 - rho2);
@@ -296,7 +374,7 @@ export function rasteriseGlobe({ size, center, sample, base, data }) {
       const vz = acrossVec[2] * rx + upz + forwardVec[2] * zc;
       const lat = Math.asin(vz > 1 ? 1 : vz < -1 ? -1 : vz);
       const colour = sample(lat / DEG, ((Math.atan2(vy, vx) / DEG + 540) % 360) - 180, pixel);
-      const index = (y * size + x) * 4;
+      const index = (row * cols + x) * 4;
       asked += 1;
       if (colour && colour[3] > 0) {
         painted += 1;

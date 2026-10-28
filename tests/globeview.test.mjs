@@ -6,6 +6,7 @@ import {
   cameraDirection,
   cameraFor,
   clipToHemisphere,
+  globeRasterPlan,
   globeProject,
   globeProjectClamped,
   globeProjectVector,
@@ -155,6 +156,104 @@ test('a pixel at the middle of the sphere is a real ground distance', () => {
   assert.ok(Math.abs(nmPerPixelAtCentre(3437.7468) - 1) < 1e-9);
   assert.equal(nmPerPixelAtCentre(0), 3437.7468, 'a degenerate radius cannot divide by zero');
   assert.ok(nmPerPixelAtCentre(600) < nmPerPixelAtCentre(200), 'zooming in shrinks the ground per pixel');
+});
+
+test('the pane is the sphere the canvas can show, painted at the size it is drawn', () => {
+  // A sphere smaller than the canvas is painted whole, one pixel for one pixel:
+  // this is the shape every caller of rasteriseGlobe had before the pane existed.
+  const whole = globeRasterPlan({ width: 1280, height: 800, radius: 300, cx: 640, cy: 400, dpr: 1, budget: 1000000 });
+  assert.deepEqual(
+    [whole.x0, whole.y0, whole.width, whole.height, whole.columns, whole.rows],
+    [340, 100, 600, 600, 600, 600],
+    'the disc, at one output pixel per drawn pixel',
+  );
+  assert.equal(whole.scale, 1);
+  assert.equal(whole.cx, 300, 'the sphere centre is written in the pane\'s own coordinates');
+  assert.equal(whole.radius, 300);
+  assert.equal(Math.round(whole.capDeg), 90, 'a sphere that fits the canvas can show a whole hemisphere');
+
+  // A sphere drawn larger than the canvas is painted as much of itself as the
+  // canvas can show, and the pane narrows in degrees as it grows: that narrowing
+  // is what a deeper level is paid for out of.
+  const zoomed = globeRasterPlan({ width: 1280, height: 800, radius: 1500, cx: 640, cy: 400, dpr: 1, budget: 2000000 });
+  assert.deepEqual([zoomed.x0, zoomed.y0, zoomed.width, zoomed.height], [0, 0, 1280, 800], 'the canvas, to its own edges');
+  assert.deepEqual([zoomed.columns, zoomed.rows], [1280, 800], 'one output pixel for one drawn pixel');
+  assert.deepEqual([zoomed.cx, zoomed.cy], [640, 400], 'the sphere centre is in the pane, wherever the sphere is');
+  const closer = globeRasterPlan({ width: 1280, height: 800, radius: 6000, cx: 640, cy: 400, dpr: 1, budget: 2000000 });
+  assert.ok(closer.capDeg < zoomed.capDeg, 'a closer camera sees less of the globe');
+  assert.ok(Math.abs(zoomed.capDeg - Math.asin(Math.hypot(640, 400) / 1500) * 180 / Math.PI) < 1e-9,
+    'and how much it sees is the farthest corner of the pane, folded onto the limb');
+
+  // A budget that cannot pay for the whole pane pays for a coarser one: the pane
+  // itself does not move, only the scale it is painted at.
+  const cheap = globeRasterPlan({ width: 1280, height: 800, radius: 1500, cx: 640, cy: 400, dpr: 1, budget: 200000 });
+  assert.deepEqual([cheap.x0, cheap.y0, cheap.width, cheap.height], [0, 0, 1280, 800], 'the same pane');
+  assert.ok(cheap.columns < zoomed.columns && cheap.rows < zoomed.rows, 'at a coarser scale');
+  assert.ok(Math.abs(cheap.radius - 1500 * cheap.scale) < 1, 'with the sphere scaled with it');
+  // The budget bounds the samples the pass actually asks for, which is the
+  // disc rather than the rectangle around it.
+  const asked = rasteriseGlobe({
+    columns: cheap.columns,
+    rows: cheap.rows,
+    radius: cheap.radius,
+    cx: cheap.cx,
+    cy: cheap.cy,
+    rowOffset: 0,
+    center: { lat: 0, lon: 0 },
+    base: [0, 0, 0],
+    data: new Uint8ClampedArray(cheap.columns * cheap.rows * 4),
+    sample: (lat, lon, out) => { out[3] = 255; return out; },
+  });
+  assert.ok(asked.asked <= 200000, `the pane stays inside the budget it was given (${asked.asked} samples)`);
+
+  // A retina canvas is worth painting finer, up to what the screen can show.
+  const retina = globeRasterPlan({ width: 1280, height: 800, radius: 1500, cx: 640, cy: 400, dpr: 2, budget: 2000000 });
+  assert.ok(retina.scale > 1 && retina.scale <= 2, `a device pixel is the finest anything can be shown at (${retina.scale})`);
+  const nudge = globeRasterPlan({ width: 1280, height: 800, radius: 1500, cx: 640, cy: 400, dpr: 9, budget: 2000000 });
+  assert.ok(nudge.scale <= 4, 'and no further than that, whatever the device claims');
+
+  // Nothing outside the canvas is ever painted.
+  const off = globeRasterPlan({ width: 400, height: 300, radius: 900, cx: 20, cy: 280, dpr: 1, budget: 100000 });
+  assert.ok(off.x0 >= 0 && off.y0 >= 0 && off.x0 + off.width <= 400 && off.y0 + off.height <= 300);
+});
+
+test('a raster pane can be painted a band at a time, into the caller\'s buffer', () => {
+  const columns = 40;
+  const rows = 24;
+  const radius = 18;
+  const cx = 16;
+  const cy = 10;
+  const paint = (rowOffset, bandRows) => {
+    const data = new Uint8ClampedArray(columns * rows * 4);
+    const stats = rasteriseGlobe({
+      columns,
+      rows: bandRows,
+      radius,
+      cx,
+      cy,
+      rowOffset,
+      center: { lat: 0, lon: 0 },
+      base: [10, 20, 30],
+      data,
+      sample: (lat, lon, out) => { out[0] = 200; out[1] = 100; out[2] = 50; out[3] = 255; return out; },
+    });
+    return { data, stats };
+  };
+  // The whole pane in one pass, and the same pane in bands, must agree pixel for
+  // pixel: that is what makes filling a picture in over several frames safe.
+  const whole = paint(0, rows);
+  const banded = new Uint8ClampedArray(columns * rows * 4);
+  let bandAsked = 0;
+  for (let row = 0; row < rows; row += 6) {
+    const height = Math.min(6, rows - row);
+    const band = paint(row, height);
+    bandAsked += band.stats.asked;
+    banded.set(band.data.subarray(row * columns * 4, (row + height) * columns * 4), row * columns * 4);
+  }
+  assert.deepEqual([...banded], [...whole.data], 'the bands are the same picture as one pass');
+  assert.equal(bandAsked, whole.stats.asked, 'asking for the same pixels, once each');
+  assert.equal(whole.stats.painted, whole.stats.asked, 'and a sampler that answers paints every pixel it was asked for');
+  assert.ok(whole.stats.asked > 0 && whole.stats.asked < columns * rows, 'while the corners of the pane are never asked about');
 });
 
 test('the raster pass paints the disc and only the disc, into the buffer it was given', () => {

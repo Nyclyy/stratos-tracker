@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  EARTH_STYLES, GIBS, POINT_ZOOM, TERRAIN, EarthView, decodeTerrarium, earthStyle, elevationColor,
-  gibsCoverage, gibsMatrix, gibsTileUrl, gibsZoomForRaster, mercatorFraction, offsetNm,
-  probeZoomForRadius, shadeTerrainTile, terrainMetresPerPixel, terrainTileAt, terrainTileUrl,
-  terrainZoomForRaster,
+  EARTH_STYLES, GIBS, GlobeRaster, MAX_FACE_TILES, MAX_TERRAIN_FACE_TILES, POINT_ZOOM, TERRAIN,
+  EarthView, decodeTerrarium, earthStyle, elevationColor, gibsCoverage, gibsMatrix, gibsTileUrl,
+  gibsZoomForSphere, mercatorFraction, offsetNm, probeZoomForRadius, shadeTerrainTile,
+  terrainMetresPerPixel, terrainTileAt, terrainTileUrl, terrainZoomForSphere,
 } from '../app/js/lib/earthview.js';
 
 /* The two publishers, checked against the way their services actually address
@@ -32,18 +32,60 @@ test('a GIBS tile covers the ground its matrix says it does', () => {
   assert.deepEqual([south.north, south.south], [-30, -90], 'and the last row reaches the pole');
 });
 
-test('the imagery level follows the sphere and stays bounded', () => {
-  assert.equal(gibsZoomForRaster(20), 0);
-  assert.equal(gibsZoomForRaster(300), 2);
-  assert.equal(gibsZoomForRaster(4000), 4, 'never deeper than a globe can show');
-  assert.ok(gibsZoomForRaster(600) > gibsZoomForRaster(200), 'a bigger sphere gets more detail');
+/* The radius and the angular radius of the pane the camera can see, for the
+   sphere each zoom of a 1280x800 chart draws: the pane narrows as the sphere
+   grows past the canvas, which is what makes a deep level affordable. */
+const DRAWN = [[348, 90], [696, 90], [1392, 33], [2784, 16], [5568, 8], [13920, 3.1]];
+
+/** How many tiles of one level a pane of that angular radius takes. */
+const paneTilesOf = (level, capDeg, tilesWide = GIBS.matrices[level][0]) => ((capDeg * tilesWide) / 180) ** 2;
+
+test('the imagery level follows what is drawn, and is bounded by the pane', () => {
+  // One sphere per screen has always read the coarse level, and still does.
+  assert.equal(gibsZoomForSphere(348), 2);
+  assert.equal(gibsZoomForSphere(20), 0);
+
+  // Zooming in reads deeper, because the camera is closer to the ground and the
+  // pane it can see is narrower in degrees.
+  const levels = DRAWN.map(([radius, capDeg]) => gibsZoomForSphere(radius, { capDeg }));
+  assert.deepEqual(levels, [...levels].sort((a, b) => a - b), 'a closer camera reads a deeper level');
+  assert.ok(levels[0] < levels[levels.length - 1], 'from the coarse level to the deepest the pyramid holds');
+  assert.equal(levels[levels.length - 1], GIBS.matrices.length - 1, 'a zoomed globe is not capped short of the source');
+
+  // The source is never coarser than the sphere is drawn. The pyramid doubles at
+  // every step, so "at least as fine" lands between one and two times finer.
+  for (const [radius, capDeg] of DRAWN) {
+    const level = gibsZoomForSphere(radius, { capDeg });
+    const source = (GIBS.tilePixels * GIBS.matrices[level][0]) / 360;   // pixels per degree
+    const ratio = source / (radius / 90);
+    assert.ok(ratio >= 1, `${radius} px sphere reads at least as fine as it is drawn (${ratio.toFixed(2)}x)`);
+    assert.ok(ratio < 2.1, `and not a whole step finer (${ratio.toFixed(2)}x)`);
+  }
+
+  // Cost is bounded by the pane rather than by a fixed ceiling: eight degrees of
+  // level 7 is a handful of tiles, while a hemisphere of level 7 is thousands.
+  for (const [radius, capDeg] of DRAWN) {
+    const tiles = paneTilesOf(gibsZoomForSphere(radius, { capDeg }), capDeg);
+    assert.ok(tiles <= MAX_FACE_TILES, `a ${radius} px sphere asks for ${Math.round(tiles)} tiles`);
+  }
+  assert.equal(gibsZoomForSphere(13920, { capDeg: 90 }), 3, 'the same sphere over a whole hemisphere is held back');
 });
 
 test('the drawn level stays cheap and the probe level stays honest', () => {
-  const drawn = terrainZoomForRaster(320);
+  const drawn = terrainZoomForSphere(160, { capDeg: 90 });
   assert.equal(drawn, 3);
   assert.ok(2 ** drawn <= 16, 'so the visible face is a handful of tiles, not a pyramid');
-  assert.equal(terrainZoomForRaster(320), terrainZoomForRaster(168) + 1, 'and it follows the sphere');
+  assert.equal(terrainZoomForSphere(160, { capDeg: 90 }), terrainZoomForSphere(84, { capDeg: 90 }) + 1, 'and it follows the sphere');
+
+  // Terrain is decoded and hillshaded rather than merely sampled, so its pane is
+  // held to fewer tiles than the imagery's — which is what bounds the work now
+  // that the level follows the zoom instead of a fixed ceiling.
+  for (const [radius, capDeg] of DRAWN) {
+    const level = terrainZoomForSphere(radius, { capDeg });
+    const tiles = ((capDeg * 2 ** level) / 180) ** 2;
+    assert.ok(tiles <= MAX_TERRAIN_FACE_TILES, `a ${radius} px sphere asks for ${Math.round(tiles)} terrain tiles`);
+    assert.ok(level >= 1 && level <= TERRAIN.maxZoom, 'at a level the publisher actually serves');
+  }
 
   // A radius scan reads a level whose tiles are near its own sample spacing,
   // which keeps a 20 NM scan and a 320 NM scan to about the same number of
@@ -65,7 +107,7 @@ test('terrain tiles are slippy, and their level follows the sphere', () => {
   assert.equal(terrainTileUrl(7, 20, 44), `${TERRAIN.base}/7/20/44.png`);
   assert.equal(terrainTileUrl(16, 0, 0), null, "past the publisher's ceiling");
   assert.equal(terrainTileUrl(1, 2, 1), null, 'x beyond the width of that level');
-  const zoom = terrainZoomForRaster(300);
+  const zoom = terrainZoomForSphere(150);
   assert.ok(zoom >= 1 && zoom <= 6, 'a globe reads a coarse level, not a pyramid');
   assert.ok(terrainMetresPerPixel(6, 60) < terrainMetresPerPixel(6, 0), 'narrower as the meridians converge');
 });
@@ -206,6 +248,293 @@ test('relief and elevation are two different pictures of the same ground', () =>
     `the elevation look carries the hypsometric colour (${colourSpread} against ${greySpread})`);
   assert.ok(colour.data[east + 3] === 255, 'and it is opaque');
   view.destroy();
+});
+
+/* The painter, which is what decides whether a zoomed globe is sharp and what it
+   costs a frame to get there. A canvas is stubbed because none of this needs a
+   real one: what matters is which buffer is painted, how much of it per frame,
+   and which picture is handed back. */
+test('the painter fills a pane in bands and keeps a coarse one for a turn', () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  globalThis.document = {
+    documentElement: { dataset: { theme: 'night' } },
+    createElement() {
+      const canvas = {
+        width: 0,
+        height: 0,
+        getContext: () => ({
+          createImageData: (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }),
+          putImageData: image => { canvas.painted = image.width * image.height; },
+        }),
+      };
+      return canvas;
+    },
+  };
+  try {
+    const band = 2000;
+    let ticks = 0;
+    let sampled = 0;
+    const painter = new GlobeRaster({ band, onProgress: () => { ticks += 1; } });
+    const surface = {
+      key: 'imagery|night',
+      tiles: 3,
+      base: [10, 22, 34],
+      sample: (lat, lon, out) => { sampled += 1; out[0] = 90; out[1] = 120; out[2] = 60; out[3] = 255; return out; },
+    };
+    const camera = { lat: 47.4, lon: -122.3 };
+    const geometry = { width: 640, height: 400, radius: 1800, cx: 320, cy: 200, dpr: 1 };
+    const pane = painter.geometry(geometry);
+
+    // The coarse pane is the same piece of canvas at a coarser scale, so a turn
+    // can be drawn from it straight away without moving the sphere.
+    assert.ok(pane.coarse.columns < pane.columns, 'the coarse pane is coarser');
+    assert.deepEqual(
+      [pane.coarse.x0, pane.coarse.y0, pane.coarse.width, pane.coarse.height],
+      [pane.x0, pane.y0, pane.width, pane.height],
+      'and sits in the same place',
+    );
+    assert.ok(pane.coarse.columns * pane.coarse.rows < 30000, 'small enough for a frame of a drag');
+
+    // A frame of a turn: the coarse pane, and nothing kept for later.
+    const turning = painter.frame({ pane, camera, surface, still: false });
+    assert.ok(turning && turning.canvas, 'a turning frame is drawn from the coarse pane');
+    assert.equal(turning.canvas.width, pane.coarse.columns, 'at the coarse pane\'s own size');
+    assert.equal(painter.picture, null, 'and no sharp pane has been finished yet');
+    assert.equal(painter.frame({ pane, camera, surface, still: false }), turning,
+      'the same camera does not repaint the pane it already has');
+
+    // The camera still: the pane is filled in a band at a time, and no frame is
+    // asked for more than its band.
+    let previousRow = 0;
+    let widestFrame = 0;
+    let frames = 0;
+    while (!painter.picture && frames < 400) {
+      const before = sampled;
+      painter.frame({ pane, camera, surface, still: true });
+      widestFrame = Math.max(widestFrame, sampled - before);
+      if (painter.build) {
+        assert.ok(painter.build.row >= previousRow, 'the pane fills in from the top, never backwards');
+        previousRow = painter.build.row;
+      }
+      frames += 1;
+    }
+    assert.ok(painter.picture, 'a pane converges once the camera stops');
+    assert.ok(frames > 1, `and takes more than one frame to do it (${frames})`);
+    assert.ok(widestFrame <= band + pane.columns, `and no frame asks for more than a band (${widestFrame} samples)`);
+    assert.equal(ticks, frames - 1, 'each unfinished band asks for the next frame');
+
+    // The finished pane is what is handed back, at its own size.
+    const sharp = painter.frame({ pane, camera, surface, still: true });
+    assert.equal(sharp, painter.picture.view, 'the sharp pane is what a still camera is drawn from');
+    assert.equal(sharp.canvas.width, pane.columns);
+    assert.equal(sharp.width, pane.width, 'and it covers the same rectangle of the canvas');
+    assert.equal(sharp.share, 1, 'a sampler that answers everything paints everything');
+
+    // Tiles landing while a pane is filling in are absorbed, not restarted: a
+    // face filling in would otherwise begin again on every arrival.
+    painter.clear();
+    painter.frame({ pane, camera, surface, still: false });
+    const rows = [];
+    for (let i = 0; i < 8; i += 1) {
+      surface.tiles = 3 + i;
+      painter.frame({ pane, camera, surface, still: true });
+      rows.push(painter.build ? painter.build.row : -1);
+    }
+    assert.ok(rows.every((row, i) => i === 0 || row >= rows[i - 1]), `a pane keeps filling through arrivals (${rows.join(',')})`);
+
+    // Moving the camera drops the half-painted pane rather than blitting it in
+    // the wrong place, and draws the coarse one instead.
+    const moved = painter.frame({ pane, camera: { lat: 48.2, lon: -122.3 }, surface, still: false });
+    assert.equal(painter.build, null, 'a pane of another frame\'s geometry is dropped');
+    assert.equal(moved.canvas.width, pane.coarse.columns, 'and the coarse pane is drawn in its place');
+
+    // Changing the surface is a different picture even at the same place.
+    painter.frame({ pane, camera, surface, still: true });
+    surface.key = 'relief|night';
+    assert.equal(painter.picture, null, 'a new surface has no pane yet');
+    painter.clear();
+    assert.equal(painter.coarse, null);
+    assert.equal(painter.frame({ pane, camera, surface: { ...surface, sample: null } }), null, 'a surface with no sampler paints nothing');
+  } finally {
+    if (had) Object.defineProperty(globalThis, 'document', had);
+    else delete globalThis.document;
+  }
+});
+
+test('a finished pane is left alone until the camera, the surface or a tile changes', () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  globalThis.document = {
+    documentElement: { dataset: { theme: 'night' } },
+    createElement: () => ({
+      width: 0,
+      height: 0,
+      getContext: () => ({
+        createImageData: (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }),
+        putImageData: () => {},
+      }),
+    }),
+  };
+  try {
+    let sampled = 0;
+    const painter = new GlobeRaster({ band: 4000 });
+    const surface = {
+      key: 'imagery|night',
+      tiles: 2,
+      base: [10, 22, 34],
+      sample: (lat, lon, out) => { sampled += 1; out[0] = 90; out[1] = 120; out[2] = 60; out[3] = 255; return out; },
+    };
+    const camera = { lat: 46.9, lon: 7.4 };
+    const pane = painter.geometry({ width: 320, height: 240, radius: 120, cx: 160, cy: 120, dpr: 1 });
+    const still = { pane, camera, surface, still: true };
+
+    let frames = 0;
+    while (!painter.picture && frames < 400) { painter.frame(still); frames += 1; }
+    assert.ok(painter.picture, 'the pane converges');
+    assert.equal(painter.picture.tiles, 2, 'and records the tiles it was painted from');
+    assert.ok(painter.picture.settled, 'nothing was on its way, so it is finished');
+
+    // A tracker map draws every frame for as long as the page is open. A pane
+    // that repainted itself on every one of those would burn a frame's worth of
+    // samples forever for a picture that cannot change.
+    const painted = sampled;
+    for (let i = 0; i < 30; i += 1) painter.frame(still);
+    assert.equal(sampled, painted, 'a finished pane is not painted again by a map that keeps drawing');
+    assert.equal(painter.frame(still), painter.picture.view, 'the same picture is handed back');
+
+    // A tile landing is the one thing besides the camera that changes the
+    // picture, so it is painted in — once, and then the pane is quiet again.
+    // The pane already on screen stays until the new one is finished, because a
+    // sharp picture of the same place is better than a coarse one of it.
+    surface.tiles = 3;
+    const previous = painter.picture;
+    painter.frame(still);
+    assert.ok(sampled > painted, 'a tile arriving is painted into the pane');
+    assert.equal(painter.picture, previous, 'and does not take the finished pane away while it is painted');
+    frames = 0;
+    while (painter.picture === previous && frames < 400) { painter.frame(still); frames += 1; }
+    assert.notEqual(painter.picture, previous, 'the pane is painted again');
+    assert.equal(painter.picture.tiles, 3);
+    assert.ok(painter.picture.settled, 'started with nothing on its way, so this pass is the finished one');
+    const repainted = sampled;
+    for (let i = 0; i < 30; i += 1) painter.frame(still);
+    assert.equal(sampled, repainted, 'and then it is left alone again');
+
+    // A pane painted while its tiles were still arriving is not finished: the
+    // pass paints from the top down, so a tile that arrived after its own rows
+    // were painted would leave a permanent hole. It runs once more instead — and
+    // that second pass, with nothing on its way, settles.
+    painter.clear();
+    surface.tiles = 7;
+    painter.frame(still);                                  // a pass starts here
+    surface.tiles = 8;                                     // and a tile lands mid-pass
+    frames = 0;
+    while (!painter.picture && frames < 400) { painter.frame(still); frames += 1; }
+    assert.equal(painter.picture.settled, false, 'a pane painted through an arrival is not finished');
+    frames = 0;
+    while (!(painter.picture && painter.picture.settled) && frames < 400) { painter.frame(still); frames += 1; }
+    assert.ok(painter.picture.settled, 'so it is painted once more');
+    assert.equal(painter.picture.tiles, 8, 'from the tiles that were there when it ended');
+    const settled = sampled;
+    for (let i = 0; i < 30; i += 1) painter.frame(still);
+    assert.equal(sampled, settled, 'and that pass is the last one until something else changes');
+
+    // Moving the camera is the other thing that changes it.
+    painter.frame({ pane, camera: { lat: 45.6, lon: 9.1 }, surface, still: true });
+    assert.ok(sampled > settled, 'a camera move paints the pane it is now looking at');
+  } finally {
+    if (had) Object.defineProperty(globalThis, 'document', had);
+    else delete globalThis.document;
+  }
+});
+
+test('a pane that fits one frame is painted whole, so a shallow view never settles', () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  globalThis.document = {
+    documentElement: { dataset: { theme: 'night' } },
+    createElement: () => ({
+      width: 0,
+      height: 0,
+      getContext: () => ({
+        createImageData: (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }),
+        putImageData: () => {},
+      }),
+    }),
+  };
+  try {
+    const band = 40000;
+    let ticks = 0;
+    let sampled = 0;
+    const painter = new GlobeRaster({ band, onProgress: () => { ticks += 1; } });
+    const surface = {
+      key: 'imagery|night',
+      tiles: 2,
+      base: [10, 22, 34],
+      sample: (lat, lon, out) => { sampled += 1; out[0] = 90; out[1] = 120; out[2] = 60; out[3] = 255; return out; },
+    };
+    const camera = { lat: 47.4, lon: -122.3 };
+    // A sphere drawn small: a phone, a toolbar inset, a globe zoomed out in a
+    // narrow pane. Its own pane is cheaper than one frame's band.
+    const pane = painter.geometry({ width: 320, height: 240, radius: 60, cx: 160, cy: 120, dpr: 1 });
+    assert.ok(pane.columns * pane.rows <= band, `the pane fits a frame (${pane.columns}x${pane.rows})`);
+
+    // Nothing is built ahead of the frame that needs it, and a turn over it is
+    // still drawn from a coarse copy rather than from nothing.
+    assert.equal(painter.coarse, null, 'no coarse copy is painted before it is needed');
+    const turning = painter.frame({ pane, camera, surface, still: false });
+    assert.ok(turning && turning.canvas, 'a turn is drawn from the coarse copy');
+    assert.equal(turning.canvas.width, pane.coarse.columns, 'at the coarse size');
+    assert.equal(painter.picture, null, 'and nothing sharp exists yet');
+
+    // The camera still: the pane is finished by that one frame — no soft frame
+    // first, no band left half-painted, and no extra frame asked for.
+    const before = sampled;
+    const sharp = painter.frame({ pane, camera, surface, still: true });
+    assert.equal(painter.build, null, 'nothing is left half-painted');
+    assert.ok(painter.picture, 'the pane is finished on the first still frame');
+    assert.ok(painter.picture.settled, 'and it is finished, not a pass to be repeated');
+    assert.equal(sharp, painter.picture.view, 'that pane is what is drawn');
+    assert.equal(sharp.canvas.width, pane.columns, 'at the pane\'s own size');
+    assert.equal(ticks, 0, 'and no further frame is asked for');
+    const onePass = sampled - before;
+    assert.ok(onePass > 0 && onePass <= pane.columns * pane.rows,
+      `the whole pane was asked for once (${onePass} samples)`);
+
+    // A map that keeps drawing keeps handing back the same picture.
+    const after = sampled;
+    for (let i = 0; i < 20; i += 1) painter.frame({ pane, camera, surface, still: true });
+    assert.equal(sampled, after, 'a finished pane is not painted again');
+
+    // The same rule survives a pane that is too big for one frame: that one
+    // still fills in a band at a time, which is the only visible settle left.
+    const big = painter.geometry({ width: 640, height: 400, radius: 1800, cx: 320, cy: 200, dpr: 1 });
+    assert.ok(big.columns * big.rows > band, 'a deep pane is bigger than a frame');
+    assert.ok(painter.frame({ pane: big, camera, surface, still: false }), 'and a turn still has something to draw');
+    assert.equal(painter.picture, null, 'nothing sharp of the new pane yet');
+    assert.ok(painter.frame({ pane: big, camera, surface, still: true }), 'the still frame draws the coarse copy');
+    assert.ok(painter.build, 'and the sharp pass has begun');
+    assert.ok(painter.build.row < big.rows, `a band, not the whole pane (${painter.build.row} of ${big.rows})`);
+  } finally {
+    if (had) Object.defineProperty(globalThis, 'document', had);
+    else delete globalThis.document;
+  }
+});
+
+test('a painter without a canvas paints nothing rather than throwing', () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  delete globalThis.document;
+  try {
+    const painter = new GlobeRaster();
+    const pane = painter.geometry({ width: 640, height: 400, radius: 300, cx: 320, cy: 200, dpr: 1 });
+    assert.equal(painter.frame({
+      pane,
+      camera: { lat: 0, lon: 0 },
+      surface: { key: 'imagery', tiles: 0, base: [0, 0, 0], sample: () => null },
+      still: false,
+    }), null);
+  } finally {
+    if (had) Object.defineProperty(globalThis, 'document', had);
+    else delete globalThis.document;
+  }
 });
 
 test('the sample grid walks north and east from the centre', () => {

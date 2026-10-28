@@ -15,10 +15,10 @@
    Hit testing is done in screen space against the projected geometry, so it
    stays accurate at every zoom level without a second data model. */
 
-import { DEG, destination, distanceNm, validLatLon } from './lib/geo.js';
+import { DEG, bearingDeg, destination, distanceNm, validLatLon } from './lib/geo.js';
 import { trailInk } from './lib/trailcolor.js';
 import { smoothPath } from './lib/trailpath.js';
-import { earthStyle, EarthView } from './lib/earthview.js';
+import { GlobeRaster, earthStyle, EarthView } from './lib/earthview.js';
 import {
   cameraDirection,
   cameraFor,
@@ -28,7 +28,6 @@ import {
   globeRadiusFor,
   globeUnproject,
   orbitBy,
-  rasteriseGlobe,
   unitVector,
   vectorMeanCentre,
 } from './lib/globeview.js';
@@ -36,6 +35,10 @@ import {
 const TILE = 256;
 const TILE_LIMIT = 160;
 const MIN_ZOOM = 2;
+/* A fitted view may go further out than the zoom buttons do: a plan that spans
+   half the world has to be shown whole even on a narrow chart, and the tiles
+   draw at any level the fit picks. */
+const FIT_MIN_ZOOM = 1;
 const MAX_ZOOM = 13;
 const FOLLOW_ZOOM = 9;
 
@@ -217,10 +220,10 @@ export class MiniMap {
        terrain never pays for either. */
     this.globeStyleId = earthStyle(options.globeStyle).id;
     this.earth = null;
-    this.globeRasterCache = null;
-    this.rasterHost = null;
+    this.painter = null;
     this.globeMovedAt = 0;
     this.globeRedrawTimer = 0;
+    this.globeTickTimer = 0;
     this.tiles = new Map();
     this.failedTiles = 0;
     this.onSeek = options.onSeek || null;
@@ -355,7 +358,7 @@ export class MiniMap {
     const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, base + delta));
     if (zoom === base) return;
     const before = this.unproject(x, y, view);
-    const centerX = lonToX(before.lon, zoom) - (x - this.width / 2) / TILE;
+    const centerX = lonToX(before.lon, zoom) - (x - this.width / 2 - this.marginX()) / TILE;
     const centerY = latToY(before.lat, zoom) - (y - this.height / 2) / TILE;
     this.manualZoom = zoom;
     this.manualCenter = { lat: yToLat(centerY, zoom), lon: xToLon(centerX, zoom) };
@@ -655,6 +658,17 @@ export class MiniMap {
     return document.documentElement.dataset.theme === 'day' ? 'light' : 'dark';
   }
 
+  /**
+   * How far the drawing is nudged sideways so it sits in the space a page keeps
+   * clear, in pixels. It is a drawing offset, not a move of the view: taking it
+   * out of the centre longitude instead would turn the chart by a third of the
+   * world at a low zoom, which is what a panel beside a world map used to do.
+   */
+  marginX() {
+    const insets = this.insets();
+    return (insets.left - insets.right) / 2;
+  }
+
   /** Screen space a page keeps clear on each side — a route panel, a sheet. */
   insets() {
     const pad = this.options.padding;
@@ -664,12 +678,39 @@ export class MiniMap {
     };
   }
 
+  /**
+   * The shortest longitude interval that holds every point — west, east (which
+   * may run past 180°) and the width between them.
+   *
+   * The smallest interval is the one left over after the widest empty stretch of
+   * the world: a Singapore–Newark plan leaves the Atlantic empty and therefore
+   * occupies the Pacific, 183° wide. Taken as plain minimum and maximum it would
+   * measure 350° and centre on Greenwich, which is how a Pacific plan came to be
+   * drawn in two halves at opposite edges of the chart.
+   */
+  lonSpan(points) {
+    const list = (points || []).filter(p => p && Number.isFinite(Number(p.lon)));
+    if (!list.length) return null;
+    const lons = list.map(p => ((Number(p.lon) + 540) % 360) - 180).sort((a, b) => a - b);
+    if (lons.length === 1) return { west: lons[0], east: lons[0], span: 0 };
+    let gap = -1;
+    let at = lons.length - 1;
+    for (let i = 0; i < lons.length; i += 1) {
+      const from = lons[i];
+      const to = i === lons.length - 1 ? lons[0] + 360 : lons[i + 1];
+      if (to - from > gap) { gap = to - from; at = i; }
+    }
+    const west = at === lons.length - 1 ? lons[0] : lons[at + 1];
+    const span = 360 - gap;
+    return { west, east: west + span, span };
+  }
+
   fit() {
     const pad = this.options.padding;
     const insets = this.insets();
     // The globe projects through its own camera, so the flat view is only a
     // carrier for the values the shared drawing code reads (label sizes).
-    if (this.mode === 'globe') return { zoom: this.manualZoom ?? 7, centerX: 0, centerY: 0 };
+    if (this.mode === 'globe') return { zoom: this.manualZoom ?? 7, centerX: 0, centerY: 0, frameLon: this.globeCenter.lon };
     // Geometry is centred in the part of the canvas the page has not covered,
     // so a route panel does not sit on top of the aircraft it is describing.
     const shiftX = (insets.left - insets.right) / 2;
@@ -677,8 +718,9 @@ export class MiniMap {
       const zoom = this.manualZoom ?? FOLLOW_ZOOM;
       return {
         zoom,
-        centerX: lonToX(this.position.lon, zoom) - shiftX / TILE,
+        centerX: lonToX(this.position.lon, zoom),
         centerY: latToY(this.position.lat, zoom),
+        frameLon: this.position.lon,
       };
     }
     const points = [];
@@ -686,11 +728,13 @@ export class MiniMap {
     if (this.layers.route) points.push(...this.route);
     if (!points.length && this.position) points.push(this.position);
     if (!points.length) return null;
-    let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+    let minLat = 90, maxLat = -90;
     for (const p of points) {
       minLat = Math.min(minLat, p.lat); maxLat = Math.max(maxLat, p.lat);
-      minLon = Math.min(minLon, p.lon); maxLon = Math.max(maxLon, p.lon);
     }
+    // The plan's own width, taken the short way round the world, so a route over
+    // the Pacific is fitted across the Pacific.
+    const span = this.lonSpan(points);
     const usableWidth = Math.max(60, this.width - insets.left - insets.right);
     const usableHeight = Math.max(60, this.height - pad * 2);
     // A single point has no span to fit: use the tracking zoom rather than
@@ -699,13 +743,17 @@ export class MiniMap {
       const zoom = this.manualZoom ?? FOLLOW_ZOOM;
       return {
         zoom,
-        centerX: lonToX(points[0].lon, zoom) - shiftX / TILE,
+        centerX: lonToX(points[0].lon, zoom),
         centerY: latToY(points[0].lat, zoom),
+        frameLon: points[0].lon,
       };
     }
-    let zoom = 3;
-    for (let z = MAX_ZOOM; z >= 2; z--) {
-      const xSpan = Math.abs(lonToX(maxLon, z) - lonToX(minLon, z)) * TILE;
+    // The widest level the plan still fits at, down to the whole world: a route
+    // that spans 183° of longitude cannot be shown whole in a chart only 410 px
+    // wide unless the fit is allowed below the buttons' own floor.
+    let zoom = FIT_MIN_ZOOM;
+    for (let z = MAX_ZOOM; z >= FIT_MIN_ZOOM; z--) {
+      const xSpan = Math.abs(lonToX(span.east, z) - lonToX(span.west, z)) * TILE;
       const ySpan = Math.abs(latToY(minLat, z) - latToY(maxLat, z)) * TILE;
       if (xSpan <= usableWidth && ySpan <= usableHeight) { zoom = z; break; }
     }
@@ -713,26 +761,58 @@ export class MiniMap {
     if (this.manualZoom != null) zoom = this.manualZoom;
     const centerX = this.manualCenter
       ? lonToX(this.manualCenter.lon, zoom)
-      : (lonToX(minLon, zoom) + lonToX(maxLon, zoom)) / 2 - shiftX / TILE;
+      : lonToX((span.west + span.east) / 2, zoom);
     const centerY = this.manualCenter
       ? latToY(this.manualCenter.lat, zoom)
       : (latToY(minLat, zoom) + latToY(maxLat, zoom)) / 2;
-    return { zoom, centerX, centerY };
+    /* The middle of the view, in the same frame as `centerX`: unshifted and
+       unwrapped, which is what a point's nearest copy is measured from. On a
+       chart where a route panel shifts the view sideways, this is not
+       `xToLon(centerX)` — that is the same place drawn under a different
+       longitude, and wrapping against it tears a Pacific plan in two. */
+    const frameLon = this.manualCenter ? this.manualCenter.lon : (span.west + span.east) / 2;
+    return { zoom, centerX, centerY, frameLon };
+  }
+
+  /**
+   * The longitude a chart centred here should use for this point: the copy
+   * nearest the middle of the view. The chart repeats east to west, so a chart
+   * centred on the Pacific draws a point written 74°W on its own right-hand
+   * side rather than a world away — which is what keeps a plan that crosses the
+   * date line together on one screen.
+   */
+  nearLon(lon, view) {
+    // The view's own middle, not the middle of the canvas: a route panel shifts
+    // the chart sideways, and measuring the wrap from the shifted centre would
+    // put the western end of a Pacific plan a world away from the rest of it.
+    const middle = Number.isFinite(view.frameLon) ? view.frameLon : xToLon(view.centerX, view.zoom);
+    return middle + ((((Number(lon) - middle) + 540) % 360) - 180);
   }
 
   project(lat, lon, view) {
     if (this.mode === 'globe') return this.globeProject(lat, lon) || { x: NaN, y: NaN };
+    return this.projectRaw(lat, this.nearLon(lon, view), view);
+  }
+
+  /**
+   * The same projection without picking a copy of the world: a path hands over
+   * longitudes it has already unwrapped and kept continuous, and re-wrapping
+   * them one point at a time would tear the line at the seam.
+   */
+  projectRaw(lat, lon, view) {
     return {
-      x: this.width / 2 + (lonToX(lon, view.zoom) - view.centerX) * TILE,
+      x: this.width / 2 + (lonToX(lon, view.zoom) - view.centerX) * TILE + this.marginX(),
       y: this.height / 2 + (latToY(lat, view.zoom) - view.centerY) * TILE,
     };
   }
 
   unproject(x, y, view) {
     if (this.mode === 'globe') return this.globeUnproject(x, y);
-    const worldX = view.centerX + (x - this.width / 2) / TILE;
+    const worldX = view.centerX + (x - this.width / 2 - this.marginX()) / TILE;
     const worldY = view.centerY + (y - this.height / 2) / TILE;
-    return { lat: yToLat(worldY, view.zoom), lon: xToLon(worldX, view.zoom) };
+    // Reported in the ordinary range, so a chart centred on the date line does
+    // not hand a page a longitude of 195°.
+    return { lat: yToLat(worldY, view.zoom), lon: ((xToLon(worldX, view.zoom) + 540) % 360) - 180 };
   }
 
   /* ── the globe ───────────────────────────────────────────────────────── */
@@ -891,7 +971,6 @@ export class MiniMap {
     const style = earthStyle(id);
     if (style.id === this.globeStyleId) return this.globeStyleId;
     this.globeStyleId = style.id;
-    this.globeRasterCache = null;
     if (style.source) this.earthView().setStyle(style.id);
     else if (this.earth) this.earth.setStyle(style.id);
     this.draw();
@@ -907,7 +986,10 @@ export class MiniMap {
     const center = this.globeCenter || this.viewCenter();
     if (!center) return null;
     const view = this.earthView();
-    const size = Math.max(48, Math.min(this.globeRasterCap(), Math.round(this.globeRadius() * 2)));
+    // A reading draws nothing, so its own tiles are read at the level a sphere
+    // of this size would be drawn from — capped, so asking how high the ground
+    // is stays as cheap as it has always been.
+    const size = Math.max(48, Math.min(320, Math.round(this.globeRadius() * 2)));
     view.readTerrain(center.lat, center.lon, { radiusNm: this.rangeNm, rasterPx: size });
     return view;
   }
@@ -916,7 +998,6 @@ export class MiniMap {
   globeReset() {
     this.globeCenter = this.routeCentre() || { lat: 40, lon: -95 };
     this.globeZoom = 1;
-    this.globeRasterCache = null;
     this.draw();
     this.options.onViewChange?.({ globeReset: true });
   }
@@ -930,96 +1011,83 @@ export class MiniMap {
     if (this.globeRedrawTimer) return;
     this.globeRedrawTimer = setTimeout(() => {
       this.globeRedrawTimer = 0;
-      this.globeRasterCache = null;
       this.draw();
     }, 200);
   }
 
+  /** The picture on the sphere, and the bands that fill it in. */
+  globePainter() {
+    if (!this.painter) this.painter = new GlobeRaster({ onProgress: () => this.scheduleGlobeTick() });
+    return this.painter;
+  }
+
   /**
-   * The raster is built at a bounded resolution, and a coarser one while the
-   * globe is being turned: the pilot is watching geography move, not reading
-   * pixels, and a 168-pixel hemisphere is a quarter of the work of a 320-pixel
-   * one. While tiles are still arriving the middle size is used as well, because
-   * the pass will be repeated the moment they land and paying full price twice
-   * for the same picture is the whole cost of the feature.
+   * A band of the pane was painted: draw again to take the next one, at the
+   * frame's own pace rather than at a timer's. The redraw above is a fifth of a
+   * second because a picture is not worth rebuilding that often; this one is the
+   * loop that finishes the picture, so it runs as fast as the page can draw.
    */
-  globeRasterCap() {
-    if (performance.now() - this.globeMovedAt < 240) return 168;
-    if (this.earth && this.earth.stats().waiting > 0) return 224;
-    return 320;
-  }
-
-  /** The canvas the finished raster is blitted from, reused across frames. */
-  rasterCanvas(size) {
-    if (this.rasterHost && this.rasterHost.width === size) return this.rasterHost;
-    if (typeof document === 'undefined' || typeof document.createElement !== 'function') return null;
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    this.rasterHost = canvas;
-    return canvas;
+  scheduleGlobeTick() {
+    if (this.globeTickTimer) return;
+    const run = () => { this.globeTickTimer = 0; this.draw(); };
+    this.globeTickTimer = typeof requestAnimationFrame === 'function' ? requestAnimationFrame(run) : setTimeout(run, 16);
   }
 
   /**
-   * Real imagery or real terrain, painted through the inverse orthographic
-   * projection: one output pixel at a time, each asking the tile store what
-   * colour the earth is at that coordinate.
+   * The pane of the globe this frame can see, and the levels its tiles are read
+   * at. The levels follow the sphere's drawn size and how far the pane reaches,
+   * which is what keeps a zoomed globe sharp rather than an enlargement of one
+   * coarse mosaic: a pane narrower than a hemisphere is what makes the deeper
+   * levels affordable at all, since a hemisphere of level 7 is twelve thousand
+   * tiles and the few degrees a zoomed pane covers is ten.
+   */
+  globePane(radius, center) {
+    const width = this.width;
+    const height = this.height;
+    const pane = this.globePainter().geometry({ width, height, radius, cx: width / 2, cy: height / 2, dpr: this.dpr || 1 });
+    const view = this.earthView();
+    view.setResolution(Math.max(48, Math.round(radius * 2)), { capDeg: pane.capDeg });
+    view.ensureAround(center.lat, center.lon, { capDeg: pane.capDeg });
+    return pane;
+  }
+
+  /**
+   * Real imagery or real terrain, one output pixel at a time, painted through
+   * the shared painter. While the sphere is being turned the pane is painted
+   * coarsely and at once; once the camera is still, that same pane is painted at
+   * the size it is drawn, a band of rows per frame, and the finished picture
+   * replaces the coarse one.
    *
-   * Returns false when the raster cannot carry the globe yet — nothing loaded,
-   * or so little of the visible face is read that the shapes would be missing
-   * rather than coarse. The caller draws the bundled outlines instead, and the
-   * readout reports what is still on its way.
+   * Returns false when the pane cannot carry the globe yet — nothing loaded, or
+   * so little of the visible pane is read that the shapes would be missing rather
+   * than coarse. The caller draws the bundled outlines instead, and the readout
+   * reports what is still on its way.
    */
   drawGlobeRaster(radius) {
     const style = earthStyle(this.globeStyleId);
-    if (!style.source) { this.globeRasterCache = null; return false; }
+    if (!style.source) return false;
     const center = this.globeCenter || { lat: 0, lon: 0 };
     const view = this.earthView();
     if (view.styleId !== style.id) view.setStyle(style.id);
-    const size = Math.max(48, Math.min(this.globeRasterCap(), Math.round(radius * 2)));
-    // The levels are chosen from how many pixels the sphere is actually drawn
-    // with, not from how large it is on the screen.
-    view.setResolution(size);
-    view.ensureAround(center.lat, center.lon, size);
-    const key = `${style.id}|${size}|${center.lat.toFixed(3)}|${center.lon.toFixed(3)}|${view.readyCount()}`;
-    if (!this.globeRasterCache || this.globeRasterCache.key !== key) {
-      this.globeRasterCache = { key, ...this.buildGlobeRaster(view, center, size) };
-    }
-    const raster = this.globeRasterCache;
-    if (!raster || !raster.image || raster.share < 0.35) return false;
-    const host = this.rasterCanvas(size);
-    if (!host) return false;
-    host.getContext('2d').putImageData(raster.image, 0, 0);
+    const pane = this.globePane(radius, center);
+    const picture = this.globePainter().frame({
+      pane,
+      camera: center,
+      still: performance.now() - this.globeMovedAt >= 240,
+      surface: {
+        key: `${style.id}|${this.theme()}`,
+        tiles: view.readyCount(),
+        base: this.theme() === 'light' ? [214, 228, 240] : [10, 22, 34],
+        sample: (lat, lon, out) => view.sample(lat, lon, out),
+      },
+    });
+    if (!picture || !picture.canvas || picture.share < 0.35) return false;
     const ctx = this.ctx;
     ctx.save();
     ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(host, this.width / 2 - radius, this.height / 2 - radius, radius * 2, radius * 2);
+    ctx.drawImage(picture.canvas, picture.x, picture.y, picture.width, picture.height);
     ctx.restore();
     return true;
-  }
-
-  /**
-   * One pass of the inverse projection into this globe's own ImageData. The
-   * arithmetic — including the camera-vector form that keeps a turn of the
-   * sphere off the transcendentals — is `lib/globeview.js`, shared with the
-   * tracker's map so both spheres are painted by the same code.
-   */
-  buildGlobeRaster(view, center, size) {
-    if (typeof document === 'undefined' || typeof document.createElement !== 'function') return { image: null, share: 0 };
-    const host = document.createElement('canvas');
-    host.width = size;
-    host.height = size;
-    const image = host.getContext('2d').createImageData(size, size);
-    const light = this.theme() === 'light';
-    const base = light ? [214, 228, 240] : [10, 22, 34];
-    const stats = rasteriseGlobe({
-      size,
-      center,
-      base,
-      data: image.data,
-      sample: (lat, lon, out) => view.sample(lat, lon, out),
-    });
-    return { image, ...stats };
   }
 
   /** Who supplied what is on the globe, written on the globe. */
@@ -1175,7 +1243,7 @@ export class MiniMap {
     const scale = 2 ** (view.zoom - z);
     const tileSize = TILE * scale;
     const halfW = this.width / 2, halfH = this.height / 2;
-    const left = view.centerX * TILE - halfW;
+    const left = view.centerX * TILE - halfW - this.marginX();
     const top = view.centerY * TILE - halfH;
     const style = this.theme();
     const service = style === 'dark' ? 'World_Dark_Gray_Base' : 'World_Light_Gray_Base';
@@ -1400,6 +1468,95 @@ export class MiniMap {
     this.navLabelState = { drawn: ordered.length - hidden, hidden, fixesDrawn, fixBudget };
   }
 
+  /* ── route legs ───────────────────────────────────────────────────────── */
+
+  /**
+   * One route leg as the chart should draw it.
+   *
+   * A straight screen segment between two fixes gets two things wrong, and both
+   * are plain on any oceanic plan. The great circle between them is not a
+   * straight line on a Mercator chart, so a long leg is sampled along the arc
+   * instead. And a leg from 175°E to 170°W crosses the date line: drawn as it
+   * comes, it sweeps the full width of the chart through continents the aircraft
+   * never crosses. Keeping its longitudes continuous puts the far side of the
+   * date line just past the right edge, where the wrap draws it, rather than back
+   * at the left one.
+   *
+   * Returns one list per visible piece: a globe hides the part behind its limb,
+   * and that is a break in the line, not a chord across the sphere.
+   */
+  legPath(a, b, view) {
+    // Started from the copy of the first fix nearest the middle of the chart, so
+    // the whole leg is drawn near the view rather than a world beside it.
+    const from = { lat: Number(a.lat), lon: this.mode === 'globe' ? Number(a.lon) : this.nearLon(a.lon, view) };
+    const to = { lat: Number(b.lat), lon: Number(b.lon) };
+    const total = distanceNm(from, to);
+    // About one sample every 60 NM, which bends a 3 000 NM leg to within a pixel
+    // of its great circle, and never more than 64 samples for any one leg.
+    const steps = Math.max(1, Math.min(64, Math.ceil(total / 60)));
+    const bearing = total > 0 ? bearingDeg(from, to) : 0;
+    const pieces = [];
+    let piece = null;
+    let previousLon = null;
+    for (let i = 0; i <= steps; i += 1) {
+      const point = i === 0 ? from
+        : i === steps ? to
+        : destination(from, bearing, (total * i) / steps);
+      let lon = point.lon;
+      if (previousLon != null) {
+        while (lon - previousLon > 180) lon -= 360;
+        while (lon - previousLon < -180) lon += 360;
+      }
+      previousLon = lon;
+      const screen = this.mode === 'globe'
+        ? this.project(point.lat, lon, view)
+        : this.projectRaw(point.lat, lon, view);
+      if (!screen || !Number.isFinite(screen.x) || !Number.isFinite(screen.y)) {
+        piece = null;
+        continue;
+      }
+      if (!piece) { piece = []; pieces.push(piece); }
+      piece.push(screen);
+    }
+    return pieces;
+  }
+
+  /**
+   * Stroke a leg's pieces. On a flat chart the world repeats, so a leg that
+   * leaves one edge is drawn re-entering from the other; without that half of
+   * every Pacific leg would simply be missing from the chart.
+   */
+  strokeLeg(pieces, view, width, color, dash) {
+    const ctx = this.ctx;
+    const world = this.mode === 'globe' ? null : TILE * 2 ** view.zoom;
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.setLineDash(dash || []);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    for (const piece of pieces) {
+      if (piece.length < 2) continue;
+      const shifts = [0];
+      if (world) {
+        let minX = Infinity;
+        let maxX = -Infinity;
+        for (const p of piece) {
+          if (p.x < minX) minX = p.x;
+          if (p.x > maxX) maxX = p.x;
+        }
+        if (minX < 0) shifts.push(world);
+        if (maxX > this.width) shifts.push(-world);
+      }
+      for (const shift of shifts) {
+        ctx.beginPath();
+        piece.forEach((p, i) => (i ? ctx.lineTo(p.x + shift, p.y) : ctx.moveTo(p.x + shift, p.y)));
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   drawRoute(view) {
     const ctx = this.ctx;
     const drag = this.drag && this.drag.moved && this.drag.lat != null ? this.drag : null;
@@ -1413,32 +1570,17 @@ export class MiniMap {
     if (segmentIndex != null) highlighted.add(segmentIndex);
     const accent = getComputedStyle(document.documentElement).getPropertyValue('--acc').trim() || '#79c9bb';
     if (points.length > 1) {
-      ctx.lineJoin = 'round';
-      ctx.setLineDash([7, 5]);
-      ctx.strokeStyle = 'rgba(0,0,0,.45)';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-      ctx.stroke();
-      ctx.strokeStyle = '#9bb7ff';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-      ctx.stroke();
-      ctx.setLineDash([]);
+      const legs = points.slice(0, -1).map((p, i) => this.legPath(p, points[i + 1], view));
+      for (const leg of legs) this.strokeLeg(leg, view, 4, 'rgba(0,0,0,.45)', [7, 5]);
+      for (const leg of legs) this.strokeLeg(leg, view, 2, '#9bb7ff');
 
       // Selected legs are drawn on top with a wider underlay so they read at a
       // glance on both map styles.
       for (const legIndex of highlighted) {
-        const a = points[legIndex];
-        const b = points[legIndex + 1];
-        if (!a || !b) continue;
-        ctx.strokeStyle = 'rgba(0,0,0,.35)';
-        ctx.lineWidth = 9;
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-        ctx.strokeStyle = accent;
-        ctx.lineWidth = legIndex === segmentIndex ? 4 : 3;
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        const leg = legs[legIndex];
+        if (!leg) continue;
+        this.strokeLeg(leg, view, 9, 'rgba(0,0,0,.35)');
+        this.strokeLeg(leg, view, legIndex === segmentIndex ? 4 : 3, accent);
       }
     }
     // Waypoint markers; labels only when the route is short enough to read.
@@ -1515,36 +1657,26 @@ export class MiniMap {
     const ink = invert ? 'rgba(30, 41, 59, .95)' : 'rgba(198, 214, 242, .95)';
     const flown = invert ? 'rgba(100, 116, 139, .5)' : 'rgba(148, 170, 200, .4)';
 
-    const line = (a, b, width, color, dash) => {
-      ctx.save();
-      ctx.setLineDash(dash || []);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = width;
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
-      ctx.restore();
+    // Every leg is its own great circle, so a long oceanic leg bends and a leg
+    // across the date line is drawn in one piece instead of across the world.
+    const legs = points.slice(0, -1).map((p, i) => this.legPath(p, points[i + 1], view));
+    const line = (legIndex, width, color, dash) => {
+      const leg = legs[legIndex];
+      if (leg) this.strokeLeg(leg, view, width, color, dash);
     };
 
     for (let i = 0; i < points.length - 1; i += 1) {
-      const a = points[i];
-      const b = points[i + 1];
       const isFlown = passed >= 0 && i < passed;
-      line(a, b, 4.4, 'rgba(0, 0, 0, .45)');
-      line(a, b, isFlown ? 1.6 : 2.2, isFlown ? flown : ink, isFlown ? [4, 4] : []);
+      line(i, 4.4, 'rgba(0, 0, 0, .45)');
+      line(i, isFlown ? 1.6 : 2.2, isFlown ? flown : ink, isFlown ? [4, 4] : []);
     }
 
     // The leg under the aircraft, then a selected leg on top of the plan.
-    if (passed >= 0 && points[passed] && points[passed + 1]) {
-      line(points[passed], points[passed + 1], 3.4, accent);
-    }
+    if (passed >= 0 && points[passed + 1]) line(passed, 3.4, accent);
     for (const legIndex of new Set([selectedLeg, ...segments])) {
       if (legIndex == null || !points[legIndex] || !points[legIndex + 1]) continue;
-      line(points[legIndex], points[legIndex + 1], 8, 'rgba(0, 0, 0, .35)');
-      line(points[legIndex], points[legIndex + 1], 3.6, accent);
+      line(legIndex, 8, 'rgba(0, 0, 0, .35)');
+      line(legIndex, 3.6, accent);
     }
 
     points.forEach(node => {
@@ -1902,8 +2034,13 @@ export class MiniMap {
     this.drag = null;
     clearTimeout(this.globeRedrawTimer);
     this.globeRedrawTimer = 0;
+    if (this.globeTickTimer) {
+      if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this.globeTickTimer);
+      clearTimeout(this.globeTickTimer);
+      this.globeTickTimer = 0;
+    }
     if (this.earth) { this.earth.destroy(); this.earth = null; }
-    this.globeRasterCache = null;
+    if (this.painter) { this.painter.clear(); this.painter = null; }
   }
 }
 

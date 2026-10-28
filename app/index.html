@@ -402,8 +402,8 @@ window.aircraftIcon = aircraftIcon;
    bundled world outlines. The event is what tells the page the globe can be
    switched on, including a projection the pilot left on last visit. */
 import * as GLOBE from './js/lib/globeview.js';
-import { EARTH_STYLES, GIBS, TERRAIN, earthStyle, EarthView } from './js/lib/earthview.js';
-window.STRATOS_GLOBE = { ...GLOBE, EARTH_STYLES, GIBS, TERRAIN, earthStyle, EarthView };
+import { EARTH_STYLES, GIBS, TERRAIN, GlobeRaster, earthStyle, EarthView } from './js/lib/earthview.js';
+window.STRATOS_GLOBE = { ...GLOBE, EARTH_STYLES, GIBS, TERRAIN, earthStyle, EarthView, GlobeRaster };
 window.dispatchEvent(new Event('stratos-globe-ready'));
 </script>
 <script>
@@ -619,12 +619,16 @@ const wun=(X,Y,z)=>{const zoom=z!==undefined?z:V.z,k=SZ*2**zoom;return[X/k*360-1
    this engine reads that module off `window` the way it already reads the
    aircraft icon and the world outlines: this is a classic script. Until it
    arrives the chart stays flat, and the Globe button says so. */
-const GV={earth:null,rings:null,cache:null,moved:0,read:null,noteAt:0,msg:'',cacheAt:0,capAt:0,capVal:320};
+const GV={earth:null,rings:null,painter:null,moved:0,read:null,noteAt:0,msg:''};
 function globeModule(){return (typeof window!=='undefined'&&window.STRATOS_GLOBE)||null}
 function globeStyles(){const g=globeModule();return g?g.EARTH_STYLES:[]}
 function globeStyle(id){const g=globeModule();return g?g.earthStyle(id):{id:'vector',label:'Outlines',hint:'',source:''}}
 function globePicture(){return !!globeStyle(V.gs).source}
-const mercator=(lon,lat)=>{const c=wpx(V.lon,V.lat,V.z),p=wpx(lon,lat,V.z);return[p[0]-c[0]+W/2,p[1]-c[1]+H/2]};
+/* The chart repeats east to west, so a coordinate is drawn at the copy nearest
+   the middle of the view. A chart centred on the Pacific then shows a point
+   written 74°W on its own right-hand side, a world away from where the plain
+   arithmetic would have put it. */
+const mercator=(lon,lat)=>{const near=Number(V.lon)+((((Number(lon)-Number(V.lon))+540)%360)-180),c=wpx(V.lon,V.lat,V.z),p=wpx(near,lat,V.z);return[p[0]-c[0]+W/2,p[1]-c[1]+H/2]};
 /* The chart's one projection. A point on the far side of the sphere is placed
    on the limb in its own direction, so a line crossing the horizon runs to it
    and stops there instead of streaking to a corner. `vis` is the same call with
@@ -637,6 +641,70 @@ function vis(lon,lat){if(V.mode!=='globe')return mercator(lon,lat);const g=globe
    on the sphere as well as on the flat chart. */
 function unvis(x,y){if(V.mode==='globe'){const g=globeModule(),p=g&&g.globeUnproject(x,y,globeCam());return p?[p.lon,p.lat]:null}const c=wpx(V.lon,V.lat,V.z),p=wun(c[0]+x-W/2,c[1]+y-H/2,V.z);return[p[0],p[1]]}
 function globeCam(){const g=globeModule();return g?g.cameraFor({lat:V.lat,lon:V.lon},globeR(),W/2,H/2):null}
+/* ── The plan line, drawn as a chart draws it ─────────────────────────────
+   A line between projected points gets two things wrong, and both are plain on
+   an oceanic plan. The great circle between two fixes is not a straight line on
+   the chart, so a long leg is sampled along its arc (about one sample every
+   60 NM, never more than 64 a leg). And a leg from 158°E to 162°W crosses the
+   date line: drawn as it comes, it sweeps the whole width of the chart through
+   continents the aircraft never crosses. Its longitudes are kept continuous
+   instead, which puts the far side of the date line just past the right edge —
+   and the flat chart repeats, so a piece that leaves one edge is stroked again
+   shifted by a world and re-enters at the other. On the sphere the far side
+   breaks the line rather than being clamped onto the limb. */
+function gcStep(a,b,f){
+  const p1=a.lat*R,l1=a.lon*R,p2=b.lat*R,l2=b.lon*R;
+  const h=Math.sin((p2-p1)/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin((l2-l1)/2)**2;
+  const d=2*Math.asin(Math.min(1,Math.sqrt(Math.max(0,h))));
+  if(!(d>1e-9))return{lat:a.lat+(b.lat-a.lat)*f,lon:a.lon+(b.lon-a.lon)*f};
+  const A=Math.sin((1-f)*d)/Math.sin(d),B=Math.sin(f*d)/Math.sin(d);
+  const x=A*Math.cos(p1)*Math.cos(l1)+B*Math.cos(p2)*Math.cos(l2);
+  const y=A*Math.cos(p1)*Math.sin(l1)+B*Math.cos(p2)*Math.sin(l2);
+  const z=A*Math.sin(p1)+B*Math.sin(p2);
+  return{lat:Math.atan2(z,Math.hypot(x,y))/R,lon:Math.atan2(y,x)/R};
+}
+/* One point of the plan on screen: the flat chart takes an unwrapped longitude
+   (the projection is linear in it), the sphere reports null for its far side. */
+function planPoint(lat,lon){
+  // A path hands over longitudes it has already unwrapped and kept continuous,
+  // so it is projected raw: taking the nearest copy point by point would tear
+  // the line at the seam.
+  if(V.mode!=='globe'){const c=wpx(V.lon,V.lat,V.z),p=wpx(lon,lat,V.z);return[p[0]-c[0]+W/2,p[1]-c[1]+H/2]}
+  const g=globeModule();if(!g)return mercator(lon,lat);
+  const p=g.globeProject(Number(lat),Number(lon),globeCam());
+  return p?[p.x,p.y]:null;
+}
+/* The plan as the pieces a pen can draw: continuous across the date line, and
+   broken wherever the chart cannot show the ground (the far side of a globe). */
+function planPieces(points){
+  const pieces=[];let piece=null,prev=null;
+  for(let i=0;i<points.length-1;i++){
+    const a=points[i],b=points[i+1];
+    const steps=Math.max(1,Math.min(64,Math.ceil(dist(a,b)/60)));
+    for(let s=i?1:0;s<=steps;s++){
+      const q=s===0?{lat:a.lat,lon:a.lon}:s===steps?{lat:b.lat,lon:b.lon}:gcStep(a,b,s/steps);
+      // The first sample is taken from the copy of the world nearest the middle
+      // of the view, and the rest follow it without a jump.
+      let lon=prev==null?Number(V.lon)+((((q.lon-Number(V.lon))+540)%360)-180):q.lon;
+      if(prev!=null){while(lon-prev>180)lon-=360;while(lon-prev<-180)lon+=360}
+      prev=lon;
+      const p=planPoint(q.lat,lon);
+      if(!p){piece=null;continue}
+      if(!piece){piece=[];pieces.push(piece)}
+      piece.push(p);
+    }
+  }
+  return pieces;
+}
+function drawPlanLine(points){
+  const world=V.mode==='globe'?0:SZ*2**V.z;
+  for(const piece of planPieces(points)){
+    if(piece.length<2)continue;
+    let min=Infinity,max=-Infinity;for(const p of piece){if(p[0]<min)min=p[0];if(p[0]>max)max=p[0]}
+    const shifts=[0];if(world){if(min<0)shifts.push(world);if(max>W)shifts.push(-world)}
+    for(const dx of shifts){cx.beginPath();piece.forEach((p,i)=>i?cx.lineTo(p[0]+dx,p[1]):cx.moveTo(p[0]+dx,p[1]));cx.stroke()}
+  }
+}
 function globeR(){const g=globeModule();return g?g.globeRadiusFor(W,H,26,V.gz):120}
 /* Label density, in the flat chart's own zoom units, so every threshold below
    keeps working in both projections without a second set of numbers. */
@@ -709,62 +777,52 @@ function globeCredit(r){
 /* The tile store, built the first time a surface needs one: an outlines globe
    never builds it, makes no request and decodes nothing. */
 function globeEarth(){
-  if(!GV.earth){const g=globeModule();GV.earth=new g.EarthView({style:V.gs,onTiles:()=>{GV.cache=null}})}
+  if(!GV.earth){const g=globeModule();GV.earth=new g.EarthView({style:V.gs})}
   return GV.earth;
 }
-/* A bounded raster, and a coarser one while the sphere is being turned: the
-   pilot is watching geography move, not reading pixels. While tiles are still
-   arriving the middle size is used as well, because the pass is repeated the
-   moment they land and paying full price twice for one picture is the whole
-   cost of the feature. */
-function globeCap(){
-  const now=performance.now();
-  // `stats()` walks the whole tile store, so the answer is kept briefly rather
-  // than rebuilt on every frame for a choice that changes over seconds.
-  if(GV.capAt&&now-GV.capAt<150)return GV.capVal;
-  GV.capAt=now;
-  GV.capVal=now-GV.moved<240?168:(GV.earth&&GV.earth.stats().waiting>0?224:320);
-  return GV.capVal;
+/* The picture on the sphere, from the shared painter: the same pane, the same
+   bands and the same coarse pass while turning as the EFB's own map draws. */
+function globePainter(){
+  if(!GV.painter)GV.painter=new (globeModule().GlobeRaster)();
+  return GV.painter;
 }
-function buildGlobeRaster(e,size){
-  if(typeof document==='undefined')return{canvas:null,share:0};
-  const host=document.createElement('canvas');host.width=host.height=size;
-  const image=host.getContext('2d').createImageData(size,size);
-  const light=document.documentElement.dataset.theme==='day';
-  const stats=globeModule().rasteriseGlobe({size,center:{lat:V.lat,lon:V.lon},base:light?[214,228,240]:[10,22,34],data:image.data,sample:(lat,lon,out)=>e.sample(lat,lon,out)});
-  host.getContext('2d').putImageData(image,0,0);
-  return{canvas:host,share:stats.share,painted:stats.painted,asked:stats.asked};
+/* The pane of the globe this frame can see, and the levels the tiles behind it
+   are read at. The levels follow the sphere's drawn size and how far its pane
+   reaches — never the transient coarseness of a frame mid-turn. Letting them
+   follow the frame would change which tiles a pane needs the moment a drag
+   starts, so every drag would fetch and hillshade a second set of tiles: the
+   same ground, twice, for a picture that is moving too fast to read either. */
+function globePane(){
+  const painter=globePainter(),r=globeR();
+  const pane=painter.geometry({width:W,height:H,radius:r,cx:W/2,cy:H/2,dpr});
+  const e=globeEarth();
+  e.setResolution(Math.max(48,Math.round(r*2)),{capDeg:pane.capDeg});
+  e.ensureAround(V.lat,V.lon,{capDeg:pane.capDeg});
+  return pane;
 }
-/* Real imagery or real terrain, one output pixel at a time, rebuilt only when
-   the camera, the size, the surface or the loaded tiles changed. Returns false
-   when too little of the visible face is read, so the caller draws the bundled
+/* The size a terrain reading is taken at. A reading draws nothing, so its own
+   tiles are read at the level a sphere of this size would be drawn from, which
+   keeps a reading as cheap as it has always been. */
+function globeReadSize(){return Math.max(48,Math.min(320,Math.round(globeR()*2)))}
+/* Real imagery or real terrain, one output pixel at a time, painted through the
+   shared painter: a coarse pane of the globe while it is being turned, and that
+   same pane at the size it is drawn once the camera is still. Returns false when
+   too little of the visible pane is read, so the caller draws the bundled
    outlines instead rather than a sphere of unread background. */
 function globeRaster(r){
   const style=globeStyle(V.gs);
   if(!style.source)return false;
-  const e=globeEarth();
-  const size=Math.max(48,Math.min(globeCap(),Math.round(r*2)));
-  /* The level the tiles are read at follows the size of the sphere on screen,
-     never the transient coarseness of a frame mid-turn. Letting it follow the
-     frame would change which tiles a hemisphere needs the moment a drag starts,
-     so every drag would fetch and hillshade a second set of tiles — the same
-     ground, twice, for a picture that is moving too fast to read either. */
-  const level=Math.max(size,Math.min(320,Math.round(r*2)));
-  e.setResolution(level);
-  e.ensureAround(V.lat,V.lon,size);
-  const now=performance.now();
-  const key=style.id+'|'+size+'|'+V.lat.toFixed(3)+'|'+V.lon.toFixed(3);
-  const ready=e.readyCount();
-  // The camera or the surface changed: rebuild now. Tiles merely arriving are
-  // quoted at most five times a second — a face filling in tile by tile would
-  // otherwise rebuild the whole sphere in the same frame each image lands.
-  const stale=!GV.cache||GV.cache.key!==key;
-  const filling=ready!==(GV.cache&&GV.cache.ready)&&now-(GV.cacheAt||0)>200;
-  if(stale||filling){GV.cache={key,ready,...buildGlobeRaster(e,size)};GV.cacheAt=now}
-  const cache=GV.cache;
-  if(!cache.canvas||cache.share<.35)return false;
+  const e=globeEarth(),pane=globePane();
+  const theme=document.documentElement.dataset.theme;
+  const view=globePainter().frame({
+    pane,
+    camera:{lat:V.lat,lon:V.lon},
+    still:performance.now()-GV.moved>=240,
+    surface:{key:style.id+'|'+theme,tiles:e.readyCount(),base:theme==='day'?[214,228,240]:[10,22,34],sample:(lat,lon,out)=>e.sample(lat,lon,out)},
+  });
+  if(!view||!view.canvas||view.share<.35)return false;
   cx.save();cx.imageSmoothingEnabled=true;
-  cx.drawImage(cache.canvas,W/2-r,H/2-r,r*2,r*2);
+  cx.drawImage(view.canvas,view.x,view.y,view.width,view.height);
   cx.restore();
   return true;
 }
@@ -800,7 +858,7 @@ function gProbeNm(){
 function globeRead(){
   if(V.mode!=='globe'||!globeModule())return null;
   const nm=gProbeNm(),e=globeEarth();
-  e.readTerrain(V.lat,V.lon,{radiusNm:nm,rasterPx:globeCap()});
+  e.readTerrain(V.lat,V.lon,{radiusNm:nm,rasterPx:globeReadSize()});
   GV.read={at:Date.now(),nm};
   GV.noteAt=0;gNote();
   return nm;
@@ -863,7 +921,7 @@ function globeMode(mode){
   GV.msg='';
   if(next==='globe'&&!globeStyles().length){GV.msg='The globe module has not loaded yet, so the chart is still flat. Switch again in a moment.';GV.noteAt=0;gNote();return V.mode}
   if(next==='globe'&&CH.on){GV.msg='A charted approach is a flat chart: close the chart to use the globe.';GV.noteAt=0;gNote();return V.mode}
-  V.mode=next;V.in=null;V.tz=null;V.anchor=null;drag=null;pinch=null;GV.cache=null;GV.read=null;
+  V.mode=next;V.in=null;V.tz=null;V.anchor=null;drag=null;pinch=null;GV.read=null;
   if(next==='globe'){V.gz=1;globeRings()}
   try{localStorage.setItem('dl.mode',next)}catch(_){}
   GV.noteAt=0;pjUi();gsUi();globeAttr();gNote();
@@ -873,7 +931,7 @@ function globeMode(mode){
 function globeReset(){
   const g=globeModule();if(!g||V.mode!=='globe')return;
   const centre=(route.length>1&&g.vectorMeanCentre(route))||(liveOk()?{lat:own.lat,lon:own.lon}:null)||{lat:40,lon:-95};
-  V.lon=centre.lon;V.lat=centre.lat;V.gz=1;GV.cache=null;GV.read=null;setFol(false);V.tz=null;V.in=null;
+  V.lon=centre.lon;V.lat=centre.lat;V.gz=1;GV.read=null;setFol(false);V.tz=null;V.in=null;
   if(route.length>1)fitRoute();
   GV.noteAt=0;globeAttr();gNote();
 }
@@ -882,9 +940,11 @@ function globeReset(){
 function setGlobeSurface(id){
   const style=globeStyle(id);
   if(style.id===V.gs)return V.gs;
-  V.gs=style.id;GV.cache=null;
+  V.gs=style.id;
   try{localStorage.setItem('dl.globe',V.gs)}catch(_){}
-  if(style.source){const e=globeEarth();e.setResolution(globeCap());e.ensureAround(V.lat,V.lon,e.rasterPx);e.setStyle(style.id);e.ensureAround(V.lat,V.lon,e.rasterPx)}
+  // Building the pane first sets the levels and starts the fetch, so the new
+  // surface has tiles to draw from as soon as the store holds any.
+  if(style.source){globePane();globeEarth().setStyle(style.id)}
   GV.noteAt=0;gsUi();globeAttr();gNote();
   return V.gs;
 }
@@ -895,7 +955,7 @@ function globeZoomAbout(x,y,factor){
   const before=g.globeUnproject(x,y,globeCam());
   const next=Math.max(1,Math.min(40,V.gz*factor));
   if(next===V.gz)return;
-  V.gz=next;GV.moved=performance.now();GV.cache=null;V.tz=null;V.in=null;
+  V.gz=next;GV.moved=performance.now();V.tz=null;V.in=null;
   if(before){const after=g.globeUnproject(x,y,globeCam());if(after){V.lon=((V.lon+(before.lon-after.lon)+540)%360)-180;V.lat=Math.max(-89.5,Math.min(89.5,V.lat+(before.lat-after.lat)))}}
 }
 /* The chart's own zoom, in globe units, for the places that focus on a point:
@@ -969,18 +1029,25 @@ function fitRoute(){
     const farthest=Math.max(...route.map(p=>dist(centre,p)),1);
     const theta=Math.min(Math.PI/2.05,(farthest/60)*R);
     V.gz=Math.max(1,Math.min(40,.8/Math.max(.02,Math.sin(theta))));
-    GV.cache=null;
     return true;
   }
   // Normalised Web Mercator (0..1 across the world), so the same numbers work at
   // every zoom level.
   const pts=route.map(p=>{const q=wpx(p.lon,p.lat,0);return[q[0]/SZ,q[1]/SZ]});
-  const X=pts.map(p=>p[0]),Y=pts.map(p=>p[1]);
-  const minX=Math.min(...X),maxX=Math.max(...X),minY=Math.min(...Y),maxY=Math.max(...Y);
-  if(maxX-minX<=0&&maxY-minY<=0)return false;
+  /* The plan's own width, taken the short way round the world: leave out the
+     widest empty stretch of it and what remains is the span the plan occupies.
+     Plain minimum and maximum measure a Singapore–Newark plan as 350° wide and
+     centre it on Greenwich, which is how it came to be drawn in two halves at
+     opposite edges instead of across the Pacific where it actually goes. */
+  const X=pts.map(p=>((p[0]%1)+1)%1).sort((a,b)=>a-b),Y=pts.map(p=>p[1]);
+  let gap=-1,at=X.length-1;
+  for(let i=0;i<X.length;i++){const from=X[i],to=i===X.length-1?X[0]+1:X[i+1];if(to-from>gap){gap=to-from;at=i}}
+  const west=at===X.length-1?X[0]:X[at+1],span=1-gap;
+  const minY=Math.min(...Y),maxY=Math.max(...Y);
+  if(span<=0&&maxY-minY<=0)return false;
   let z=1;
-  for(let t=12;t>=1;t--){const k=SZ*2**t;if((maxX-minX)*k<=W*.82&&(maxY-minY)*k<=H*.72){z=t;break}}
-  V.lon=(minX+maxX)/2*360-180;
+  for(let t=12;t>=1;t--){const k=SZ*2**t;if(span*k<=W*.82&&(maxY-minY)*k<=H*.72){z=t;break}}
+  V.lon=((((west+span/2)*360-180)+540)%360)-180;
   V.lat=Math.atan(Math.sinh(Math.PI-2*Math.PI*((minY+maxY)/2)))/R;
   V.z=z;V.tz=null;V.in=null;setFol(false);
   return true;
@@ -1024,7 +1091,7 @@ if(L.apt)A.forEach(a=>{if(CH.on&&a!==CH.a)return;const q=vis(a.lon,a.lat);if(!q)
 if(V.mode!=='globe'&&V.z>8.5)drawReal(a,x,y);else a.det=false;if(0)pairs(a).forEach(pr=>{const n=pr[0],h=n*10,p=ppn(a.lat)*1.4,dx=Math.sin(h*R)*p,dy=-Math.cos(h*R)*p;cx.strokeStyle=C.ap;cx.lineWidth=Math.max(3,p/9);cx.lineCap='butt';cx.beginPath();cx.moveTo(x-dx,y-dy);cx.lineTo(x+dx,y+dy);cx.stroke()});
 if(a.det){}else if(V.mode!=='globe'&&V.z>8.5){cx.beginPath();cx.arc(x,y,3,0,7);cx.fillStyle=C.land;cx.fill();cx.strokeStyle=C.ap;cx.lineWidth=2.2;cx.stroke()}else mkRing(x,y,mkRz()*.9,mkColor('apt'),1);
 if(lblZ()>(a.x?7:4.8)&&x>-40&&x<W+40&&y>-40&&y<H+40&&!(L.rte&&planTocTod().ids.has(String(a.id).toUpperCase())))mkText(a.id,x+Math.round(mkRz()*.62)-3,y-6,SAT()?(DKM()?'#fff':'#111'):C.txt,12.5,true)});
-drawProcedurePaths();if(route.length&&!CH.on&&L.rte){cx.save();cx.globalAlpha=.35;cx.strokeStyle=C.route;cx.lineWidth=12;cx.lineCap='round';cx.lineJoin='round';cx.beginPath();route.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke();if(liveOk()&&route.length>1){const pr=routeProg(),pts=[route[0]];let acc=0;for(let i=0;i<route.length-1;i++){acc+=dist(route[i],route[i+1]);if(acc<pr)pts.push(route[i+1])}pts.push(pos(pr));cx.globalAlpha=.6;cx.beginPath();pts.forEach((p,i)=>{const[x,y]=sc(p.lon,p.lat);i?cx.lineTo(x,y):cx.moveTo(x,y)});cx.stroke()}cx.restore()
+drawProcedurePaths();if(route.length&&!CH.on&&L.rte){cx.save();cx.globalAlpha=.35;cx.strokeStyle=C.route;cx.lineWidth=12;cx.lineCap='round';cx.lineJoin='round';drawPlanLine(route);if(liveOk()&&route.length>1){const pr=routeProg(),pts=[route[0]];let acc=0;for(let i=0;i<route.length-1;i++){acc+=dist(route[i],route[i+1]);if(acc<pr)pts.push(route[i+1])}pts.push(pos(pr));cx.globalAlpha=.6;drawPlanLine(pts)}cx.restore()
 drawRouteMarkers();}
 trails();if(L.trf&&!CH.on)T.forEach(a=>{const q=vis(a.lon,a.lat);if(!q)return;const[x,y]=q;drawAircraft(a.type,x,y,a.hdg,C.trf,32);if(lblZ()>6&&x>-40&&x<W+40&&y>-20&&y<H+20)mkText(a.id+' '+Math.round(a.alt/100),x+4,y+4,C.trf,10,false)});
 if(liveOk()){const q=vis(own.lon,own.lat);if(q){const[x,y]=q;cx.beginPath();cx.arc(x,y,19,0,7);cx.strokeStyle=C.own;cx.globalAlpha=.38;cx.lineWidth=1.5;cx.stroke();cx.globalAlpha=1;drawAircraft(live.d?.type||live.d?.aircraft||live.d?.aircraftType,x,y,own.hdg,C.own,40)}}

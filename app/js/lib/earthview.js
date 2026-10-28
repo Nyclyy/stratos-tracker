@@ -42,6 +42,7 @@
  */
 
 import { DEG, validLatLon } from './geo.js';
+import { globeRasterPlan, rasteriseGlobe } from './globeview.js';
 
 /* ── NASA GIBS ──────────────────────────────────────────────────────────── */
 
@@ -95,21 +96,45 @@ export function gibsTileUrl(zoom, x, y, { layer = 'imagery' } = {}) {
 }
 
 /**
- * The GIBS level for a sphere of this radius on screen. The globe shows half
- * the world across its diameter, so a 300-pixel sphere wants roughly 3 km per
- * pixel — a couple of coarse levels, over-sampled about twice. Level 4 is the
- * ceiling: past it the globe would be fetching tiles smaller than a few screen
- * pixels to show terrain the pilot cannot see at this size.
+ * How many tiles a pane of this angular radius takes out of a level this many
+ * tiles wide. A globe shows a pane of itself, not a hemisphere, once it is
+ * zoomed in: the closer the camera, the smaller the pane in degrees, and the
+ * deeper the level that same count of tiles can pay for. That is what makes a
+ * deep zoom affordable at all — level 7 over a hemisphere is twelve thousand
+ * tiles, and level 7 over the few degrees a zoomed pane covers is a handful.
  */
-export function gibsZoomForRaster(rasterPx) {
-  const px = Math.max(8, Number(rasterPx) || 0);
-  // A level whose 512-pixel tiles carry about twice the detail the sphere can
-  // show: 512 pixels across 360/matrix degrees is the source's ground angle, and
-  // the sphere shows 180 degrees across its diameter.
-  const wanted = px / 64;
+function paneTiles(tilesWide, capDeg) {
+  const across = (Math.max(0, Math.min(90, capDeg)) * tilesWide) / 180;
+  return across * across;
+}
+
+/**
+ * The GIBS level for a sphere drawn this many pixels in radius, over a pane the
+ * camera can see `capDeg` degrees around its target.
+ *
+ * The level follows what is drawn, so a zoomed sphere reads finer imagery
+ * rather than the same coarse mosaic enlarged: 512-pixel tiles at `tilesWide`
+ * across the world are 512*tilesWide/360 pixels per degree, and a sphere of
+ * radius R draws R/90 pixels per degree at the middle of its face. So the level
+ * is the shallowest one whose source is at least as fine as the sphere is drawn,
+ * which the pyramid's doubling of every step lands between one and two times
+ * finer — 1.8 times, measured from zoom 1 to zoom 40. The shallower level of
+ * each pair is the one that stays nearest the sphere, because a step that is not
+ * needed is a step of tiles that never have to be fetched.
+ *
+ * It is bounded by cost rather than by a fixed number: a level deeper than the
+ * visible pane can pay for is dropped, which keeps a zoomed-in sphere to about
+ * a dozen tiles and a whole-hemisphere view to a couple of dozen.
+ */
+export function gibsZoomForSphere(radiusPx, { capDeg = 90, maxTiles = MAX_FACE_TILES } = {}) {
+  const px = Math.max(8, Number(radiusPx) || 0);
+  const wanted = px / 90;
   let level = 0;
   while (level < GIBS.matrices.length - 1 && GIBS.matrices[level][0] < wanted) level += 1;
-  return Math.min(4, level);
+  const cap = Number(capDeg);
+  const room = Math.max(1, Number(maxTiles) || MAX_FACE_TILES);
+  while (level > 0 && paneTiles(GIBS.matrices[level][0], Number.isFinite(cap) ? cap : 90) > room) level -= 1;
+  return level;
 }
 
 /* ── AWS / Mapzen terrain tiles ─────────────────────────────────────────── */
@@ -176,17 +201,24 @@ export function terrainTileUrl(z, x, y) {
 }
 
 /**
- * The terrain level for a sphere of this radius. Detail is capped on purpose:
- * a whole-hemisphere view at level 6 would be hundreds of tiles for relief the
- * sphere draws a few pixels wide, while level 2-4 still shows every major range
- * as terrain rather than as a flat wash.
+ * The terrain level for a sphere of this drawn radius over a pane of this
+ * angular radius. Same reasoning as the imagery level — the source is kept
+ * about twice as fine as the sphere is drawn — but the ceiling is lower,
+ * because every terrain tile is decoded and hillshaded rather than merely
+ * sampled: a pane of sixteen of them is the most one surface can pay without a
+ * visible stall, and that is what the deeper levels are checked against.
  */
-export function terrainZoomForRaster(rasterPx) {
-  const px = Math.max(8, Number(rasterPx) || 0);
-  // Same reasoning as the imagery levels: a tile at this level is about twice
-  // as fine as a pixel of the sphere, so a level-3 globe reads thirteen tiles
-  // rather than the eight hundred a level-6 globe would need to look the same.
-  return Math.max(1, Math.min(6, Math.round(Math.log2(px / 32))));
+export function terrainZoomForSphere(radiusPx, { capDeg = 90, maxTiles = MAX_TERRAIN_FACE_TILES } = {}) {
+  const px = Math.max(8, Number(radiusPx) || 0);
+  // A level's ground is 360/(256*2^level) degrees per pixel, and the sphere
+  // draws 90/radius degrees per pixel at the middle of its face: this is the
+  // level about four times finer than that, which is the oversampling relief was
+  // tuned with — a hillshade read too coarsely looks like a flat wash.
+  let level = Math.max(1, Math.min(TERRAIN.maxZoom, Math.round(Math.log2(px / 16))));
+  const cap = Number(capDeg);
+  const room = Math.max(1, Number(maxTiles) || MAX_TERRAIN_FACE_TILES);
+  while (level > 1 && paneTiles(2 ** level, Number.isFinite(cap) ? cap : 90) > room) level -= 1;
+  return level;
 }
 
 /* Reading a height is a different question from drawing terrain, and it wants a
@@ -195,6 +227,14 @@ export function terrainZoomForRaster(rasterPx) {
    half the spacing of the sample grid — which keeps the scan near a dozen tiles
    whatever radius the pilot is working at. */
 export const POINT_ZOOM = 9;
+
+/* The tile ceilings the two surfaces are held to. Imagery is only sampled once
+   it is decoded, so it can afford a pane of a few dozen tiles; terrain has to be
+   hillshaded tile by tile, and one 256-pixel hillshade costs about as much as a
+   hundred thousand imagery samples, so its pane stays smaller. Both are the
+   count of tiles the *visible pane* needs, not the count a hemisphere would. */
+export const MAX_FACE_TILES = 32;
+export const MAX_TERRAIN_FACE_TILES = 16;
 
 export function probeZoomForRadius(radiusNm) {
   const nm = Math.max(1, Number(radiusNm) || 0);
@@ -340,6 +380,222 @@ export function earthStyle(id) {
   return EARTH_STYLES.find(style => style.id === id) || EARTH_STYLES[0];
 }
 
+/* ── Painting the sphere ────────────────────────────────────────────────── */
+
+/* What one frame of the sphere may spend, and how much of a sharp pane one frame
+   may fill in. Measured with a sampler that does what `sample()` below does — a
+   tile lookup and four writes per pixel — the raster runs at 2.9 million samples
+   a second in Node and about a third of that in a browser, which is what these
+   numbers are: the coarse pass is the same 22 000 samples the old fixed-size
+   raster always cost a drag, and a band is half a frame, so filling the pane in
+   does not hold a frame up. The sharp pane's own ceiling is where the memory and
+   the time to converge stop being worth the last pixels of a zoomed view. */
+export const COARSE_SAMPLES = 22000;
+export const SHARP_SAMPLES = 1100000;
+/* A band is one frame's worth of sampling, measured rather than guessed: with a
+   real GIBS mosaic loaded the sampler here answers 3.4 million samples a second,
+   so 48 000 samples is about fourteen milliseconds and filling the pane in does
+   not hold a frame up. It is also the size at which a pane is worth painting in
+   one go at all — a pane whose own sample count is no more than this is painted
+   whole, sharp, on the first still frame, which is what keeps a shallow view
+   (a small sphere, a phone, the chart inset) from ever showing a soft frame. */
+export const BAND_SAMPLES = 48000;
+
+/**
+ * The picture on the sphere, painted a pane at a time.
+ *
+ * A globe zoomed in is drawn larger than the canvas, and a picture of what the
+ * canvas can show has to be painted at the size it is drawn or it is soft
+ * however fine the imagery underneath is. Painting that whole pane in one frame
+ * costs hundreds of milliseconds at a real zoom — so the work is split:
+ *
+ *   • while the sphere is being turned, the pane is painted coarsely and at
+ *     once. Every frame of a drag costs what the old fixed-size raster cost,
+ *     and the pilot is watching geography move rather than reading pixels;
+ *   • once the camera is still, the same pane is painted at the size it is
+ *     drawn, a band of rows per frame, and the finished picture replaces the
+ *     coarse one. No frame is ever blocked, and sharpness follows the zoom
+ *     instead of being capped. That pass runs once per pane and per arrival,
+ *     not once per frame: a finished pane is left alone until something about
+ *     it actually changes;
+ *   • a pane no larger than one frame's band is not banded at all. It is
+ *     painted whole on the first still frame and needs no coarse copy, so a
+ *     shallow view — a sphere drawn small, on a phone, in the chart inset — is
+ *     sharp immediately instead of sharpening over a dozen frames. Only a pane
+ *     whose own pixels exceed a frame's budget is filled in progressively, and
+ *     that is what makes the deep zooms the only ones that visibly settle.
+ *
+ * Nothing here invents a pixel: what a frame cannot paint is the surface's own
+ * base colour, and the share of the pane that asked for a colour and got one is
+ * reported back so a caller can draw its own outlines instead of a half-empty
+ * sphere.
+ */
+export class GlobeRaster {
+  constructor({ onProgress = null, coarse = COARSE_SAMPLES, sharp = SHARP_SAMPLES, band = BAND_SAMPLES } = {}) {
+    this.onProgress = typeof onProgress === 'function' ? onProgress : null;
+    this.coarseSamples = Math.max(1, Number(coarse) || COARSE_SAMPLES);
+    this.sharpSamples = Math.max(1, Number(sharp) || SHARP_SAMPLES);
+    this.bandSamples = Math.max(1, Number(band) || BAND_SAMPLES);
+    this.shape = null;     // the pane, camera and surface the pictures below belong to
+    this.coarse = null;    // what a turn is drawn from, rebuilt whenever the pane moves
+    this.picture = null;   // the sharp pane, once one has been finished
+    this.build = null;     // the pane being filled in, a band at a time
+  }
+
+  /**
+   * Where the sphere is this frame, and what its pane can see: the plan to paint
+   * the pane at the size it is drawn, with the coarse plan for the same frame
+   * kept alongside it.
+   */
+  geometry({ width, height, radius, cx, cy, dpr = 1 }) {
+    const pane = globeRasterPlan({ width, height, radius, cx, cy, dpr, budget: this.sharpSamples });
+    const coarse = globeRasterPlan({ width, height, radius, cx, cy, dpr: 1, budget: this.coarseSamples });
+    return { ...pane, coarse };
+  }
+
+  /** Forget the picture: a surface change, a reset or a teardown. */
+  clear() {
+    this.shape = null;
+    this.coarse = null;
+    this.picture = null;
+    this.build = null;
+  }
+
+  /**
+   * One frame of the sphere, returning what to blit and where, or null when
+   * there is nothing to blit at all.
+   *
+   * `pane` is from `geometry()`, `camera` is the place the sphere is centred on,
+   * `surface` is `{ key, tiles, sample, base }` — the surface's own name, how
+   * many tiles of it are read, and the sampler and base colour to paint with —
+   * and `still` says the camera has stopped moving, which is what allows the
+   * sharp pass to run at all.
+   */
+  frame({ pane, camera, surface, still = true }) {
+    if (!pane || !pane.coarse || !camera || !surface || typeof surface.sample !== 'function') return null;
+    const shape = [
+      surface.key,
+      camera.lat.toFixed(4),
+      camera.lon.toFixed(4),
+      `${pane.x0},${pane.y0}`,
+      `${pane.columns}x${pane.rows}`,
+      pane.radius.toFixed(2),
+    ].join('|');
+    /* A pane that fits one frame's sampling is painted whole, so it never needs
+       the coarse copy a larger pane is turned from — see `advance()`, which
+       paints it in a single band the moment the camera stops. */
+    const whole = pane.columns * pane.rows <= this.bandSamples;
+    if (this.shape !== shape) {
+      // The camera or the pane moved: the coarse pass is what a turning frame is
+      // drawn from, and a sharp pane of another frame's geometry is not this
+      // frame's picture — an image in the wrong place is worse than a coarse one.
+      this.shape = shape;
+      this.coarse = whole ? null : this.paint(pane.coarse, camera, surface, shape);
+      this.picture = this.picture && this.picture.shape === shape ? this.picture : null;
+      this.build = null;
+    }
+    if (still) this.advance(pane, camera, surface, shape, Number(surface.tiles) || 0);
+    // A whole pane has nothing to blit until it is painted, so a turn over one
+    // falls back to its coarse copy rather than to nothing at all.
+    else if (whole && !this.coarse) this.coarse = this.paint(pane.coarse, camera, surface, shape);
+    const shown = this.picture && this.picture.shape === shape ? this.picture : this.coarse;
+    return shown ? shown.view : null;
+  }
+
+  /** A whole pane in one pass, and the canvas it is blitted from. */
+  paint(plan, camera, surface, shape) {
+    const image = this.imageData(plan.columns, plan.rows);
+    if (!image) return null;
+    const stats = rasteriseGlobe({
+      columns: plan.columns,
+      rows: plan.rows,
+      radius: plan.radius,
+      cx: plan.cx,
+      cy: plan.cy,
+      center: camera,
+      sample: surface.sample,
+      base: surface.base,
+      data: image.data,
+    });
+    return { shape, view: this.blit(image, plan, stats.share) };
+  }
+
+  /**
+   * One band of the sharp pane, started here if there is none in flight. Filling
+   * in a deep zoom takes tens of frames, so the bands are driven by the caller's
+   * own redraws: each one asks for the next through `onProgress`, and the band
+   * that finishes the pane becomes the picture. Tiles landing while the pane
+   * fills in are absorbed rather than restarting it — the pass samples the store
+   * itself, so a band painted after a tile arrived already has that tile in it,
+   * and a pane filling in would otherwise begin again from the top on every
+   * arrival and never finish.
+   *
+   * A pass is started only when there is something new to paint. A tracker map
+   * draws every frame, so a pass that restarted itself would repaint a finished
+   * pane for as long as the page is open, which is the one cost this whole design
+   * exists to avoid — so a finished pane is left alone until the camera moves,
+   * the surface changes, or a tile lands.
+   *
+   * A pane no larger than a frame's band is finished by its first band, which is
+   * what makes a shallow view sharp on one frame with no soft one before it.
+   *
+   * A pane painted while tiles were still arriving is not finished: the pass
+   * paints its rows from the top down, so a tile that arrived after its own rows
+   * were painted would leave a permanent hole. Such a pass is therefore marked
+   * unsettled and runs once more — and that pass, started from a store nothing
+   * more is on its way to, settles.
+   */
+  advance(pane, camera, surface, shape, tiles = 0) {
+    if (!this.build || this.build.shape !== shape) {
+      if (this.picture && this.picture.settled && this.picture.shape === shape && this.picture.tiles === tiles) return;
+      const image = this.imageData(pane.columns, pane.rows);
+      if (!image) return;
+      this.build = { shape, pane, image, row: 0, painted: 0, asked: 0, seen: tiles };
+    }
+    const build = this.build;
+    const band = Math.max(1, Math.round(this.bandSamples / Math.max(1, pane.columns)));
+    const rows = Math.max(0, Math.min(band, pane.rows - build.row));
+    if (rows) {
+      const stats = rasteriseGlobe({
+        columns: pane.columns,
+        rows,
+        radius: pane.radius,
+        cx: pane.cx,
+        cy: pane.cy,
+        rowOffset: build.row,
+        center: camera,
+        sample: surface.sample,
+        base: surface.base,
+        data: build.image.data,
+      });
+      build.painted += stats.painted;
+      build.asked += stats.asked;
+      build.row += rows;
+    }
+    if (build.row < pane.rows) {
+      this.onProgress?.();
+      return;
+    }
+    this.picture = { shape, tiles, settled: build.seen === tiles, view: this.blit(build.image, build.pane, build.asked ? build.painted / build.asked : 0) };
+    this.build = null;
+  }
+
+  /** The pane as a canvas to blit from, and where on the map it goes. */
+  blit(image, plan, share) {
+    const canvas = imageCanvas(image.width, image.height);
+    if (!canvas) return null;
+    canvas.getContext('2d').putImageData(image, 0, 0);
+    return { canvas, x: plan.x0, y: plan.y0, width: plan.width, height: plan.height, share };
+  }
+
+  /** A buffer to paint into, or null where there is no canvas to paint with. */
+  imageData(columns, rows) {
+    const canvas = imageCanvas(columns, rows);
+    if (!canvas) return null;
+    return canvas.getContext('2d').createImageData(columns, rows);
+  }
+}
+
 /* ── The tile store and the sampler ─────────────────────────────────────── */
 
 const MAX_TILES = 96;
@@ -350,10 +606,15 @@ const MAX_REQUESTS_PER_PASS = 12;
 const MAX_PROBE_TILES = 26;
 
 function canvasFor(width, height) {
+  return imageCanvas(width, height);
+}
+
+/** An offscreen canvas of this size, or null where there is no DOM at all. */
+function imageCanvas(width, height) {
   if (typeof document === 'undefined' || typeof document.createElement !== 'function') return null;
   const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = Math.max(1, Math.round(width));
+  canvas.height = Math.max(1, Math.round(height));
   return canvas;
 }
 
@@ -375,6 +636,7 @@ export class EarthView {
     this.failed = 0;
     this.failedReasons = new Set();
     this.rasterPx = 220;
+    this.capDeg = 90;
     this.center = { lat: 0, lon: 0 };
     this.destroyed = false;
     this.setResolution(this.rasterPx);
@@ -385,21 +647,29 @@ export class EarthView {
   /** Imagery, terrain, or neither. Turning tiles off releases nothing already read. */
   setStyle(id) {
     this.styleId = earthStyle(id).id;
-    this.ensureAround(this.center.lat, this.center.lon, this.radiusPx);
+    this.ensureAround(this.center.lat, this.center.lon, { capDeg: this.capDeg });
   }
 
   /**
-   * The sphere changed size: the levels it draws from changed with it. The
-   * levels come from how many pixels across the sphere actually is — not from
-   * how big it looks on a large screen — and the level geometry is worked out
+   * The sphere changed size, or the camera moved closer to it: the levels it
+   * draws from changed with it. The levels come from how many pixels across the
+   * sphere actually is — not from how big it looks on a large screen, and not
+   * from the resolution of the frame it is painted in — and they are worked out
    * once here rather than per pixel, because the globe reads these constants a
    * hundred thousand times per redraw.
+   *
+   * `drawnPx` is the sphere's size across on screen and `capDeg` is how far the
+   * pane the camera can see reaches around its target: together they are what a
+   * zoomed globe gets its detail from. A pane narrower than a hemisphere is what
+   * lets the deeper levels stay affordable — a whole hemisphere at level 7 would
+   * be twelve thousand tiles, and the few degrees a zoomed pane covers is ten.
    */
-  setResolution(rasterPx) {
-    const px = Math.max(8, Number(rasterPx) || this.rasterPx);
+  setResolution(drawnPx, { capDeg = this.capDeg } = {}) {
+    const px = Math.max(8, Number(drawnPx) || this.rasterPx);
     this.rasterPx = px;
-    this.imageryZoom = gibsZoomForRaster(px);
-    this.demZoom = terrainZoomForRaster(px);
+    this.capDeg = Math.max(0, Math.min(90, Number.isFinite(Number(capDeg)) ? Number(capDeg) : 90));
+    this.imageryZoom = gibsZoomForSphere(px / 2, { capDeg: this.capDeg });
+    this.demZoom = terrainZoomForSphere(px / 2, { capDeg: this.capDeg });
     const matrix = gibsMatrix(this.imageryZoom);
     this.imageryGeometry = {
       zoom: this.imageryZoom,
@@ -454,6 +724,18 @@ export class EarthView {
   }
 
   /**
+   * The angular radius to fetch around: what the pane can show, plus one tile, so
+   * a tile the pane's own edge runs through is still fetched. A globe zoomed in
+   * sees a narrow pane, and that is what keeps a deep level to a handful of
+   * tiles instead of the hemisphere the old fixed reach would have walked.
+   */
+  fetchReach(capDeg, tilesWide) {
+    const cap = Number.isFinite(Number(capDeg)) ? Number(capDeg) : 90;
+    const tileDeg = tilesWide > 0 ? 360 / tilesWide : 0;
+    return Math.max(0, Math.min(100, cap + tileDeg));
+  }
+
+  /**
    * Read one tile's pixels. `resolve(z, x, y)` returns the URL for a tile or
    * null when it is outside the world; every tile that arrives is decoded once,
    * because both the shading and a terrain elevation query need the pixels.
@@ -503,9 +785,10 @@ export class EarthView {
    * at a time. Panning a globe gently must not fire off hundreds of requests,
    * and a globe that is not showing tiles must fire none.
    */
-  ensureAround(lat, lon, radiusPx, options = {}) {
+  ensureAround(lat, lon, options = {}) {
     const wantImagery = options.imagery ?? (this.styleId === 'imagery');
     const wantTerrain = options.terrain ?? this.needsTerrain();
+    const capDeg = Number.isFinite(Number(options.capDeg)) ? Number(options.capDeg) : this.capDeg;
     this.center = { lat, lon };
     if (this.destroyed || (!wantImagery && !wantTerrain)) {
       this.settled = true;
@@ -515,9 +798,9 @@ export class EarthView {
     let budget = Math.max(0, Math.min(MAX_REQUESTS_PER_PASS, MAX_IN_FLIGHT - inFlight));
     if (!budget) { this.settled = false; return; }
 
-    /* The visible face is everything within 90 degrees of the camera's centre.
-       The bounding box of that cap is up to four times larger than the cap, so
-       each candidate tile's own centre is measured against it. */
+    /* The visible pane is everything within its own reach of the camera's
+       centre. The bounding box of that cap is up to four times larger than the
+       cap, so each candidate tile's own centre is measured against it. */
     const candidates = [];
     const consider = (kind, z, resolve, tileZ, tileX, tileY) => {
       const width = kind === 'imagery' ? gibsMatrix(z).width : 2 ** z;
@@ -529,7 +812,7 @@ export class EarthView {
       const tileLon = (bounds.west + bounds.east) / 2;
       const entry = this.tiles.get(this.key(kind, tileZ, tileX, tileY));
       if (entry && (entry.ready || entry.requested)) return;
-      if (sphericalDistanceDeg(lat, lon, tileLat, tileLon) > 100) return;
+      if (sphericalDistanceDeg(lat, lon, tileLat, tileLon) > this.fetchReach(capDeg, width)) return;
       candidates.push({ kind, z: tileZ, x: tileX, y: tileY, resolve, distance: sphericalDistanceDeg(lat, lon, tileLat, tileLon) });
     };
 
@@ -565,7 +848,7 @@ export class EarthView {
    */
   readTerrain(lat, lon, { radiusNm = 40, rasterPx = this.rasterPx } = {}) {
     this.setResolution(rasterPx);
-    this.ensureAround(lat, lon, rasterPx, { imagery: false, terrain: true });
+    this.ensureAround(lat, lon, { imagery: false, terrain: true, capDeg: this.capDeg });
     this.ensureProbe(lat, lon, radiusNm);
   }
 

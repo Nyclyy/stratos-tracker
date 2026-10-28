@@ -40,6 +40,55 @@ export const AIRLINES = Object.freeze([
   // United's current globe and wordmark are not published under a licence that
   // allows redistribution, so its theme is drawn as the typographic roundel.
   { icao: 'UAL', iata: 'UA', name: 'United Airlines', accent: '#8c9cff', deep: '#0a1030', logo: null },
+
+  /* The rest of the table. None of these carries a bundled mark: a logo is only
+     drawn when a file published under a licence that allows redistribution sits
+     in `images/airlines/`, and inventing artwork for an airline would be an
+     imitation of its trademark. Each is drawn as the typographic roundel of its
+     designator, in the brand's own tone. */
+  { icao: 'AFR', iata: 'AF', name: 'Air France', accent: '#7f9cff', deep: '#04122e', logo: null },
+  { icao: 'SWR', iata: 'LX', name: 'Swiss International Air Lines', accent: '#ff5b52', deep: '#3a0703', logo: null },
+  { icao: 'AUA', iata: 'OS', name: 'Austrian Airlines', accent: '#ff6a6a', deep: '#3a0808', logo: null },
+  { icao: 'IBE', iata: 'IB', name: 'Iberia', accent: '#ff6b5a', deep: '#380b06', logo: null },
+  { icao: 'AEA', iata: 'UX', name: 'Air Europa', accent: '#5f9bff', deep: '#03142e', logo: null },
+  { icao: 'TAP', iata: 'TP', name: 'TAP Air Portugal', accent: '#3ddc91', deep: '#04261a', logo: null },
+  { icao: 'SAS', iata: 'SK', name: 'Scandinavian Airlines', accent: '#62a9ff', deep: '#04162b', logo: null },
+  { icao: 'FIN', iata: 'AY', name: 'Finnair', accent: '#7f9cff', deep: '#050a2b', logo: null },
+  { icao: 'NAX', iata: 'DY', name: 'Norwegian', accent: '#ff5f78', deep: '#33060f', logo: null },
+  { icao: 'WZZ', iata: 'W6', name: 'Wizz Air', accent: '#ff6bd0', deep: '#33052a', logo: null },
+  { icao: 'VLG', iata: 'VY', name: 'Vueling', accent: '#ffd54a', deep: '#332b00', logo: null },
+  { icao: 'EIN', iata: 'EI', name: 'Aer Lingus', accent: '#3ddc91', deep: '#04261a', logo: null },
+  { icao: 'LOT', iata: 'LO', name: 'LOT Polish Airlines', accent: '#5f9dff', deep: '#04142b', logo: null },
+  { icao: 'AEE', iata: 'A3', name: 'Aegean Airlines', accent: '#5f9dff', deep: '#04142b', logo: null },
+  { icao: 'THY', iata: 'TK', name: 'Turkish Airlines', accent: '#ff5f5f', deep: '#330404', logo: null },
+  { icao: 'UAE', iata: 'EK', name: 'Emirates', accent: '#ff5a5f', deep: '#33070a', logo: null },
+  { icao: 'ETD', iata: 'EY', name: 'Etihad Airways', accent: '#e8bb4e', deep: '#2b2103', logo: null },
+  { icao: 'QTR', iata: 'QR', name: 'Qatar Airways', accent: '#d76a9f', deep: '#2b0416', logo: null },
+  { icao: 'SVA', iata: 'SV', name: 'Saudia', accent: '#4ce08b', deep: '#04261a', logo: null },
+  { icao: 'SIA', iata: 'SQ', name: 'Singapore Airlines', accent: '#ffc247', deep: '#33230a', logo: null },
+  { icao: 'CPA', iata: 'CX', name: 'Cathay Pacific', accent: '#3dd6c0', deep: '#032622', logo: null },
+  { icao: 'JAL', iata: 'JL', name: 'Japan Airlines', accent: '#ff5c5c', deep: '#330404', logo: null },
+  { icao: 'ANA', iata: 'NH', name: 'All Nippon Airways', accent: '#5f9dff', deep: '#04142b', logo: null },
+  { icao: 'KAL', iata: 'KE', name: 'Korean Air', accent: '#6f96ff', deep: '#03102e', logo: null },
+  { icao: 'CCA', iata: 'CA', name: 'Air China', accent: '#ff5f57', deep: '#330404', logo: null },
+  { icao: 'CES', iata: 'MU', name: 'China Eastern Airlines', accent: '#ff6b6b', deep: '#330707', logo: null },
+  { icao: 'CSN', iata: 'CZ', name: 'China Southern Airlines', accent: '#59b7ff', deep: '#03192b', logo: null },
+  { icao: 'THA', iata: 'TG', name: 'Thai Airways', accent: '#b184f5', deep: '#180a2e', logo: null },
+  { icao: 'MAS', iata: 'MH', name: 'Malaysia Airlines', accent: '#5c9fe0', deep: '#031628', logo: null },
+  { icao: 'GIA', iata: 'GA', name: 'Garuda Indonesia', accent: '#57b6ff', deep: '#03192b', logo: null },
+  { icao: 'EVA', iata: 'BR', name: 'EVA Air', accent: '#3ddc95', deep: '#04261a', logo: null },
+  { icao: 'AIC', iata: 'AI', name: 'Air India', accent: '#ff6a5c', deep: '#380b06', logo: null },
+  { icao: 'ETH', iata: 'ET', name: 'Ethiopian Airlines', accent: '#4ce08b', deep: '#04261a', logo: null },
+  { icao: 'TAM', iata: 'JJ', name: 'LATAM Brasil', accent: '#7f9cff', deep: '#04122e', logo: null },
+  { icao: 'AVA', iata: 'AV', name: 'Avianca', accent: '#ff6b6b', deep: '#330707', logo: null },
+  { icao: 'AMX', iata: 'AM', name: 'Aeroméxico', accent: '#ff7b7b', deep: '#330909', logo: null },
+  { icao: 'JBU', iata: 'B6', name: 'JetBlue', accent: '#5aa9ff', deep: '#03192b', logo: null },
+  { icao: 'SWA', iata: 'WN', name: 'Southwest Airlines', accent: '#ffb43d', deep: '#33230a', logo: null },
+  { icao: 'ASA', iata: 'AS', name: 'Alaska Airlines', accent: '#3fd6e0', deep: '#032528', logo: null },
+  { icao: 'WJA', iata: 'WS', name: 'WestJet', accent: '#3fd6d6', deep: '#032525', logo: null },
+  { icao: 'FDX', iata: 'FX', name: 'FedEx Express', accent: '#b184f5', deep: '#180a2e', logo: null },
+  { icao: 'UPS', iata: '5X', name: 'UPS Airlines', accent: '#d8a24a', deep: '#2b2008', logo: null },
+  { icao: 'TOM', iata: 'BY', name: 'TUI Airways', accent: '#5aa9ff', deep: '#03192b', logo: null },
 ]);
 
 /** The house identity, used whenever no airline is selected or recognised. */

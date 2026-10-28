@@ -561,9 +561,13 @@ export async function mount(root, ctx) {
      sheet over the bottom, so the chart keeps its width. */
   function syncMapInsets() {
     if (!map) return;
-    // Only a wide chart is split with the panel: on a tablet the panel would
-    // eat most of the width and the route would be fitted to a keyhole.
-    const beside = panelOpen && !el.panel.hidden && window.matchMedia('(min-width: 1000px)').matches;
+    /* The chart is split with the panel whenever it can still show the plan
+       beside it: the measure is the chart's own width, not the window's, because
+       a narrow window with a wide device pixel ratio still gives a chart that is
+       wide enough to be split, and a window that is wide on paper is not what
+       the map sees. Below this the panel is a sheet over the chart and the plan
+       keeps the full width. */
+    const beside = panelOpen && !el.panel.hidden && map.width >= 680;
     const clear = beside ? el.panel.getBoundingClientRect().width + 56 : 0;
     map.options.paddingRight = 34 + clear;
     map.draw();
@@ -721,6 +725,15 @@ export async function mount(root, ctx) {
   renderStrip(null);
   root.querySelector('[data-chart]')?.setAttribute('aria-pressed', chartTheme === 'day' ? 'true' : 'false');
   syncMapInsets();
+  /* The panel has no measured width until the page has been laid out, and the
+     canvas has none either, so the framing taken here is provisional: it is
+     taken again whenever the panel's own size settles. Without that the chart is
+     fitted to the whole canvas and the plan runs under a panel opened beside it
+     until the window happens to be resized. */
+  if (typeof ResizeObserver === 'function' && el.panel) {
+    const panelWatch = new ResizeObserver(() => { if (!destroyed) syncMapInsets(); });
+    panelWatch.observe(el.panel);
+  }
 
   return {
     destroy() {

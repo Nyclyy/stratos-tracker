@@ -250,6 +250,125 @@ test('minimap: switching to the globe keeps the place in view, and the span is a
   assert.ok(map.viewSpanNm() < span);
 });
 
+test('minimap: a leg across the date line is one piece, drawn off the edge rather than across the world', () => {
+  const map = new MiniMap(makeCanvas(400, 300), { padding: 22 });
+  const a = { id: 'ANCHR', lat: 45, lon: 175 };
+  const b = { id: 'AFTER', lat: 45, lon: -170 };
+  map.setRoute([a, b]);
+  const view = map.fit();
+  const pieces = map.legPath(a, b, view);
+  assert.equal(pieces.length, 1, 'the date line is not a break in the line');
+  const xs = pieces[0].map(p => p.x);
+  const ys = pieces[0].map(p => p.y);
+  const world = 256 * 2 ** view.zoom;
+
+  // A straight segment between the two projected points would be one jump of
+  // most of the chart. The sampled leg steps east instead, past the right edge,
+  // where the wrap draws it re-entering on the left.
+  for (let i = 1; i < xs.length; i += 1) {
+    assert.ok(Math.abs(xs[i] - xs[i - 1]) < world * 0.15,
+      `no sample jumps across the chart (${Math.round(Math.abs(xs[i] - xs[i - 1]))} px)`);
+  }
+  assert.ok(xs[xs.length - 1] > 0, 'and the leg runs east from its first fix');
+  // The chart centres on the plan, so this leg crosses the middle of the canvas
+  // rather than leaving one edge and re-entering the other: that wrap is only
+  // needed when the middle of the view is somewhere else.
+  const all = map.lonSpan(map.route);
+  assert.ok(all.span < 20, `the plan is fitted as the 15° it really spans (${all.span.toFixed(1)}°)`);
+  assert.ok(Math.max(...xs) < map.width && Math.min(...xs) > 0, 'and the leg is drawn whole, in view');
+
+
+
+  // It bends: a great circle between two points on the same latitude reaches
+  // higher than either of them, so its samples sit above both ends.
+  const ends = Math.max(ys[0], ys[ys.length - 1]);
+  assert.ok(Math.min(...ys) < ends - 1, 'the arc bows poleward, as a great circle does');
+
+  // The same leg on a globe is a straight screen segment only at the centre;
+  // sampled, it follows the sphere and breaks at the limb rather than chording it.
+  map.setMode('globe');
+  map.fitRoute();
+  const globeView = map.fit();
+  const globePieces = map.legPath(a, b, globeView);
+  assert.ok(globePieces.length >= 1, 'a globe still draws the leg');
+  assert.ok(globePieces.every(piece => piece.every(p => Number.isFinite(p.x) && Number.isFinite(p.y))),
+    'and never projects the far side onto the disc');
+});
+
+test('minimap: a plan across the date line is fitted across the Pacific, not the Atlantic', () => {
+  const xToLon = (x, z) => (x / 2 ** z) * 360 - 180;
+  const map = new MiniMap(makeCanvas(800, 500), { padding: 22 });
+  const pacific = [
+    { id: 'WSSS', lat: 1.35, lon: 103.99 },
+    { id: 'RJAA', lat: 35.76, lon: 140.39 },
+    { id: 'PACD', lat: 55.21, lon: -162.72 },
+    { id: 'PANC', lat: 61.17, lon: -149.99 },
+    { id: 'KEWR', lat: 40.69, lon: -74.17 },
+  ];
+  map.setRoute(pacific);
+  const view = map.fit();
+
+  // Read as plain longitudes the plan is 178° wide and its centre sits at 15°E —
+  // over Africa, with the two ends a world apart. Read the short way it is 183°
+  // wide across the Pacific, so the chart belongs over the ocean.
+  const centre = xToLon(view.centerX, view.zoom);
+  const overPacific = centre < -110 || centre > 110;
+  assert.ok(overPacific, `the chart is centred on the Pacific (${centre.toFixed(1)}°)`);
+
+  // Every point of the plan is on the canvas, ends included: the projection
+  // takes each one from the copy of the world nearest the middle.
+  for (const point of pacific) {
+    const screen = map.project(point.lat, point.lon, view);
+    assert.ok(screen.x > 0 && screen.x < map.width, `${point.id} is on the chart across the seam (x ${Math.round(screen.x)})`);
+    assert.ok(screen.y > 0 && screen.y < map.height, `${point.id} is on the chart across the seam (y ${Math.round(screen.y)})`);
+  }
+  // And it is one band, not the whole world: the plan occupies most of the width.
+  const xs = pacific.map(p => map.project(p.lat, p.lon, view).x);
+  assert.ok(Math.max(...xs) - Math.min(...xs) > map.width * 0.5, 'the plan uses the chart');
+
+  // A narrow chart still shows the plan whole: the fit may go below the level
+  // the zoom buttons stop at, because a 183° plan cannot be framed in 400 px
+  // otherwise.
+  const narrow = new MiniMap(makeCanvas(420, 500), { padding: 22 });
+  narrow.setRoute(pacific);
+  const tight = narrow.fit();
+  assert.equal(tight.zoom, 1, `a wide plan on a narrow chart fits the whole world (${tight.zoom})`);
+  for (const point of pacific) {
+    const screen = narrow.project(point.lat, point.lon, tight);
+    assert.ok(screen.x > 0 && screen.x < narrow.width, `${point.id} is still framed (x ${Math.round(screen.x)})`);
+  }
+
+  // A plan that does not cross the date line is fitted exactly as before.
+  const other = new MiniMap(makeCanvas(800, 500), { padding: 22 });
+  other.setRoute([{ lat: 37.62, lon: -122.38 }, { lat: 40.64, lon: -73.78 }]);
+  const ordinary = other.fit();
+  const ordinaryCentre = xToLon(ordinary.centerX, ordinary.zoom);
+  assert.ok(Math.abs(ordinaryCentre + 98) < 1, `a continental plan keeps its own centre (${ordinaryCentre.toFixed(1)}°)`);
+});
+
+test('minimap: a route panel narrows the chart without turning the view', () => {
+  const map = new MiniMap(makeCanvas(800, 500), { padding: 22, paddingRight: 300 });
+  map.setRoute([{ lat: 40, lon: -160 }, { lat: 40, lon: -100 }]);
+  const view = map.fit();
+
+  // The centre is the plan's own middle. Taking the panel out of the centre
+  // instead — which is what the chart used to do — turns the view a long way at
+  // a low zoom, so the plan leaves the screen.
+  const centre = ((view.centerX / 2 ** view.zoom) * 360) - 180;
+  assert.ok(Math.abs(centre + 130) < 1, `the view looks at the plan, not past it (${centre.toFixed(1)}°)`);
+
+  // The drawing is offset by half the space the panel keeps clear, so the plan
+  // sits in what is left rather than behind it.
+  assert.equal(map.marginX(), (22 - 300) / 2);
+  const middle = map.project(40, -130, view);
+  assert.ok(middle.x < map.width / 2, `the plan is drawn left of a right-hand panel (x ${Math.round(middle.x)})`);
+
+  // And the pointer still lands where it was put: the offset is drawing, not place.
+  const back = map.unproject(middle.x, middle.y, view);
+  assert.ok(Math.abs(back.lat - 40) < 0.01 && Math.abs(back.lon + 130) < 0.01,
+    `a pixel maps back to its coordinate (${back.lat.toFixed(2)}, ${back.lon.toFixed(2)})`);
+});
+
 test('minimap: the globe frames the route it is showing', () => {
   const map = new MiniMap(makeCanvas(), { padding: 22 });
   map.setRoute([{ id: 'KSFO', lat: 37.62, lon: -122.38 }, { id: 'EGLL', lat: 51.47, lon: -0.4543 }]);
