@@ -1,4 +1,20 @@
 {
+  "2.1.28": {
+    "summary": "Every operator in the EFB's airline picker now wears its own mark — 49 real logos in place of two-letter initials — with the source and licence of each one recorded in the app.",
+    "changelog": {
+      "features": [
+        "Airline appearance draws 49 operators with their own mark on the deck and in the settings preview, up from nine."
+      ],
+      "improvements": [
+        "Marks are single-tone masks, so each logo takes its airline's accent colour instead of bringing its own palette onto the deck.",
+        "The four operators with no freely licensed mark — United, China Eastern, Malaysia and Garuda — keep a designator roundel, and ATTRIBUTION.md names each one and the reason."
+      ],
+      "fixes": [
+        "Ryanair's bundled wordmark masked as a solid block; it now shows the letters.",
+        "WestJet's bundled artwork drew nothing at all; it is replaced with a mark that renders."
+      ]
+    }
+  },
   "2.1.27": {
     "summary": "Route lines are drawn the way a chart draws them — great circles, and across the date line instead of over the continents in between — a Pacific plan is fitted across the Pacific with its panel beside it, a shallow globe is sharp on its first still frame, and the EFB's airline picker now covers 53 operators.",
     "changelog": {

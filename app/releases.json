@@ -3,57 +3,52 @@
   "product": "stratos",
   "source": "https://github.com/Nyclyy/stratos-tracker",
   "latest": {
-    "version": "2.1.27",
+    "version": "2.1.28",
     "releasedAt": "2026-10-28",
     "severity": "normal",
-    "summary": "Route lines are drawn the way a chart draws them — great circles, and across the date line instead of over the continents in between — a Pacific plan is fitted across the Pacific with its panel beside it, a shallow globe is sharp on its first still frame, and the EFB's airline picker now covers 53 operators.",
+    "summary": "Every operator in the EFB's airline picker now wears its own mark — 49 real logos in place of two-letter initials — with the source and licence of each one recorded in the app.",
     "changelog": {
       "features": [
-        "A fitted view can show a plan that spans half the world: the chart may zoom out past the zoom buttons' own floor, so a Singapore–Newark plan is on one screen at once.",
-        "The route panel narrows the chart rather than covering it, and the plan is fitted into the space the panel leaves as soon as the panel has been measured.",
-        "Airline appearance offers 53 operators — searchable by name, ICAO or IATA code — so most SimBrief callsigns can wear their own colours instead of the Stratos default."
+        "Airline appearance draws 49 operators with their own mark on the deck and in the settings preview, up from nine."
       ],
       "improvements": [
-        "Each leg is drawn along its great circle, so a long oceanic leg bends the way it does on a chart instead of running ruler-straight.",
-        "A leg across the date line leaves one edge and re-enters on the other, rather than crossing every continent in between.",
-        "A plan that crosses the date line is centred on the ocean it crosses, not on the Atlantic.",
-        "A chart shifted to make room for a panel keeps looking at the same place: the offset is a drawing shift, not a change in longitude."
+        "Marks are single-tone masks, so each logo takes its airline's accent colour instead of bringing its own palette onto the deck.",
+        "The four operators with no freely licensed mark — United, China Eastern, Malaysia and Garuda — keep a designator roundel, and ATTRIBUTION.md names each one and the reason."
       ],
       "fixes": [
-        "The Flight Deck's plan line had the same fault and is drawn the same way — sampled, unwrapped at the date line and wrapped at the edges.",
-        "The Navigator no longer frames its first view as though the route panel were closed, which left the plan under the panel until the window was resized."
+        "Ryanair's bundled wordmark masked as a solid block; it now shows the letters.",
+        "WestJet's bundled artwork drew nothing at all; it is replaced with a mark that renders."
       ],
-      "performance": [
-        "The globe is painted whole on the first still frame when its pane fits one frame's sampling — a shallow view is sharp with no settle — while a deep zoom still fills in a band at a time."
-      ],
+      "performance": [],
       "ui": [],
       "compatibility": [],
       "other": []
-    },
-    "downloads": {
-      "windows": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.27/Stratos-Setup.exe",
-        "sha256": "79d4be83805b086518094f0ff47798ad8914911f3c37907e4f23d9f7e9666cf8",
-        "size": 107787566
-      },
-      "mac-arm64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.27/Stratos-2.1.27-mac-arm64.dmg",
-        "sha256": "db4c3a8fa21364a771b4e77d4e9af91e0ebe0804949b0bf890b6a8a3f98d851f",
-        "size": 123627533
-      },
-      "mac-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.27/Stratos-2.1.27-mac-x64.dmg",
-        "sha256": "8324dce1fa193ccb5cd1fe64432a0745e885ca2b47834a7c7d8fdbb41b70fe9f",
-        "size": 128951172
-      },
-      "linux-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.27/Stratos-2.1.27-linux-x64.AppImage",
-        "sha256": "06ddb00c8cea882c6036cee727aad689b1eebbcb6f8d998e1cfe33fe6019e107",
-        "size": 144526880
-      }
     }
   },
   "releases": [
+    {
+      "version": "2.1.28",
+      "releasedAt": "2026-10-28",
+      "severity": "normal",
+      "summary": "Every operator in the EFB's airline picker now wears its own mark — 49 real logos in place of two-letter initials — with the source and licence of each one recorded in the app.",
+      "changelog": {
+        "features": [
+          "Airline appearance draws 49 operators with their own mark on the deck and in the settings preview, up from nine."
+        ],
+        "improvements": [
+          "Marks are single-tone masks, so each logo takes its airline's accent colour instead of bringing its own palette onto the deck.",
+          "The four operators with no freely licensed mark — United, China Eastern, Malaysia and Garuda — keep a designator roundel, and ATTRIBUTION.md names each one and the reason."
+        ],
+        "fixes": [
+          "Ryanair's bundled wordmark masked as a solid block; it now shows the letters.",
+          "WestJet's bundled artwork drew nothing at all; it is replaced with a mark that renders."
+        ],
+        "performance": [],
+        "ui": [],
+        "compatibility": [],
+        "other": []
+      }
+    },
     {
       "version": "2.1.27",
       "releasedAt": "2026-10-28",
