@@ -521,11 +521,48 @@ class XPlaneIdentityTests(unittest.TestCase):
         self.assertEqual(bridge.plausible_registration("B-1234"), "B-1234", "a country mark is not a type")
         self.assertEqual(bridge.plausible_registration("MD-82"), "", "a type with a hyphen is still a type")
 
-    def test_the_subscription_covers_every_character_asked_for(self):
-        self.assertEqual(len(bridge.RREF_REQUESTS), 10 + 8 + 48)
+    def test_the_subscription_covers_every_character_and_numeric_row(self):
+        self.assertEqual(len(bridge.RREF_REQUESTS), 10 + 8 + 48 + 3)
         names = [dataref for _index, dataref in bridge.RREF_REQUESTS]
         self.assertIn("sim/aircraft/view/acf_tailnum[0]", names)
         self.assertIn("sim/aircraft/view/acf_tailnum[9]", names)
+        self.assertIn("sim/weather/region/altimeter_setting_inhg", names)
+        self.assertIn("sim/flightmodel/weight/m_total", names)
+        self.assertIn("sim/cockpit2/controls/flap_ratio", names)
+
+    def test_performance_datarefs_become_physical_values(self):
+        saved = dict(bridge._XPLANE_NUMERIC)
+        saved_status = dict(bridge.xplane_performance_status)
+        try:
+            bridge._XPLANE_NUMERIC.update(qnh=29.92, weight=70000.0, flap=0.5)
+            bridge.apply_xplane_performance()
+            status = bridge.xplane_performance_status
+            self.assertTrue(status["available"])
+            self.assertAlmostEqual(status["qnhHpa"], 1013.2, places=1)
+            self.assertEqual(status["weightKg"], 70000.0)
+            self.assertEqual(status["flapRatio"], 0.5)
+            self.assertGreater(status["at"], 0)
+        finally:
+            bridge._XPLANE_NUMERIC.clear()
+            bridge._XPLANE_NUMERIC.update(saved)
+            bridge.xplane_performance_status.clear()
+            bridge.xplane_performance_status.update(saved_status)
+
+    def test_implausible_performance_values_are_not_published(self):
+        saved = dict(bridge._XPLANE_NUMERIC)
+        saved_status = dict(bridge.xplane_performance_status)
+        try:
+            bridge.xplane_performance_status.update(
+                available=False, qnhHpa=None, weightKg=None, flapRatio=None, at=0)
+            bridge._XPLANE_NUMERIC.update(qnh=0.0, weight=0.0, flap=1.5)
+            bridge.apply_xplane_performance()
+            self.assertFalse(bridge.xplane_performance_status["available"])
+            self.assertIsNone(bridge.xplane_performance_status["qnhHpa"])
+        finally:
+            bridge._XPLANE_NUMERIC.clear()
+            bridge._XPLANE_NUMERIC.update(saved)
+            bridge.xplane_performance_status.clear()
+            bridge.xplane_performance_status.update(saved_status)
 
 
 class RelayTrafficTests(unittest.TestCase):
@@ -722,6 +759,15 @@ class AircraftPhotoTests(unittest.TestCase):
         self.assertEqual(bridge.photo_registration(""), "")
         self.assertEqual(bridge.photo_registration(None), "")
         self.assertEqual(bridge.photo_registration("N<script>"), "")
+
+    def test_an_n_number_that_looks_like_a_type_is_still_a_tail(self):
+        for reg in ("N123", "N1234", "N737SW", "N8312C"):
+            self.assertEqual(bridge.photo_registration(reg), reg)
+
+    def test_a_mode_s_address_is_six_hex_digits(self):
+        self.assertEqual(bridge.photo_hex(" ab5eb2 "), "AB5EB2")
+        for value in ("", None, "4066D", "4066D0A", "ZZZZZZ", "BAW2620"):
+            self.assertEqual(bridge.photo_hex(value), "", str(value))
 
     def test_a_found_photo_is_kept_longer_than_a_miss(self):
         self.assertGreater(bridge.PHOTO_TTL, bridge.PHOTO_MISS_TTL)

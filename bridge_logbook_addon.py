@@ -22,7 +22,7 @@ import threading
 import time
 import uuid
 
-VERSION = "2.1.28"
+VERSION = "2.1.29"
 
 # ── Thresholds ──────────────────────────────────────────────────────
 TAXI_SPEED_KT    = 2

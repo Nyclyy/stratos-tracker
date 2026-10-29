@@ -1,4 +1,22 @@
 {
+  "2.1.29": {
+    "summary": "Aircraft photos now resolve when only a Mode S address is reported and fall back to a labelled photo of another live aircraft of the same airline and type, while the Performance page is rebuilt around a bundled, versioned aircraft database.",
+    "changelog": {
+      "features": [
+        "Aircraft that report a Mode S address but no registration get their own Planespotters photo, linked to its page and credited to the photographer.",
+        "When the feed reports neither a registration nor an address, the card shows a labelled backup: a random live aircraft of the same airline and type, with its registration named.",
+        "The Performance page loads six bundled profiles — A321-200, A321neo, A340-600, 777-200ER, 777-200LR, 777-300ER — detects a ToLiss or FlightFactor airframe, and allows manual selection."
+      ],
+      "improvements": [
+        "Performance figures name their source and are labelled verified, interpolated, estimated or unavailable; field lengths and V-speeds say they are unavailable rather than being estimated.",
+        "Performance inputs prefill from the simulator and weather and stay editable, with no file import or dataset for a pilot to manage."
+      ],
+      "fixes": [
+        "The tracker reads the ADS-B aircraft type field correctly, so real airliners are no longer rejected as backup photo candidates.",
+        "A failed ADS-B lookup is reported as unavailable instead of being described as no aircraft flying."
+      ]
+    }
+  },
   "2.1.28": {
     "summary": "Every operator in the EFB's airline picker now wears its own mark — 49 real logos in place of two-letter initials — with the source and licence of each one recorded in the app.",
     "changelog": {

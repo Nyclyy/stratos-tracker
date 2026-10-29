@@ -1077,8 +1077,37 @@ test('the aircraft card works out a registration its feed did not report', async
   assert.match(page, /lookupPlan\(\{hex:o\.hx,callsign:o\.id\}\)/, 'live traffic is resolved from its Mode S address or callsign');
   assert.match(page, /fcDetect\(sel\);/, 'the card detects before it draws');
   assert.match(page, /\(detected\?' \(detected\)':''\)/, 'a worked-out registration is labelled as detected, not as feed data');
-  assert.match(page, /if\(!reg\)return fcNoRegHtml\(o\);/, 'a missing registration has its own card states');
+  assert.match(page, /if\(!ref\)return fcNoRegHtml\(o\);/, 'an aircraft with no airframe reference has its own card states');
   assert.match(page, /Detecting the registration…/, 'the card says it is detecting instead of claiming there is none');
+});
+
+test('the aircraft photo is the link to its spotter page and falls back to Mode S', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  // Planespotters' terms require the thumbnail itself, not only the caption,
+  // to lead back to the photo page, without rel=nofollow.
+  assert.ok(page.includes('<a class="fcph-link" href="'), 'the photo image is wrapped in the page link');
+  assert.ok(page.includes('<figcaption class="fcph-c">'), 'the photographer credit stays beside the image');
+  assert.ok(page.includes("const shot='<a class=\"fcph-link\" href=\"'+link+'\" target=\"_blank\" rel=\"noopener\""), 'the service URL is used unchanged');
+  // The public API documents registration and hex lookups, and the card asks
+  // for the hex only when the feed reported no registration.
+  assert.match(page, /photoHexRequest\(hex\)/, 'a Mode S address can be looked up');
+  assert.match(page, /photoUpstreamUrl\(\{hex\}\)/, 'the desktop direct call has a hex endpoint too');
+  assert.match(page, /kind=='hex'\?'Mode S '\+ref\.value/, 'a hex photo is labelled by its address, not a guessed tail');
+});
+
+test('the aircraft card offers a labelled backup of the same airline and type', async () => {
+  const fs = await import('node:fs');
+  const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  assert.match(page, /import \* as AL from '\.\/js\/lib\/airlines\.js';/, 'the card can name the callsign operator');
+  assert.match(page, /const PHOTOS=new Map\(\),REPS=new Map\(\),TYPE_FEED=new Map\(\);/, 'backup searches and the type feed are cached');
+  assert.match(page, /representativeQuery\(\{callsign:fcCallsign\(o\),type:fcTypeCode\(o\)\}\)/, 'the callsign code and type form the backup query');
+  assert.match(page, /representativeCandidates\(T,ref\)/, 'aircraft already on the map are offered before a network request');
+  assert.match(page, /representativeCandidates\(payload\.ac,ref\)/, 'the live type feed can supply the backup');
+  assert.match(page, /if\(!payload\)\{REPS\.set\(ref\.key,\{state:'unavailable'\}\)/, 'an unreachable feed is not reported as an empty sky');
+  assert.match(page, /Math\.random\(\)\*list\.length/, 'any matching aircraft of the operator and type is acceptable');
+  assert.ok(page.includes('<span class="fcph-rep">BACKUP</span>'), 'the photo is visibly a backup');
+  assert.match(page, /not the tracked aircraft/, 'the alternative is not presented as the selected airframe');
 });
 
 test('the map draws waypoint symbols over a route line it never rewrites', async () => {

@@ -118,10 +118,12 @@ button.on{background:var(--acc);color:#fff;border-color:transparent}:root[data-t
 #fc .fci{flex:0 0 auto;width:22px;height:22px;display:grid;place-items:center;padding:0;border-radius:6px;border:1px solid color-mix(in srgb,var(--coast) 40%,transparent);background:none;color:var(--mut);font-size:11px;line-height:1;cursor:pointer}
 #fc .fci:hover{color:var(--txt);border-color:var(--acc)}
 #fc .fcph{position:relative;margin:-14px -16px 12px;border-radius:16px 16px 0 0;overflow:hidden;background:linear-gradient(135deg,#1e293b,#0b1220);display:block}
+#fc .fcph a.fcph-link{display:block;line-height:0}
 #fc .fcph img{display:block;width:100%;height:132px;object-fit:cover}
 #fc .fcph figcaption{position:absolute;left:0;right:0;bottom:0;padding:14px 12px 5px;font-size:10px;letter-spacing:.02em;color:#e2e8f0;text-align:right;background:linear-gradient(180deg,transparent,rgba(3,7,18,.82))}
 #fc .fcph figcaption a{color:#e2e8f0;text-decoration:none}
 #fc .fcph figcaption a:hover{text-decoration:underline}
+#fc .fcph-rep{display:inline-block;margin-right:4px;padding:1px 4px;border-radius:3px;background:#f59e0b;color:#111;font-size:8.5px;font-weight:800;letter-spacing:.06em;vertical-align:1px}
 #fc .fcph.none,#fc .fcph.load{display:flex;flex-direction:column;justify-content:center;gap:3px;min-height:84px;padding:12px 16px}
 #fc .fcph.none .fcph-t{font-size:14px;font-weight:700;color:var(--txt)}
 #fc .fcph.load .fcph-t{font-size:12px;color:var(--txt)}
@@ -2314,7 +2316,7 @@ return '<svg class="spark" viewBox="0 0 '+W2+' '+H2+'" preserveAspectRatio="none
    own aircraft when nothing is selected. Every field comes from the simulator
    snapshot, the traffic feed or the planned route; a field a source does not
    provide says so rather than showing a plausible number. */
-const PHOTOS=new Map();
+const PHOTOS=new Map(),REPS=new Map(),TYPE_FEED=new Map();
 /* Expanded is the default; a minimized card is the user's choice, remembered
    on this device. Minimized keeps the callsign, the live numbers and the
    planned SID/STAR with their runways, and hides the photo and the long list. */
@@ -2326,6 +2328,42 @@ function fcKey(o){return o.k=='own'?'own:'+String((live.d&&live.d.aircraft)||'')
 function fcReported(o){const io=o.k=='own',raw=io?(live.d&&live.d.registration):o.reg;return window.PHOTO?window.PHOTO.normalizeRegistration(raw):''}
 function fcRegState(o){const reported=fcReported(o);return reported?{state:'ok',registration:reported,via:'reported'}:(IDENT.get(fcKey(o))||{state:'idle'})}
 function fcReg(o){const s=fcRegState(o);return s.state=='ok'?s.registration:''}
+function fcHex(o){return o.k=='own'||!window.REG?'':window.REG.normalizeHex(o.hx)}
+function fcRegPhotoRef(reg){return{key:reg,kind:'reg',value:reg,url:window.PHOTO.photoRequest(reg),direct:window.PHOTO.photoUpstreamUrl({registration:reg})}}
+function fcCallsign(o){
+  if(o.k!='own')return String(o.id||'').trim();
+  return String((live.d&&live.d.callsign)||(((fpOfp()||{}).flight||{}).callsign)||'').trim()
+}
+function fcTypeCode(o){
+  if(!window.PHOTO)return '';
+  if(o.k!='own')return window.PHOTO.typeCode(o.type||'');
+  for(const value of [(live.d&&live.d.aircraftType),(live.d&&live.d.aircraft)]){
+    const code=window.PHOTO.typeCode(value);
+    if(code)return code;
+  }
+  const ofp=fpOfp();
+  return window.PHOTO.typeCode((ofp&&ofp.aircraft&&ofp.aircraft.icao)||'')
+}
+/* A registration is the airframe; the Mode S address is the service's other
+   exact index. With neither, ask for a backup of the same operator and type,
+   which is labelled as a representative aircraft, never as this one. */
+function fcRepQuery(o){
+  if(!window.PHOTO)return null;
+  const rep=window.PHOTO.representativeQuery({callsign:fcCallsign(o),type:fcTypeCode(o)});
+  if(!rep)return null;
+  const air=window.AL?window.AL.airlineByIcao(rep.designator):null;
+  return{...rep,airline:air?air.name:rep.designator}
+}
+function fcPhotoRef(o){
+  if(!window.PHOTO)return null;
+  const reg=fcReg(o);
+  if(reg)return fcRegPhotoRef(reg);
+  const hex=fcHex(o);
+  if(hex)return{key:'hex:'+hex,kind:'hex',value:hex,url:window.PHOTO.photoHexRequest(hex),direct:window.PHOTO.photoUpstreamUrl({hex})};
+  const rep=fcRepQuery(o);
+  if(rep)return{kind:'rep',...rep,key:'rep:'+rep.key};
+  return null;
+}
 /* The registration a feed did not carry. Your own airframe is named in the
    aircraft title or its livery, which is how Volanta and similar apps identify
    what you are flying; a live target is resolved from its Mode S address, or,
@@ -2384,13 +2422,56 @@ function fcNoRegHtml(o){
 }
 function fcType(o){const io=o.k=='own',t=io?((live.d&&live.d.aircraft)||''):(o.type||'');return String(t).trim()}
 function fcSource(o){if(o.k=='own')return 'LIVE FROM '+String((live.d&&live.d.src)||'SIM').toUpperCase();if(o.source=='vatsim')return 'VATSIM';if(o.source=='adsb')return 'ADS-B'+(WT.src?' VIA '+String(WT.src).toUpperCase():'');return String(o.cc||'TRAFFIC').toUpperCase()}
-/* One lookup per registration per session. A failure is remembered as a
-   failure, so a missing photo is not retried on every frame. */
-async function fcPhoto(reg){
-  if(!reg||PHOTOS.has(reg))return;
-  PHOTOS.set(reg,{state:'loading'});
-  const direct='https://api.planespotters.net/pub/photos/reg/'+encodeURIComponent(reg);
-  // missingOn404 separates "the service has no photo for this registration" from
+function fcPick(list){return list&&list.length?list[Math.floor(Math.random()*list.length)]:null}
+/* The backup search: use a matching aircraft already on the map when one is
+   there, otherwise ask the live ADS-B type feed for one. Only the callsign's
+   three-letter operator code and the ICAO type are matched; nothing is guessed.
+   Any matching aircraft is acceptable: the photo is labeled a backup. One
+   search per operator/type per session, and the type feed is kept per type. */
+async function fcRepPhoto(ref){
+  if(REPS.has(ref.key))return;
+  REPS.set(ref.key,{state:'loading'});
+  const onMap=window.PHOTO.representativeCandidates(T,ref);
+  if(onMap.length){
+    const seen=fcPick(onMap);
+    REPS.set(ref.key,{...seen,state:'ok',key:ref.key});
+    const shot=fcRegPhotoRef(seen.registration);
+    if(PHOTOS.has(shot.key))fCard();else fcPhoto(shot);
+    return
+  }
+  const ask=async url=>{
+    for(let attempt=0;attempt<2;attempt++){
+      let r=null;
+      try{
+        const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),8000);
+        try{r=await fetch(url,{signal:ac.signal})}finally{clearTimeout(tm)}
+      }catch(_){r=null}
+      if(r&&r.ok){try{return await r.json()}catch(_){return null}}
+      if(attempt===0)await new Promise(res=>setTimeout(res,700))
+    }
+    return null
+  };
+  const via=await wtUseProxy();
+  let payload=TYPE_FEED.get(ref.url);
+  if(!payload){
+    payload=await ask(via?wtApi(ref.url):ref.url);
+    if(payload)TYPE_FEED.set(ref.url,payload)
+  }
+  // No payload is an unreachable source, not an empty sky.
+  if(!payload){REPS.set(ref.key,{state:'unavailable'});fCard();return}
+  const found=fcPick(window.PHOTO.representativeCandidates(payload.ac,ref));
+  if(!found){REPS.set(ref.key,{state:'none'});fCard();return}
+  REPS.set(ref.key,{...found,state:'ok',key:ref.key});
+  const shot=fcRegPhotoRef(found.registration);
+  if(PHOTOS.has(shot.key))fCard();else fcPhoto(shot)
+}
+/* One lookup per registration or Mode S address per session. A failure is
+   remembered as a failure, so a missing photo is not retried on every frame. */
+async function fcPhoto(ref){
+  if(!ref||PHOTOS.has(ref.key))return;
+  if(ref.kind=='rep'){await fcRepPhoto(ref);return}
+  PHOTOS.set(ref.key,{state:'loading'});
+  // missingOn404 separates "the service has no photo for this airframe" from
   // "this deployment has no photo route at all", which are different answers.
   const ask=async(missingOn404,url)=>{
     let r;
@@ -2403,21 +2484,44 @@ async function fcPhoto(reg){
   // The desktop build has no same-origin API; its main process supplies the
   // User-Agent the service requires, so the direct call is the working path there.
   const outcome=location.protocol==='file'
-    ? await ask(true,direct)
-    : await ask(false,window.PHOTO.photoRequest(reg));
-  PHOTOS.set(reg,outcome&&outcome.state?outcome:{state:'unavailable'});
+    ? await ask(true,ref.direct)
+    : await ask(false,ref.url);
+  PHOTOS.set(ref.key,outcome&&outcome.state?outcome:{state:'unavailable'});
   fCard();
 }
+function fcRepHtml(ref){
+  const who=esc(ref.airline||ref.designator),type=esc(ref.type);
+  const r=REPS.get(ref.key);
+  if(!r||r.state=='loading')return '<div class="fcph load"><span class="fcph-t">Finding a backup '+who+' '+type+'…</span><span class="fcph-c">Live ADS-B · Planespotters.net</span></div>';
+  if(r.state=='unavailable')return '<div class="fcph none"><span class="fcph-t">'+who+' '+type+'</span><span class="fcph-c">The live ADS-B backup lookup failed, so no '+who+' '+type+' could be found</span></div>';
+  if(r.state=='none')return '<div class="fcph none"><span class="fcph-t">'+who+' '+type+'</span><span class="fcph-c">No live '+who+' '+type+' found for a backup photo</span></div>';
+  const p=PHOTOS.get(r.registration);
+  if(!p||p.state=='loading')return '<div class="fcph load"><span class="fcph-t">Looking up backup '+esc(r.registration)+'…</span><span class="fcph-c">Planespotters.net</span></div>';
+  if(p.state=='unavailable')return '<div class="fcph none"><span class="fcph-t">'+who+' '+type+'</span><span class="fcph-c">Backup photo lookup is unavailable here · '+esc(r.registration)+'</span></div>';
+  if(p.state!='ok'||!p.photo)return '<div class="fcph none"><span class="fcph-t">'+who+' '+type+'</span><span class="fcph-c">No spotter photo published for backup '+esc(r.registration)+'</span></div>';
+  const credit=esc(window.PHOTO.photoCredit(p.photo)),link=esc(p.photo.link);
+  const cap='<a href="'+link+'" target="_blank" rel="noopener">'+credit+'</a>';
+  const img='<img src="'+esc(p.photo.src)+'" alt="Representative '+who+' '+type+' '+esc(r.registration)+', not the tracked aircraft" loading="lazy" referrerpolicy="no-referrer">';
+  const shot='<a class="fcph-link" href="'+link+'" target="_blank" rel="noopener" title="Open this photo on Planespotters.net">'+img+'</a>';
+  return '<figure class="fcph">'+shot+'<figcaption class="fcph-c"><span class="fcph-rep">BACKUP</span> '+who+' '+type+' · '+esc(r.registration)+' · '+cap+'</figcaption></figure>';
+}
 function fcPhotoHtml(o){
-  const reg=fcReg(o),type=fcType(o),label=type||'Aircraft';
-  if(!reg)return fcNoRegHtml(o);
-  const p=PHOTOS.get(reg);
-  if(!p||p.state=='loading')return '<div class="fcph load"><span class="fcph-t">Looking up '+esc(reg)+'…</span><span class="fcph-c">Planespotters.net</span></div>';
-  if(p.state=='unavailable')return '<div class="fcph none"><span class="fcph-t">'+esc(label)+'</span><span class="fcph-c">Photo lookup is unavailable here · registration '+esc(reg)+'</span></div>';
-  if(p.state!='ok'||!p.photo)return '<div class="fcph none"><span class="fcph-t">'+esc(label)+'</span><span class="fcph-c">No spotter photo published for '+esc(reg)+'</span></div>';
-  const credit=esc(window.PHOTO.photoCredit(p.photo));
-  const cap=p.photo.link?'<a href="'+esc(p.photo.link)+'" target="_blank" rel="noopener">'+credit+'</a>':credit;
-  return '<figure class="fcph"><img src="'+esc(p.photo.src)+'" alt="'+esc(label)+' '+esc(reg)+'" loading="lazy" referrerpolicy="no-referrer"><figcaption class="fcph-c">'+cap+'</figcaption></figure>';
+  const ref=fcPhotoRef(o),label=fcType(o)||'Aircraft';
+  if(!ref)return fcNoRegHtml(o);
+  if(ref.kind=='rep')return fcRepHtml(ref);
+  const p=PHOTOS.get(ref.key);
+  const match=ref.kind=='hex'?'Mode S '+ref.value:'registration '+ref.value;
+  if(!p||p.state=='loading')return '<div class="fcph load"><span class="fcph-t">Looking up '+esc(ref.kind=='hex'?'Mode S '+ref.value:ref.value)+'…</span><span class="fcph-c">Planespotters.net</span></div>';
+  if(p.state=='unavailable')return '<div class="fcph none"><span class="fcph-t">'+esc(label)+'</span><span class="fcph-c">Photo lookup is unavailable here · '+esc(match)+'</span></div>';
+  if(p.state!='ok'||!p.photo)return '<div class="fcph none"><span class="fcph-t">'+esc(label)+'</span><span class="fcph-c">No spotter photo published for '+esc(match)+'</span></div>';
+  const credit=esc(window.PHOTO.photoCredit(p.photo)),link=esc(p.photo.link);
+  const cap='<a href="'+link+'" target="_blank" rel="noopener">'+credit+'</a>';
+  /* Planespotters' terms ask for the thumbnail itself to lead back to the
+     photo's page, carrying the photographer's credit beside the image. A
+     payload without that page is not shown by the photo module at all. */
+  const img='<img src="'+esc(p.photo.src)+'" alt="'+esc(label)+' '+esc(ref.kind=='hex'?'Mode S '+ref.value:ref.value)+'" loading="lazy" referrerpolicy="no-referrer">';
+  const shot='<a class="fcph-link" href="'+link+'" target="_blank" rel="noopener" title="Open this photo on Planespotters.net">'+img+'</a>';
+  return '<figure class="fcph">'+shot+'<figcaption class="fcph-c">'+(ref.kind=='hex'?'Mode S '+esc(ref.value)+' · ':'')+cap+'</figcaption></figure>';
 }
 /* The named procedures belong to the plan being flown. Only the stored
    SimBrief OFP carries a SID, a STAR or a planned runway; a live target's feed
@@ -2575,8 +2679,8 @@ function fcRender(ok){
   let s;
   if(pick){
     fcDetect(sel);
-    const reg=fcReg(sel);
-    if(reg)fcPhoto(reg);
+    const ref=fcPhotoRef(sel);
+    if(ref)fcPhoto(ref);
     /* A minimized card drops the photograph and the long list; the callsign,
        the live numbers and the SID/STAR summary stay on the map. */
     s=(fExp?fcPhotoHtml(sel):'')+fcAircraftHtml(sel);
@@ -2585,8 +2689,8 @@ function fcRender(ok){
     /* Your own airframe gets the same treatment as a selected one: read the
        registration the simulator reports (or the title names), then one photo. */
     fcDetect({k:'own'});
-    const ownReg=fcReg({k:'own'});
-    if(fExp&&ownReg)fcPhoto(ownReg);
+    const ownReg=fcReg({k:'own'}),ownRef=fcPhotoRef({k:'own'});
+    if(fExp&&ownRef)fcPhoto(ownRef);
     const org=cf.depAirport||(rt?route[0].id:''),dst=cf.arrAirport||(rt?route[route.length-1].id:'');
     const sub=[d.aircraft,d.src?'Live from '+d.src:'Live from the simulator'].filter(Boolean).join(' · ');
     const left=rt?Math.round(Math.max(0,tot-pr)):(isFinite(parseFloat(g('tDS')))?Math.round(parseFloat(g('tDS'))):null);
@@ -2859,6 +2963,7 @@ try{if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').t
   import * as AC from './js/lib/aircraft.js';
   import * as PHOTO from './js/lib/aircraftphoto.js';
   import * as REG from './js/lib/aircraftreg.js';
+  import * as AL from './js/lib/airlines.js';
   import * as PROFILE from './js/lib/profile.js';
   import * as PROC from './js/lib/procedures.js';
   import * as TRAILC from './js/lib/trailcolor.js';
@@ -2873,5 +2978,6 @@ try{if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').t
   window.FS = FS;
   window.PHOTO = PHOTO;
   window.REG = REG;
+  window.AL = AL;
 </script>
 </body></html>

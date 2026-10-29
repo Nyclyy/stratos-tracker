@@ -116,17 +116,30 @@ PHOTOS = {}
 PHOTO_LOCK = threading.Lock()
 PHOTO_TTL = 24 * 60 * 60
 PHOTO_MISS_TTL = 60 * 60
-PHOTO_ENDPOINT = "https://api.planespotters.net/pub/photos/reg/"
+PHOTO_REG_ENDPOINT = "https://api.planespotters.net/pub/photos/reg/"
+PHOTO_HEX_ENDPOINT = "https://api.planespotters.net/pub/photos/hex/"
 
 
 def photo_registration(value):
-    """A plausible registration, or an empty string. Never a callsign or a type."""
+    """A plausible registration, or an empty string. Never a callsign or a type.
+
+    N-numbers that look like a type code (N123, N1234) are still real tails and
+    are kept.
+    """
     reg = str(value or "").strip().upper()
     if not re.match(r"^[A-Z0-9][A-Z0-9-]{1,9}$", reg):
         return ""
-    if re.match(r"^\d+$", reg) or re.match(r"^[A-Z]{1,4}\d{1,4}$", reg):
+    if re.match(r"^\d+$", reg):
+        return ""
+    if re.match(r"^[A-Z]{1,4}\d{1,4}$", reg) and not re.match(r"^N\d[0-9A-Z]{0,5}$", reg):
         return ""
     return reg
+
+
+def photo_hex(value):
+    """A 24-bit Mode S address, or an empty string."""
+    address = str(value or "").strip().upper()
+    return address if re.match(r"^[0-9A-F]{6}$", address) else ""
 FAA = {}
 FAA_LOCK = threading.Lock()
 # Cycle, publication window and check time for the catalogue currently in FAA.
@@ -1030,15 +1043,31 @@ XPLANE_STRING_DATAREFS = (
     ("icao", "sim/aircraft/view/acf_ICAO", 8),
     ("desc", "sim/aircraft/view/acf_descrip", 48),
 )
+# The Performance page needs the airframe's current environment as well as its
+# name. These are standard X-Plane datarefs, read at 1 Hz with the identity
+# strings: altimeter setting (inHg), total weight (kg) and flap handle ratio.
+XPLANE_NUMERIC_DATAREFS = (
+    ("qnh", "sim/weather/region/altimeter_setting_inhg"),
+    ("weight", "sim/flightmodel/weight/m_total"),
+    ("flap", "sim/cockpit2/controls/flap_ratio"),
+)
 RREF_INDEX_BASE = 9000
+RREF_NUMERIC_INDEX_BASE = 9200
 RREF_SLOTS = {}
+RREF_NUMERIC_SLOTS = {}
 RREF_REQUESTS = []
 _XPLANE_CHARS = {"tail": {}, "icao": {}, "desc": {}}
+_XPLANE_NUMERIC = {"qnh": None, "weight": None, "flap": None}
+xplane_performance_status = {
+    "available": False, "qnhHpa": None, "weightKg": None,
+    "flapRatio": None, "at": 0, "error": "",
+}
 
 
 def build_rref_requests():
-    """One subscription per character, each with its own response index."""
+    """One subscription per string character, plus the numeric performance rows."""
     RREF_SLOTS.clear()
+    RREF_NUMERIC_SLOTS.clear()
     RREF_REQUESTS.clear()
     index = RREF_INDEX_BASE
     for key, path, length in XPLANE_STRING_DATAREFS:
@@ -1046,6 +1075,11 @@ def build_rref_requests():
             RREF_SLOTS[index] = (key, position)
             RREF_REQUESTS.append((index, "%s[%d]" % (path, position)))
             index += 1
+    index = RREF_NUMERIC_INDEX_BASE
+    for key, path in XPLANE_NUMERIC_DATAREFS:
+        RREF_NUMERIC_SLOTS[index] = key
+        RREF_REQUESTS.append((index, path))
+        index += 1
 
 
 def rref_request(index, dataref, freq=1):
@@ -1127,6 +1161,32 @@ def apply_xplane_identity():
             state["registration"] = tail
 
 
+def apply_xplane_performance():
+    """Publish the numeric datarefs the Performance page may prefill from.
+
+    An implausible value is dropped rather than shown: a stale or unavailable
+    dataref reads as zero, which is not a QNH, a weight or a flap setting.
+    """
+    qnh_inhg = _XPLANE_NUMERIC.get("qnh")
+    weight = _XPLANE_NUMERIC.get("weight")
+    flap = _XPLANE_NUMERIC.get("flap")
+    qnh_hpa = None
+    weight_kg = None
+    flap_ratio = None
+    if isinstance(qnh_inhg, float) and math.isfinite(qnh_inhg) and 25.0 <= qnh_inhg <= 35.0:
+        qnh_hpa = round(qnh_inhg * 33.8639, 1)
+    if isinstance(weight, float) and math.isfinite(weight) and 0.0 < weight <= 500000.0:
+        weight_kg = round(weight, 1)
+    if isinstance(flap, float) and math.isfinite(flap) and 0.0 <= flap <= 1.0:
+        flap_ratio = round(flap, 3)
+    if qnh_hpa is None and weight_kg is None and flap_ratio is None:
+        return
+    xplane_performance_status.update(
+        available=True, qnhHpa=qnh_hpa, weightKg=weight_kg,
+        flapRatio=flap_ratio, at=int(time.time() * 1000), error="",
+    )
+
+
 def xplane_identity_loop():
     """Ask X-Plane for the loaded airframe's names, gently: 1 Hz, no polling loop."""
     if not RREF_REQUESTS:
@@ -1162,16 +1222,24 @@ def xplane_identity_loop():
         except OSError:
             return
         changed = False
+        changed_numbers = False
         for index, value in rref_values(data):
             slot = RREF_SLOTS.get(index)
-            if not slot:
+            if slot:
+                chars = _XPLANE_CHARS[slot[0]]
+                if chars.get(slot[1]) != value:
+                    chars[slot[1]] = value
+                    changed = True
                 continue
-            chars = _XPLANE_CHARS[slot[0]]
-            if chars.get(slot[1]) != value:
-                chars[slot[1]] = value
-                changed = True
+            numeric = RREF_NUMERIC_SLOTS.get(index)
+            if numeric:
+                if _XPLANE_NUMERIC.get(numeric) != value:
+                    _XPLANE_NUMERIC[numeric] = value
+                    changed_numbers = True
         if changed:
             apply_xplane_identity()
+        if changed_numbers:
+            apply_xplane_performance()
 
 
 build_rref_requests()
@@ -2130,6 +2198,7 @@ class Handler(BaseHTTPRequestHandler):
             "lanAddress": "http://%s:%d" % (lan_ip(), HTTP_PORT),
             "discovery": dict(mdns_status),
             "xplaneIdentity": dict(xplane_identity_status),
+            "xplanePerformance": dict(xplane_performance_status),
             "navdata": nav_data().summary(),
             "auth": {"remoteTokenRequired": True},
             "identity": load_aircraft_identity(),
@@ -2444,25 +2513,31 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(answer, 200 if answer.get("ok") else 400)
 
     def handle_photo(self, parsed):
-        """One aircraft photo by registration, for a page the bridge serves.
+        """One aircraft photo by registration or Mode S address, for a page the
+        bridge serves.
 
         The Planespotters API refuses a browser User-Agent, so the lookup runs
-        here with the app's own. Results are cached per registration: a photo
-        for a day, a miss for an hour. An unknown registration is an empty list,
-        not an error; an unreachable source is a 502 the card reports as such.
+        here with the app's own. Results are cached per registration or address:
+        a photo for a day, a miss for an hour. An unknown airframe is an empty
+        list, not an error; an unreachable source is a 502 the card reports as
+        such.
         """
-        reg = photo_registration(urllib.parse.parse_qs(parsed.query).get("reg", [""])[0])
-        if not reg:
-            self.send_json({"error": "Unsupported registration"}, 400)
+        query = urllib.parse.parse_qs(parsed.query)
+        reg = photo_registration(query.get("reg", [""])[0])
+        address = "" if reg else photo_hex(query.get("hex", [""])[0])
+        if not reg and not address:
+            self.send_json({"error": "Unsupported registration or Mode S address"}, 400)
             return
+        key = ("reg:" + reg) if reg else ("hex:" + address)
+        endpoint = (PHOTO_REG_ENDPOINT + urllib.parse.quote(reg)) if reg else (PHOTO_HEX_ENDPOINT + address)
         now = time.time()
         with PHOTO_LOCK:
-            cached = PHOTOS.get(reg)
+            cached = PHOTOS.get(key)
         if cached and now - cached[0] < cached[2]:
             self.send_json(cached[1])
             return
         request = urllib.request.Request(
-            PHOTO_ENDPOINT + urllib.parse.quote(reg),
+            endpoint,
             headers={"Accept": "application/json",
                      "User-Agent": "Stratos/2 (+https://github.com/Nyclyy/stratos-tracker)"})
         try:
@@ -2472,7 +2547,7 @@ class Handler(BaseHTTPRequestHandler):
             if exc.code == 404:
                 payload = {"photos": []}
                 with PHOTO_LOCK:
-                    PHOTOS[reg] = (now, payload, PHOTO_MISS_TTL)
+                    PHOTOS[key] = (now, payload, PHOTO_MISS_TTL)
                 self.send_json(payload)
                 return
             self.send_json({"error": "Photo source returned %d" % exc.code}, 502)
@@ -2484,7 +2559,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"error": "The photo source returned an unexpected response"}, 502)
             return
         with PHOTO_LOCK:
-            PHOTOS[reg] = (now, payload, PHOTO_TTL)
+            PHOTOS[key] = (now, payload, PHOTO_TTL)
         self.send_json(payload)
 
     def serve_static(self, path):

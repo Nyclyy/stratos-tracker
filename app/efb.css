@@ -2174,22 +2174,36 @@ body.view-nav .efb-main { background: #04070b; }
    missing before the numbers appear, not after. One row per input, with the
    value that came from the plan, the airport or the observation beside it. */
 
-.e-perf-ready { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 14px; }
-.e-perf-ready-row { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
-.e-perf-ready-row i { font-style: normal; font-size: 10px; line-height: 1; }
-.e-perf-ready-row i.is-ok { color: #6ee7b7; }
-.e-perf-ready-row i.is-missing { color: var(--efb-faint); }
-.e-perf-ready-row b { font-size: 11px; font-weight: 650; white-space: nowrap; }
-.e-perf-ready-row em {
-  font-style: normal;
-  font-size: 10px;
-  color: var(--efb-faint);
+/* Performance: the form and the calculated output. The layout collapses to one
+   column before either side can be squeezed; a min-width on the grid was what
+   made the old page hide its results on a phone. */
+.perf-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.perf-column { display: flex; flex-direction: column; min-width: 0; }
+.perf-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+.perf-tile {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  padding: 9px 10px;
+  border: 1px solid var(--efb-line);
+  border-radius: var(--efb-r-sm);
+  background: rgba(148, 163, 184, .03);
+}
+.perf-source {
+  margin-top: 6px;
+  font-size: 9.5px;
+  line-height: 1.4;
+  color: var(--efb-faint);
+  word-break: break-word;
 }
 
-@media (max-width: 900px) {
-  .e-perf-ready { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 1180px) {
+  .perf-layout { grid-template-columns: minmax(0, 1fr); }
 }

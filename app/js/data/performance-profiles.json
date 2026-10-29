@@ -1,0 +1,481 @@
+{
+  "schema": "stratos.performance-db/1",
+  "version": "2026.10-acd",
+  "released": "2026-10-28",
+  "source": {
+    "name": "FAA Aircraft Characteristics Database",
+    "record": "ACD_Data",
+    "release": "FY2024",
+    "retrieved": "2026-10-28",
+    "url": "https://www.faa.gov/airports/engineering/aircraft_char_database/aircraft_data",
+    "license": "U.S. Government work, public domain",
+    "note": "The database publishes weight limits and an airport-planning approach speed. It does not publish takeoff or landing distance, ground roll, or V1/VR/V2; those axes are marked unsupported rather than estimated."
+  },
+  "units": {
+    "weight": "kg",
+    "distance": "ft",
+    "speed": "kt",
+    "altitude": "ft",
+    "temperature": "C",
+    "pressure": "hPa"
+  },
+  "profiles": [
+    {
+      "id": "a321-200",
+      "manufacturer": "Airbus",
+      "name": "A321-200",
+      "icao": "A321",
+      "match": {
+        "text": [
+          "ToLiss A321",
+          "A321-200",
+          "Airbus A321"
+        ],
+        "exclude": [
+          "neo",
+          "A21N"
+        ]
+      },
+      "source": {
+        "name": "FAA Aircraft Characteristics Database",
+        "record": "A321",
+        "release": "FY2024",
+        "retrieved": "2026-10-28",
+        "url": "https://www.faa.gov/airports/engineering/aircraft_char_database/aircraft_data",
+        "license": "U.S. Government work, public domain"
+      },
+      "verification": "verified",
+      "units": {
+        "weight": "kg",
+        "distance": "ft",
+        "speed": "kt"
+      },
+      "limits": {
+        "mtowKg": 91000,
+        "mlwKg": 77800
+      },
+      "operatingRange": {
+        "weightKg": [
+          0,
+          91000
+        ],
+        "pressureAltitudeFt": [
+          -1000,
+          12000
+        ],
+        "oatC": [
+          -40,
+          50
+        ],
+        "basis": "Stratos input window, not an aircraft operating limitation."
+      },
+      "takeoff": {
+        "status": "unsupported",
+        "reason": "No licensed takeoff distance, ground roll or V1/VR/V2 table is available for this type. The FAA ACD publishes weights and approach speed only.",
+        "table": null
+      },
+      "landing": {
+        "status": "unsupported",
+        "reason": "No licensed landing distance table is available for this type. The FAA ACD publishes weights and approach speed only.",
+        "vrefKt": 142,
+        "vrefBasis": "FAA ACD approach speed at maximum landing weight; an airport-planning value, not an AFM VREF.",
+        "table": null
+      },
+      "corrections": {
+        "status": "unsupported",
+        "axes": [
+          "wind",
+          "slope",
+          "surface",
+          "flaps",
+          "thrust",
+          "antiIce",
+          "braking",
+          "autobrake"
+        ],
+        "reason": "The FAA ACD publishes weight limits and an approach speed only; it contains no takeoff or landing corrections for wind, slope, surface, flaps, thrust, anti-ice or braking."
+      }
+    },
+    {
+      "id": "a321neo",
+      "manufacturer": "Airbus",
+      "name": "A321neo",
+      "icao": "A21N",
+      "match": {
+        "text": [
+          "A321neo",
+          "A321 neo",
+          "A321-251N",
+          "A321-271N"
+        ],
+        "exclude": [
+          "A321-200"
+        ]
+      },
+      "source": {
+        "name": "FAA Aircraft Characteristics Database",
+        "record": "A21N",
+        "release": "FY2024",
+        "retrieved": "2026-10-28",
+        "url": "https://www.faa.gov/airports/engineering/aircraft_char_database/aircraft_data",
+        "license": "U.S. Government work, public domain"
+      },
+      "verification": "verified",
+      "units": {
+        "weight": "kg",
+        "distance": "ft",
+        "speed": "kt"
+      },
+      "limits": {
+        "mtowKg": 95000,
+        "mlwKg": 79200
+      },
+      "operatingRange": {
+        "weightKg": [
+          0,
+          95000
+        ],
+        "pressureAltitudeFt": [
+          -1000,
+          12000
+        ],
+        "oatC": [
+          -40,
+          50
+        ],
+        "basis": "Stratos input window, not an aircraft operating limitation."
+      },
+      "takeoff": {
+        "status": "unsupported",
+        "reason": "No licensed takeoff distance, ground roll or V1/VR/V2 table is available for this type. The FAA ACD publishes weights and approach speed only.",
+        "table": null
+      },
+      "landing": {
+        "status": "unsupported",
+        "reason": "No licensed landing distance table is available for this type. The FAA ACD publishes weights and approach speed only.",
+        "vrefKt": 136,
+        "vrefBasis": "FAA ACD approach speed at maximum landing weight; an airport-planning value, not an AFM VREF.",
+        "table": null
+      },
+      "corrections": {
+        "status": "unsupported",
+        "axes": [
+          "wind",
+          "slope",
+          "surface",
+          "flaps",
+          "thrust",
+          "antiIce",
+          "braking",
+          "autobrake"
+        ],
+        "reason": "The FAA ACD publishes weight limits and an approach speed only; it contains no takeoff or landing corrections for wind, slope, surface, flaps, thrust, anti-ice or braking."
+      }
+    },
+    {
+      "id": "a340-600",
+      "manufacturer": "Airbus",
+      "name": "A340-600",
+      "icao": "A346",
+      "match": {
+        "text": [
+          "ToLiss A340",
+          "A340-600",
+          "Airbus A340-600"
+        ],
+        "exclude": [
+          "A340-500",
+          "A345"
+        ]
+      },
+      "source": {
+        "name": "FAA Aircraft Characteristics Database",
+        "record": "A346",
+        "release": "FY2024",
+        "retrieved": "2026-10-28",
+        "url": "https://www.faa.gov/airports/engineering/aircraft_char_database/aircraft_data",
+        "license": "U.S. Government work, public domain"
+      },
+      "verification": "verified",
+      "units": {
+        "weight": "kg",
+        "distance": "ft",
+        "speed": "kt"
+      },
+      "limits": {
+        "mtowKg": 380000,
+        "mlwKg": 265000
+      },
+      "operatingRange": {
+        "weightKg": [
+          0,
+          380000
+        ],
+        "pressureAltitudeFt": [
+          -1000,
+          12000
+        ],
+        "oatC": [
+          -40,
+          50
+        ],
+        "basis": "Stratos input window, not an aircraft operating limitation."
+      },
+      "takeoff": {
+        "status": "unsupported",
+        "reason": "No licensed takeoff distance, ground roll or V1/VR/V2 table is available for this type. The FAA ACD publishes weights and approach speed only.",
+        "table": null
+      },
+      "landing": {
+        "status": "unsupported",
+        "reason": "No licensed landing distance table is available for this type. The FAA ACD publishes weights and approach speed only.",
+        "vrefKt": 153,
+        "vrefBasis": "FAA ACD approach speed at maximum landing weight; an airport-planning value, not an AFM VREF.",
+        "table": null
+      },
+      "corrections": {
+        "status": "unsupported",
+        "axes": [
+          "wind",
+          "slope",
+          "surface",
+          "flaps",
+          "thrust",
+          "antiIce",
+          "braking",
+          "autobrake"
+        ],
+        "reason": "The FAA ACD publishes weight limits and an approach speed only; it contains no takeoff or landing corrections for wind, slope, surface, flaps, thrust, anti-ice or braking."
+      }
+    },
+    {
+      "id": "b777-200er",
+      "manufacturer": "Boeing",
+      "name": "777-200ER",
+      "icao": "B772",
+      "match": {
+        "text": [
+          "777-200ER",
+          "FlightFactor 777-200ER",
+          "B777-200ER"
+        ],
+        "exclude": [
+          "777-200LR",
+          "B77L"
+        ]
+      },
+      "source": {
+        "name": "FAA Aircraft Characteristics Database",
+        "record": "B772",
+        "release": "FY2024",
+        "retrieved": "2026-10-28",
+        "url": "https://www.faa.gov/airports/engineering/aircraft_char_database/aircraft_data",
+        "license": "U.S. Government work, public domain"
+      },
+      "verification": "verified",
+      "units": {
+        "weight": "kg",
+        "distance": "ft",
+        "speed": "kt"
+      },
+      "limits": {
+        "mtowKg": 297557,
+        "mlwKg": 213188
+      },
+      "operatingRange": {
+        "weightKg": [
+          0,
+          297557
+        ],
+        "pressureAltitudeFt": [
+          -1000,
+          12000
+        ],
+        "oatC": [
+          -40,
+          50
+        ],
+        "basis": "Stratos input window, not an aircraft operating limitation."
+      },
+      "takeoff": {
+        "status": "unsupported",
+        "reason": "No licensed takeoff distance, ground roll or V1/VR/V2 table is available for this type. The FAA ACD publishes weights and approach speed only.",
+        "table": null
+      },
+      "landing": {
+        "status": "unsupported",
+        "reason": "No licensed landing distance table is available for this type. The FAA ACD publishes weights and approach speed only.",
+        "vrefKt": 140,
+        "vrefBasis": "FAA ACD approach speed at maximum landing weight; an airport-planning value, not an AFM VREF.",
+        "table": null
+      },
+      "corrections": {
+        "status": "unsupported",
+        "axes": [
+          "wind",
+          "slope",
+          "surface",
+          "flaps",
+          "thrust",
+          "antiIce",
+          "braking",
+          "autobrake"
+        ],
+        "reason": "The FAA ACD publishes weight limits and an approach speed only; it contains no takeoff or landing corrections for wind, slope, surface, flaps, thrust, anti-ice or braking."
+      }
+    },
+    {
+      "id": "b777-200lr",
+      "manufacturer": "Boeing",
+      "name": "777-200LR",
+      "icao": "B77L",
+      "match": {
+        "text": [
+          "777-200LR",
+          "FlightFactor 777-200LR",
+          "B777-200LR"
+        ],
+        "exclude": [
+          "777-200ER",
+          "B772"
+        ]
+      },
+      "source": {
+        "name": "FAA Aircraft Characteristics Database",
+        "record": "B77L",
+        "release": "FY2024",
+        "retrieved": "2026-10-28",
+        "url": "https://www.faa.gov/airports/engineering/aircraft_char_database/aircraft_data",
+        "license": "U.S. Government work, public domain"
+      },
+      "verification": "verified",
+      "units": {
+        "weight": "kg",
+        "distance": "ft",
+        "speed": "kt"
+      },
+      "limits": {
+        "mtowKg": 347500,
+        "mlwKg": 260816
+      },
+      "operatingRange": {
+        "weightKg": [
+          0,
+          347500
+        ],
+        "pressureAltitudeFt": [
+          -1000,
+          12000
+        ],
+        "oatC": [
+          -40,
+          50
+        ],
+        "basis": "Stratos input window, not an aircraft operating limitation."
+      },
+      "takeoff": {
+        "status": "unsupported",
+        "reason": "No licensed takeoff distance, ground roll or V1/VR/V2 table is available for this type. The FAA ACD publishes weights and approach speed only.",
+        "table": null
+      },
+      "landing": {
+        "status": "unsupported",
+        "reason": "No licensed landing distance table is available for this type. The FAA ACD publishes weights and approach speed only.",
+        "vrefKt": 140,
+        "vrefBasis": "FAA ACD approach speed at maximum landing weight; an airport-planning value, not an AFM VREF.",
+        "table": null
+      },
+      "corrections": {
+        "status": "unsupported",
+        "axes": [
+          "wind",
+          "slope",
+          "surface",
+          "flaps",
+          "thrust",
+          "antiIce",
+          "braking",
+          "autobrake"
+        ],
+        "reason": "The FAA ACD publishes weight limits and an approach speed only; it contains no takeoff or landing corrections for wind, slope, surface, flaps, thrust, anti-ice or braking."
+      }
+    },
+    {
+      "id": "b777-300er",
+      "manufacturer": "Boeing",
+      "name": "777-300ER",
+      "icao": "B77W",
+      "match": {
+        "text": [
+          "777-300ER",
+          "FlightFactor 777-300ER",
+          "B777-300ER"
+        ],
+        "exclude": [
+          "777-200",
+          "B772",
+          "B77L"
+        ]
+      },
+      "source": {
+        "name": "FAA Aircraft Characteristics Database",
+        "record": "B77W",
+        "release": "FY2024",
+        "retrieved": "2026-10-28",
+        "url": "https://www.faa.gov/airports/engineering/aircraft_char_database/aircraft_data",
+        "license": "U.S. Government work, public domain"
+      },
+      "verification": "verified",
+      "units": {
+        "weight": "kg",
+        "distance": "ft",
+        "speed": "kt"
+      },
+      "limits": {
+        "mtowKg": 351534,
+        "mlwKg": 251290
+      },
+      "operatingRange": {
+        "weightKg": [
+          0,
+          351534
+        ],
+        "pressureAltitudeFt": [
+          -1000,
+          12000
+        ],
+        "oatC": [
+          -40,
+          50
+        ],
+        "basis": "Stratos input window, not an aircraft operating limitation."
+      },
+      "takeoff": {
+        "status": "unsupported",
+        "reason": "No licensed takeoff distance, ground roll or V1/VR/V2 table is available for this type. The FAA ACD publishes weights and approach speed only.",
+        "table": null
+      },
+      "landing": {
+        "status": "unsupported",
+        "reason": "No licensed landing distance table is available for this type. The FAA ACD publishes weights and approach speed only.",
+        "vrefKt": 149,
+        "vrefBasis": "FAA ACD approach speed at maximum landing weight; an airport-planning value, not an AFM VREF.",
+        "table": null
+      },
+      "corrections": {
+        "status": "unsupported",
+        "axes": [
+          "wind",
+          "slope",
+          "surface",
+          "flaps",
+          "thrust",
+          "antiIce",
+          "braking",
+          "autobrake"
+        ],
+        "reason": "The FAA ACD publishes weight limits and an approach speed only; it contains no takeoff or landing corrections for wind, slope, surface, flaps, thrust, anti-ice or braking."
+      }
+    }
+  ]
+}

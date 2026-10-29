@@ -66,7 +66,7 @@ test('dev server: the traffic proxy refuses non-https and credential-bearing tar
 });
 
 test('dev server: the photo endpoint rejects a missing or implausible registration', async () => {
-  for (const url of ['/api/photo', '/api/photo?reg=', '/api/photo?reg=BAW2620', '/api/photo?reg=1234']) {
+  for (const url of ['/api/photo', '/api/photo?reg=', '/api/photo?reg=BAW2620', '/api/photo?reg=1234', '/api/photo?hex=', '/api/photo?hex=ZZZZZZ', '/api/photo?hex=4066D']) {
     const response = await fetch(BASE + url);
     assert.equal(response.status, 400, url);
   }

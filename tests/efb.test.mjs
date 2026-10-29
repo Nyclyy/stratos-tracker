@@ -53,83 +53,6 @@ test('EFB conditions: wind components keep their sign and side', async () => {
   assert.equal(windComponents(270, 270, ''), null);
 });
 
-function demoDataset() {
-  return {
-    schema: 'stratos.performance/1',
-    aircraft: { icao: 'A321', variant: 'A321-200 test' },
-    source: 'Unit-test AFM extract',
-    revision: 'test-1',
-    approved: false,
-    mode: 'simulation',
-    axes: {
-      weight: [60000, 80000],
-      pressureAltitudeFt: [0, 8000],
-      oatC: [0, 20],
-    },
-    takeoff: {
-      // Values are deliberate lattice points so the interpolation can be checked.
-      distanceFt: [
-        [[1800, 2200], [2600, 3200]],
-        [[2600, 3100], [3800, 4500]],
-      ],
-      v1Kt: [
-        [[130, 132], [140, 143]],
-        [[144, 147], [156, 160]],
-      ],
-    },
-    landing: {
-      distanceFt: [
-        [[1300, 1500], [1800, 2100]],
-        [[1500, 1750], [2100, 2450]],
-      ],
-    },
-  };
-}
-
-test('EFB performance dataset: validation refuses anything it cannot trust', async () => {
-  const { validateDataset, SCHEMA } = await import('../app/js/lib/aircraftperformance.js');
-  assert.equal(validateDataset(demoDataset()).ok, true);
-
-  const noSource = { ...demoDataset(), source: '' };
-  assert.equal(validateDataset(noSource).ok, false);
-  const badAxis = demoDataset();
-  badAxis.axes.weight = [80000, 60000];
-  assert.match(validateDataset(badAxis).problems.join(' '), /strictly ascending/);
-  const shortRow = demoDataset();
-  shortRow.takeoff.distanceFt[0].pop();
-  assert.equal(validateDataset(shortRow).ok, false);
-  const wrongSchema = { ...demoDataset(), schema: 'something-else' };
-  assert.equal(validateDataset(wrongSchema).ok, false);
-  assert.match(validateDataset(wrongSchema).problems.join(' '), new RegExp(SCHEMA.replace('/', '\\/')));
-  assert.equal(validateDataset(null).ok, false);
-});
-
-test('EFB performance: lookups interpolate inside the table and refuse outside it', async () => {
-  const { validateDataset, lookupPerformance, datasetLabel } = await import('../app/js/lib/aircraftperformance.js');
-  const { dataset } = validateDataset(demoDataset());
-
-  const exact = lookupPerformance(dataset, 'takeoff', { weight: 60000, pressureAltitudeFt: 0, oatC: 0 });
-  assert.equal(exact.distanceFt.value, 1800);
-  assert.equal(exact.v1Kt.value, 130);
-
-  const middle = lookupPerformance(dataset, 'takeoff', { weight: 70000, pressureAltitudeFt: 4000, oatC: 10 });
-  assert.equal(middle.distanceFt.value, 2975, 'the centre of the table is the mean of its eight corners');
-  assert.equal(middle.v1Kt.value, 144);
-  const linear = lookupPerformance(dataset, 'takeoff', { weight: 70000, pressureAltitudeFt: 0, oatC: 0 });
-  assert.equal(linear.distanceFt.value, 2200, 'halfway between two weight rows');
-
-  const outside = lookupPerformance(dataset, 'takeoff', { weight: 95000, pressureAltitudeFt: 0, oatC: 0 });
-  assert.match(outside.distanceFt.unavailable, /outside the dataset/);
-  assert.equal(outside.distanceFt.value, undefined, 'an extrapolation is never returned as a value');
-
-  const tooHot = lookupPerformance(dataset, 'landing', { weight: 70000, pressureAltitudeFt: 4000, oatC: 35 });
-  assert.match(tooHot.distanceFt.unavailable, /outside the dataset/);
-
-  const missing = lookupPerformance(null, 'takeoff', {});
-  assert.deepEqual(missing, {});
-  assert.match(datasetLabel(dataset), /A321 A321-200 test · Unit-test AFM extract · revision test-1 · simulation · unapproved/);
-});
-
 test('EFB weight and balance: sums, limits and the missing-CG truth', async () => {
   const { computeLoadSheet, limitsFromOfp, parseCg } = await import('../app/js/lib/weightbalance.js');
   const sheet = computeLoadSheet({
@@ -633,29 +556,4 @@ test('the airline dresses the whole bag, with a preview and a manual override', 
   assert.match(settings, /data-air-reset/, 'and the house appearance can be restored');
   assert.match(settings, /ctx\.setPrefs\(\{ airlineMode: 'manual', airline: pick \}\)/, 'manual writes both mode and airline');
   assert.match(settings, /No SimBrief plan is stored/, 'a missing plan is explained, not guessed around');
-});
-
-test('EFB performance leads the pilot through what it needs, and never guesses the rest', () => {
-  const src = fs.readFileSync(new URL('../app/js/efb/performance.js', import.meta.url), 'utf8');
-  const lib = fs.readFileSync(new URL('../app/js/lib/aircraftperformance.js', import.meta.url), 'utf8');
-
-  // One tap fills from the plan, the airport database and the observation.
-  assert.match(src, /async function fillFromSources\(/);
-  assert.match(src, /write\('airport', phaseAirportCode\(\), 'flight plan'\)/);
-  assert.match(src, /write\('elevationFt', Number\(airport\.elev\), 'airport'\)/);
-  assert.match(src, /write\('windKt', metar\.wind\.speedKt, 'METAR'\)/);
-  // The takeoff analysis belongs to the departure, the landing one to the arrival.
-  assert.match(src, /state\.phase === 'landing' \? ofp\.destination : ofp\.origin/);
-  // Takeoff weight for takeoff, planned landing weight for landing.
-  assert.match(src, /state\.phase === 'landing' \? weights\.lw : weights\.tow/);
-  // A value the pilot typed is never overwritten; only a METAR value is refreshed.
-  assert.match(src, /if \(!empty\(key\) && !replaceable\(key\)\) return false;/);
-  // The list of what is missing is shown before the numbers, not after.
-  assert.match(src, /function readinessRows\(\)/);
-  assert.match(src, /Still needed: /);
-  // A runway suggested from the wind is labelled a suggestion, never a report.
-  assert.match(src, /Suggested from the wind — this is not a report of which runway is in use\./);
-  assert.match(lib, /export function windComponents/);
-  assert.match(lib, /export function lookupPerformance/);
-  assert.match(src, /No validated performance dataset is loaded/);
 });

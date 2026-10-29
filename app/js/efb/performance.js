@@ -1,674 +1,754 @@
 /* EFB · Performance.
  *
- * Two panels, deliberately separate:
+ * The page owns four things and nothing else:
  *
- *   Conditions — pressure altitude, ISA, density altitude and runway wind
- *   components. These are physics and are always computed.
+ *   Airframe   — the bundled profile, detected from X-Plane or chosen by hand.
+ *   Inputs     — phase-correct airport and weight, weather/simulator prefill,
+ *                every value editable.
+ *   Calculate  — one explicit action that runs the engine.
+ *   Results    — each figure labelled verified, interpolated, estimated or
+ *                unavailable, with its source and limits.
  *
- *   Aircraft data — V-speeds and field lengths. Stratos has no licensed approved
- *   dataset for the A340-600, A321 or 777, so these are only produced from a
- *   dataset the operator imports, and only inside its published range. The panel
- *   says which cells are unavailable and why; it never extrapolates, and it never
- *   fills a missing value with a plausible-looking number.
- *
- * The form is pre-filled from the imported plan, the airport database and the
- * observed weather for the airport the chosen phase belongs to — departure for
- * takeoff, destination for landing — and every pre-filled value says where it
- * came from. The readiness list at the top says what is still missing, so the
- * pilot is never left guessing which field the calculation is waiting for.
+ * There is no file import. A profile ships with Stratos or the type is not
+ * supported; the page says which.
  */
 
 import {
-  airportByCode, airportRunways, esc, fmtAge, fmtFt, fmtNum, currentPlan, weatherFor,
+  airportByCode, airportRunways, currentPlan, esc, fmtAge, fmtFt, fmtNum,
+  liveStatus, loadPrefs, loadRouteMeta, onLive, weatherFor,
 } from './common.js';
-import {
-  analyseConditions, datasetLabel, lookupPerformance, pressureAltitudeFt,
-  SCHEMA, validateDataset, windComponents,
-} from '../lib/aircraftperformance.js';
-import { EFB_AIRCRAFT, aircraftLabel } from '../data/efb-aircraft.js';
+import { loadDatabase, profileById, profileLabel } from '../lib/performance-db.js';
+import { matchAircraft } from '../lib/aircraft-match.js';
+import { convertWeight, evaluatePhase } from '../lib/aircraftperformance.js';
 import { parseMetar } from '../lib/routeweather.js';
-import { convertWeight } from '../lib/flightsummary.js';
 
-const DATASET_KEY = 'stratos.efb.performanceDataset';
-const INPUT_KEY = 'stratos.efb.performanceInputs';
-
-const PHASE = {
-  takeoff: { key: 'takeoff', label: 'Takeoff', speedKeys: ['v1Kt', 'vrKt', 'v2Kt'], distanceKey: 'distanceFt' },
-  landing: { key: 'landing', label: 'Landing', speedKeys: ['vrefKt'], distanceKey: 'distanceFt' },
+const STATUS_TONE = { verified: 'good', interpolated: 'accent', estimated: 'warn', unavailable: 'bad' };
+const STATUS_TEXT = { verified: 'Verified', interpolated: 'Interpolated', estimated: 'Estimated', unavailable: 'Unavailable' };
+const CORRECTION_LABELS = {
+  wind: 'wind', slope: 'runway slope', surface: 'surface/contamination', flaps: 'flaps',
+  thrust: 'thrust/derate', antiIce: 'anti-ice', braking: 'braking', autobrake: 'autobrake',
 };
+const WEIGHT_RESULTS = new Set(['mtow', 'mlw', 'margin']);
 
-function loadDataset() {
-  try {
-    const raw = localStorage.getItem(DATASET_KEY);
-    if (!raw) return { dataset: null, error: '' };
-    const checked = validateDataset(JSON.parse(raw));
-    if (!checked.ok) return { dataset: null, error: `The stored dataset is invalid: ${checked.problems[0]}` };
-    return { dataset: checked.dataset, error: '' };
-  } catch (_) {
-    return { dataset: null, error: 'The stored dataset could not be read and is ignored.' };
+function numberOrNull(value) {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function timestampOf(value) {
+  const number = Number(value);
+  if (Number.isFinite(number) && number > 0) return number < 1e12 ? number * 1000 : number;
+  const parsed = Date.parse(String(value || ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function headingValue(row) {
+  return row && numberOrNull(row.heading) != null ? String(row.heading) : '';
+}
+
+/* Match the planned runway to a real end. A suffix (16L) is used when the
+ * source publishes it. A numeric snapshot cannot identify a parallel strip,
+ * so a number shared by several runways is never guessed: the page asks. */
+export function matchRunwayEnd(rows, planned) {
+  const wanted = String(planned || '').trim().toUpperCase();
+  if (!wanted) return { row: null, message: '' };
+  const exact = rows.filter(row => String(row.id).trim().toUpperCase() === wanted);
+  if (exact.length === 1) return { row: exact[0], message: '' };
+  if (exact.length > 1) {
+    return { row: null, message: `The plan names runway ${wanted}, but the airport record lists ${exact.length} runways with that identifier. Choose the one in use.` };
   }
-}
-
-function loadInputs() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(INPUT_KEY) || '{}');
-    return raw && typeof raw === 'object' ? raw : {};
-  } catch (_) { return {}; }
-}
-
-function saveInputs(values) {
-  try { localStorage.setItem(INPUT_KEY, JSON.stringify(values)); } catch (_) { /* private mode */ }
-}
-
-function variantOptions(selected) {
-  return EFB_AIRCRAFT.flatMap(type => type.variants.map(variant => {
-    const value = variant.icao;
-    return `<option value="${value}" ${value === selected ? 'selected' : ''}>${esc(type.name)} · ${esc(variant.label)}</option>`;
-  })).join('');
-}
-
-function templateDataset() {
-  const axes = {
-    weight: [0, 0],
-    pressureAltitudeFt: [0, 0],
-    oatC: [0, 0],
-  };
-  // Two stops per axis make the shape valid while every cell stays unpublished.
-  axes.weight = [60000, 80000];
-  axes.pressureAltitudeFt = [0, 8000];
-  axes.oatC = [0, 20];
-  const grid = () => axes.weight.map(() => axes.pressureAltitudeFt.map(() => axes.oatC.map(() => null)));
+  const number = wanted.replace(/[A-Z]$/, '');
+  const sameNumber = rows.filter(row => String(row.id).trim().toUpperCase() === number);
+  if (sameNumber.length === 1 && wanted === number) return { row: sameNumber[0], message: '' };
+  if (sameNumber.length === 1) {
+    return { row: null, message: `The plan names runway ${wanted}, but the airport record publishes only ${number}, without a parallel suffix. Choose the runway in use.` };
+  }
   return {
-    schema: SCHEMA,
-    aircraft: { icao: 'A321', variant: 'A321-200' },
-    source: 'Replace with the document these numbers come from',
-    revision: 'YYYY-MM-DD',
-    approved: false,
-    mode: 'simulation',
-    axes,
-    takeoff: { distanceFt: grid(), v1Kt: grid(), vrKt: grid(), v2Kt: grid() },
-    landing: { distanceFt: grid(), vrefKt: grid() },
-    note: 'Every cell is null: replace the cells you are licensed to use. A null cell is shown as unavailable, never interpolated around.',
+    row: null,
+    message: sameNumber.length > 1
+      ? `The plan names runway ${wanted}, but the airport record lists ${sameNumber.length} parallel runways numbered ${number} and does not publish the suffix. Choose the one in use.`
+      : `The plan names runway ${wanted}, which is not in the airport record. Choose one.`,
   };
+}
+
+/* A physical runway has two ends. The airport helper returns one row per pair
+ * (08/26), so both ends are offered here with their own headings; otherwise a
+ * plan that names 26 would be flown at 080°.
+ *
+ * Runway data from the simulator names the parallel strip (16L/34R); the
+ * bundled snapshot sometimes carries only the numbers (16/34). Those are kept
+ * as separate choices, marked ambiguous, because three physical runways cannot
+ * honestly be collapsed into one "16". */
+export function runwayEnds(rows) {
+  const ends = [];
+  const seen = new Set();
+  for (const row of rows) {
+    const heading = numberOrNull(row.heading);
+    if (heading == null) continue;
+    const [first, second] = String(row.id || '').split('/');
+    for (const [id, endHeading] of [[first, heading], [second, (heading + 180) % 360]]) {
+      if (!id) continue;
+      const key = `${id}|${endHeading}|${row.lengthFt || ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      ends.push({ key: String(ends.length + 1), id, heading: endHeading, lengthFt: row.lengthFt || null });
+    }
+  }
+  const counts = {};
+  for (const end of ends) counts[end.id] = (counts[end.id] || 0) + 1;
+  return ends.map(end => ({ ...end, ambiguous: counts[end.id] > 1 }));
 }
 
 export async function mount(root, ctx) {
   let destroyed = false;
+  const prefs = loadPrefs();
+  const unit = prefs.units === 'lb' ? 'lb' : 'kg';
   const plan = currentPlan();
   const ofp = plan && plan.ofp;
-  const saved = loadInputs();
-  const loaded = loadDataset();
-  let dataset = loaded.dataset;
-  let datasetError = loaded.error;
-
-  const unit = ofp && ofp.units === 'lb' ? 'lb' : ctx.prefs().units === 'lb' ? 'lb' : 'kg';
-  const initialAircraft = saved.aircraft || (ofp && ofp.aircraft && ofp.aircraft.icao) || EFB_AIRCRAFT[0].variants[0].icao;
+  const builtPlan = loadRouteMeta().plan;
 
   const state = {
-    phase: saved.phase === 'landing' ? 'landing' : 'takeoff',
-    aircraft: initialAircraft,
-    airport: saved.airport || (ofp && ofp.origin && ofp.origin.icao) || '',
-    elevationFt: saved.elevationFt ?? '',
-    qnhHpa: saved.qnhHpa ?? 1013,
-    oatC: saved.oatC ?? '',
-    runway: saved.runway ?? '',
-    runwayLengthFt: saved.runwayLengthFt ?? '',
-    slopePct: saved.slopePct ?? '',
-    surface: saved.surface || 'dry',
-    flap: saved.flap || '',
-    thrust: saved.thrust || '',
-    weight: saved.weight ?? '',
-    windFromDeg: saved.windFromDeg ?? '',
-    windKt: saved.windKt ?? '',
-    gustKt: saved.gustKt ?? '',
+    database: null,
+    dbError: '',
+    phase: 'takeoff',
+    profileId: '',
+    manualProfile: false,
+    airport: '',
+    airportName: '',
+    airportMissing: false,
+    elevationFt: '',
+    qnhHpa: '',
+    oatC: '',
+    windFromDeg: '',
+    windKt: '',
+    gustKt: '',
+    weight: '',
+    runway: '',
+    runwayLengthFt: '',
     prefill: {},
+    manual: {},
+    runwayRows: [],
+    runwayMissing: '',
+    weatherAt: 0,
+    metarRaw: '',
+    windVariable: false,
+    detected: null,
+    live: null,
+    liveSignature: '',
+    calculation: null,
+    stale: false,
+    errors: [],
+    contextSeq: 0,
   };
 
-  root.innerHTML = `
-    <div class="e-grid" style="grid-template-columns:minmax(0,400px) minmax(0,1fr);align-items:start" id="perf-layout">
-      <div class="e-card" id="perf-form"></div>
-      <div id="perf-results"></div>
-    </div>`;
-
-  const formEl = root.querySelector('#perf-form');
-  const resultsEl = root.querySelector('#perf-results');
-  // The runway list of the selected airport, refreshed when the airport changes
-  // and shared by the selector, the wind suggestion and the prefill.
-  let runwayRows = [];
-  // When the weather observation behind the pre-filled values was issued.
-  let observedAt = 0;
-
-  function set(key, value, source = '') {
-    state[key] = value;
-    if (source) state.prefill[key] = source;
-    else delete state.prefill[key];
-    saveInputs(state);
+  /* A SimBrief plan is used when one is stored. Without it, the route built in
+   * the Flight Planner names its own airports and runways, so the page works
+   * from that flight rather than asking for the airport a second time. */
+  function phaseLeg() {
+    if (ofp) return state.phase === 'landing' ? ofp.destination : ofp.origin;
+    if (!builtPlan) return null;
+    return state.phase === 'landing' ? builtPlan.destination : builtPlan.origin;
   }
 
-  function field(key, label, value, { type = 'text', hint = '', placeholder = '', step = 'any', unitLabel = '' } = {}) {
-    const source = state.prefill[key] ? `<span class="e-badge accent" title="Pre-filled from ${esc(state.prefill[key])}">${esc(state.prefill[key])}</span>` : '';
+  function phaseAirport() {
+    const leg = phaseLeg();
+    const code = leg && (leg.icao || leg.id);
+    return String(code || '').trim().toUpperCase();
+  }
+
+  function phaseRunway() {
+    const leg = phaseLeg();
+    if (leg && leg.rwy) return String(leg.rwy).trim().toUpperCase();
+    if (ofp) return '';
+    const rwy = builtPlan && (state.phase === 'landing' ? builtPlan.arrivalRwy : builtPlan.departureRwy);
+    return String(rwy || '').trim().toUpperCase();
+  }
+
+  function planWeightKg() {
+    if (!ofp || !ofp.weights) return null;
+    const value = state.phase === 'landing' ? ofp.weights.lw : ofp.weights.tow;
+    return numberOrNull(value) != null ? convertWeight(value, ofp.units || 'kg', 'kg') : null;
+  }
+
+  function displayWeight(kg) {
+    return kg == null ? '' : String(Math.round(convertWeight(kg, 'kg', unit)));
+  }
+
+  function setPrefill(key, value, source) {
+    state[key] = value;
+    state.prefill[key] = source;
+  }
+
+  function clearPhaseFields() {
+    for (const key of ['airportName', 'elevationFt', 'qnhHpa', 'oatC', 'windFromDeg', 'windKt', 'gustKt', 'runway', 'runwayLengthFt']) {
+      state[key] = '';
+    }
+    state.airport = '';
+    state.airportMissing = false;
+    state.weight = '';
+    state.prefill = {};
+    state.manual = {};
+    state.runwayRows = [];
+    state.runwayMissing = '';
+    state.weatherAt = 0;
+    state.metarRaw = '';
+    state.windVariable = false;
+    state.calculation = null;
+    state.stale = false;
+    state.errors = [];
+  }
+
+  function loadPlanPhase() {
+    clearPhaseFields();
+    state.airport = phaseAirport();
+    const kg = planWeightKg();
+    if (kg != null) setPrefill('weight', displayWeight(kg), 'flight plan');
+  }
+
+  function simPerformance() {
+    return state.live && state.live.performance ? state.live.performance : null;
+  }
+
+  function applySimulatorFields() {
+    const sim = simPerformance();
+    if (!sim) return;
+    const simWeight = numberOrNull(sim.weightKg);
+    if (simWeight != null && !state.manual.weight) {
+      if (state.phase === 'takeoff' || planWeightKg() == null) {
+        setPrefill('weight', displayWeight(simWeight), 'X-Plane');
+      }
+    }
+    const qnh = numberOrNull(sim.qnhHpa);
+    if (qnh != null && !state.manual.qnhHpa) setPrefill('qnhHpa', String(Math.round(qnh)), 'X-Plane');
+  }
+
+  function airportRunwayRows() {
+    return state.runwayRows;
+  }
+
+  function adoptRunway(row) {
+    if (!state.manual.runway) state.runway = row.key;
+    if (!state.manual.runwayLengthFt && row.lengthFt) setPrefill('runwayLengthFt', String(row.lengthFt), 'airport database');
+  }
+
+  function matchPlannedRunway() {
+    // A runway belongs to the airport the plan names. After the pilot types a
+    // different airport, its runway is not a fact about this one.
+    const planned = state.airport === phaseAirport() ? phaseRunway() : '';
+    const match = matchRunwayEnd(airportRunwayRows(), planned);
+    state.runwayMissing = match.message;
+    if (match.row) adoptRunway(match.row);
+  }
+
+  async function hydratePhase() {
+    const token = ++state.contextSeq;
+    const code = String(state.airport || '').trim().toUpperCase();
+    state.airport = code;
+    state.airportName = '';
+    state.airportMissing = false;
+    state.runwayRows = [];
+    if (!code) {
+      state.runwayMissing = '';
+      if (!destroyed && token === state.contextSeq) render();
+      return;
+    }
+
+    const airport = await airportByCode(code).catch(() => null);
+    if (destroyed || token !== state.contextSeq) return;
+    if (airport) {
+      state.airportName = String(airport.name || '');
+      state.runwayRows = runwayEnds(airportRunways(airport));
+      const elevation = numberOrNull(airport.elev);
+      if (elevation != null && !state.manual.elevationFt) setPrefill('elevationFt', String(Math.round(elevation)), 'airport database');
+      matchPlannedRunway();
+    } else {
+      state.runwayRows = [];
+      state.airportMissing = true;
+    }
+    // The airport record is local; weather is not. Draw the elevation, runway
+    // and length as soon as they are known instead of holding them behind a
+    // network request.
+    if (!destroyed && token === state.contextSeq) render();
+
+    const weather = await weatherFor(code).catch(() => null);
+    if (destroyed || token !== state.contextSeq) return;
+    const metar = weather && weather.metar ? parseMetar(weather.metar) : null;
+    if (metar) {
+      state.metarRaw = weather.metar;
+      state.weatherAt = timestampOf((weather.decoded && weather.decoded.obs_time) || weather.obs_time || weather.fetchedAt);
+      if (metar.temperatureC != null && !state.manual.oatC) setPrefill('oatC', String(metar.temperatureC), 'METAR');
+      if (metar.altimeter != null && !state.manual.qnhHpa && state.prefill.qnhHpa !== 'X-Plane') {
+        const qnh = metar.altimeterUnit === 'inHg' ? metar.altimeter * 33.8639 : metar.altimeter;
+        setPrefill('qnhHpa', String(Math.round(qnh)), 'METAR');
+      }
+      if (metar.wind) {
+        state.windVariable = metar.wind.direction == null;
+        if (metar.wind.direction != null && !state.manual.windFromDeg) setPrefill('windFromDeg', String(metar.wind.direction), 'METAR');
+        if (metar.wind.speedKt != null && !state.manual.windKt) setPrefill('windKt', String(metar.wind.speedKt), 'METAR');
+        if (metar.wind.gustKt != null && !state.manual.gustKt) setPrefill('gustKt', String(metar.wind.gustKt), 'METAR');
+      }
+    }
+    applySimulatorFields();
+    if (!destroyed && token === state.contextSeq) render();
+  }
+
+  function profile() {
+    return profileById(state.database, state.profileId);
+  }
+
+  function detect() {
+    const health = liveStatus().health;
+    const identity = (health && health.xplaneIdentity) || {};
+    const stored = (health && health.identity) || {};
+    const snapshot = liveStatus().snapshot || {};
+    const telemetry = snapshot.telemetry || snapshot.parsed || {};
+    const description = String(stored.aircraft || telemetry.aircraft || '').trim();
+    const type = String(identity.type || telemetry.aircraftType || '').trim();
+    const match = matchAircraft(state.database, { icaoType: type, description });
+    state.detected = { ...match, type, description };
+    if (!state.manualProfile) {
+      if (match.profile) {
+        if (state.profileId !== match.profile.id) {
+          state.profileId = match.profile.id;
+          state.calculation = null;
+          state.stale = false;
+        }
+      } else if (type) {
+        // X-Plane now reports a type the database does not cover. Keeping the
+        // previous airframe's profile would silently calculate for the wrong
+        // aircraft; clear it and let the page say the type is unsupported.
+        state.profileId = '';
+        state.calculation = null;
+        state.stale = false;
+      }
+    }
+  }
+
+  function applyLive(status) {
+    if (destroyed || !state.database) return;
+    const health = status && status.health;
+    const identity = (health && health.xplaneIdentity) || {};
+    const performance = (health && health.xplanePerformance) || null;
+    const stored = (health && health.identity) || {};
+    // The performance inputs are a pre-takeoff snapshot. Fuel burn changes the
+    // simulated weight every refresh; re-rendering the whole page for that would
+    // move the fields under the pilot. Only a new airframe re-runs detection and
+    // prefill. The latest values are still kept for the next phase switch.
+    const signature = JSON.stringify({
+      type: identity.type || '',
+      description: stored.aircraft || '',
+      available: Boolean(identity.available),
+    });
+    state.live = { performance };
+    if (signature !== state.liveSignature) {
+      state.liveSignature = signature;
+      detect();
+      applySimulatorFields();
+      if (state.calculation) state.stale = true;
+      render();
+    }
+  }
+
+  function field(key, label, value, options = {}) {
+    const source = state.prefill[key] ? `<span class="e-badge accent">${esc(state.prefill[key])}</span>` : '';
     return `<div class="e-field">
       <label for="perf-${key}">${esc(label)} ${source}</label>
       <div class="e-row" style="gap:6px;flex-wrap:nowrap">
-        <input class="e-input small" id="perf-${key}" data-key="${key}" type="${type}" step="${step}" value="${esc(value)}" placeholder="${esc(placeholder)}" inputmode="decimal">
-        ${unitLabel ? `<span class="e-small e-faint" style="min-width:30px">${esc(unitLabel)}</span>` : ''}
+        <input class="e-input small" id="perf-${key}" data-key="${key}" type="${options.type || 'text'}" inputmode="decimal" value="${esc(value)}" placeholder="${esc(options.placeholder || '')}">
+        ${options.unit ? `<span class="e-small e-faint" style="min-width:28px">${esc(options.unit)}</span>` : ''}
       </div>
-      ${hint ? `<span class="e-hint">${esc(hint)}</span>` : ''}
+      ${options.hint ? `<span class="e-hint">${esc(options.hint)}</span>` : ''}
     </div>`;
   }
 
-  /** The airport this phase's numbers belong to: departure for takeoff, arrival for landing. */
-  function phaseAirportCode() {
-    if (!ofp) return '';
-    const leg = state.phase === 'landing' ? ofp.destination : ofp.origin;
-    return (leg && leg.icao) || '';
-  }
-
-  /**
-   * The runway the wind favours, with its components. This is a suggestion from
-   * the wind alone — a runway is not active because it points the right way, and
-   * the app says so wherever it shows this.
-   */
-  function suggestedRunway() {
-    const from = Number(state.windFromDeg);
-    const speed = Number(state.windKt);
-    if (!Number.isFinite(from) || !Number.isFinite(speed) || speed <= 0 || !runwayRows.length) return null;
-    const gust = state.gustKt === '' ? null : Number(state.gustKt);
-    let best = null;
-    for (const row of runwayRows) {
-      const components = windComponents(row.heading, from, speed, gust);
-      if (!components) continue;
-      const score = components.headwindKt - components.crosswindKt * 0.15;
-      if (!best || score > best.score) best = { row, components, score };
+  function detectionCard() {
+    const detected = state.detected;
+    const live = liveStatus();
+    const current = profile();
+    const detectedHere = Boolean(detected && detected.profile && current && detected.profile.id === current.id);
+    let line;
+    let tone;
+    if (detectedHere) {
+      line = `Detected ${profileLabel(current)} — ${detected.reason}`;
+      tone = 'good';
+    } else if (current) {
+      line = `Using ${profileLabel(current)}${state.manualProfile ? ', chosen by hand' : ''}.`;
+      if (live.status !== 'offline' && detected && detected.reason) line += ` ${detected.reason}`;
+      tone = 'accent';
+    } else if (detected && detected.profile) {
+      line = `Detection found ${profileLabel(detected.profile)}. Choose it below or select another profile.`;
+      tone = 'warn';
+    } else if (detected && detected.type) {
+      line = detected.reason;
+      tone = 'warn';
+    } else {
+      line = live.status === 'offline'
+        ? 'The Stratos bridge is offline, so no airframe can be detected. Choose a profile below.'
+        : live.status === 'waiting' || live.status === 'connecting'
+          ? 'The bridge is running but X-Plane has not reported an airframe yet. Choose a profile below.'
+          : 'No airframe reported by X-Plane. Choose a profile below.';
+      tone = 'warn';
     }
-    return best;
-  }
-
-  /**
-   * Fill from what Stratos already has: the imported plan, the airport database
-   * and the observed weather for this phase's airport. An empty field is filled;
-   * a value the pilot typed is never overwritten. `refresh` is the pilot asking
-   * for the weather values to be read again, so those may be replaced.
-   */
-  async function fillFromSources({ refresh = false } = {}) {
-    const touched = [];
-    const replaceable = key => refresh && state.prefill[key] === 'METAR';
-    const empty = key => !String(state[key] ?? '').trim();
-    const write = (key, value, source) => {
-      if (value == null || value === '') return false;
-      if (!empty(key) && !replaceable(key)) return false;
-      state[key] = value;
-      state.prefill[key] = source;
-      touched.push(key);
-      return true;
-    };
-
-    if (ofp) {
-      write('airport', phaseAirportCode(), 'flight plan');
-      // A runway the plan names is the pilot's intention, so it is taken as-is;
-      // the database only supplies its published length.
-      const leg = state.phase === 'landing' ? ofp.destination : ofp.origin;
-      const plannedRwy = leg && leg.rwy ? String(leg.rwy) : '';
-      const weights = ofp.weights || {};
-      // Takeoff is planned at the takeoff weight, landing at the planned landing
-      // weight; the plan's own figures, in the unit this panel is working in.
-      const planned = state.phase === 'landing' ? weights.lw : weights.tow;
-      if (planned) {
-        const value = unit === (ofp.units || 'kg') ? planned : convertWeight(planned, ofp.units || 'kg', unit);
-        if (Number.isFinite(value) && value > 0) write('weight', Math.round(value), 'flight plan');
-      }
-      if (plannedRwy) {
-        const row = runwayRows.find(item => item.id.split('/').includes(plannedRwy));
-        if (row) {
-          write('runway', String(row.heading), 'flight plan');
-          if (row.lengthFt) write('runwayLengthFt', row.lengthFt, 'airport');
-        }
-      }
-    }
-
-    const airport = state.airport ? await airportByCode(state.airport).catch(() => null) : null;
-    if (airport) {
-      if (Number(airport.elev)) write('elevationFt', Number(airport.elev), 'airport');
-      if (!runwayRows.length) runwayRows = airportRunways(airport);
-    }
-
-    const weather = state.airport ? await weatherFor(state.airport, { force: refresh }).catch(() => null) : null;
-    const metar = weather && weather.metar ? parseMetar(weather.metar) : null;
-    if (metar) {
-      if (metar.altimeter != null) {
-        write('qnhHpa', metar.altimeterUnit === 'inHg' ? Math.round(metar.altimeter * 33.8639) : Math.round(metar.altimeter), 'METAR');
-      }
-      if (metar.temperatureC != null) write('oatC', metar.temperatureC, 'METAR');
-      if (metar.wind) {
-        if (metar.wind.direction != null) write('windFromDeg', metar.wind.direction, 'METAR');
-        if (metar.wind.speedKt != null) write('windKt', metar.wind.speedKt, 'METAR');
-        if (metar.wind.gustKt) write('gustKt', metar.wind.gustKt, 'METAR');
-      }
-      // When the observation itself was issued, so the panel can say how old the
-      // numbers are instead of implying they are current.
-      observedAt = Number(weather.obs_time || weather.observedAt || 0) || Number(weather.fetchedAt || 0) || observedAt;
-    }
-    if (!destroyed) saveInputs(state);
-    return touched;
-  }
-
-  /** What the calculation has and what it is still waiting for. */
-  function readinessRows() {
-    const has = key => String(state[key] ?? '').trim() !== '';
-    const datasetForType = Boolean(dataset && String(dataset.aircraft.icao || '').toUpperCase() === String(state.aircraft).toUpperCase());
-    return [
-      ['Aircraft', true, aircraftLabel(state.aircraft)],
-      ['Airport', Boolean(state.airport), state.airport || 'no airport selected'],
-      ['Elevation', has('elevationFt'), has('elevationFt') ? fmtFt(state.elevationFt) : 'from the airport database'],
-      ['Weather', has('oatC') && has('qnhHpa'), has('oatC') ? `${esc(state.oatC)}°C · QNH ${esc(state.qnhHpa)} hPa` : 'OAT and QNH'],
-      ['Runway', has('runway') || has('runwayLengthFt'), has('runway') ? 'selected' : 'not selected'],
-      ['Wind', has('windFromDeg') && has('windKt'), has('windKt') ? `${esc(state.windFromDeg)}° / ${esc(state.windKt)} kt` : 'from the observation'],
-      ['Weight', has('weight'), has('weight') ? `${esc(state.weight)} ${unit}` : 'from the plan, or enter it'],
-      ['Dataset', datasetForType, datasetForType ? 'loaded for this variant' : 'none for this variant'],
-    ];
-  }
-
-  function readinessCard() {
-    const rows = readinessRows();
-    const missing = rows.filter(([, ok]) => !ok).map(([label]) => label.toLowerCase());
-    const suggestion = suggestedRunway();
-    const suggestionLine = suggestion ? `<div class="e-notice" style="margin-top:9px">
-        <b>Runway ${esc(suggestion.row.id.split('/')[0])}</b> has the most headwind: ${suggestion.components.headwindKt >= 0
-          ? `${suggestion.components.headwindKt} kt head`
-          : `${suggestion.components.tailwindKt} kt tail`}, ${suggestion.components.crosswindKt} kt crosswind${suggestion.components.crosswindSide !== 'none' ? ` from the ${suggestion.components.crosswindSide}` : ''}. Suggested from the wind — this is not a report of which runway is in use.
-        <div class="e-row" style="margin-top:7px"><button class="e-btn small" type="button" data-suggest-runway="${suggestion.row.heading}">Use runway ${esc(suggestion.row.id.split('/')[0])}</button></div>
-      </div>` : '';
-    return `<div class="e-card" style="margin-bottom:12px;background:var(--efb-panel-2)">
-      <h3>What this needs <span class="e-spacer"></span>${missing.length
-        ? `<span class="e-badge warn">${missing.length} to go</span>`
-        : '<span class="e-badge good">Complete</span>'}</h3>
-      <div class="e-perf-ready">
-        ${rows.map(([label, ok, detail]) => `<span class="e-perf-ready-row"><i class="${ok ? 'is-ok' : 'is-missing'}" aria-hidden="true">${ok ? '✓' : '○'}</i><b>${esc(label)}</b><em>${esc(detail)}</em></span>`).join('')}
+    const badge = detectedHere ? 'Detected' : current ? 'Selected' : 'No profile';
+    return `<div class="e-card" style="margin-bottom:12px">
+      <h3>Airframe <span class="e-spacer"></span><span class="e-badge ${tone}">${badge}</span></h3>
+      <p class="e-small ${tone === 'warn' ? 'e-muted' : ''}" role="status">${esc(line)}</p>
+      <div class="e-field" style="margin-top:10px">
+        <label for="perf-profile">Aircraft profile</label>
+        <select class="e-select" id="perf-profile">
+          <option value="">Choose a profile…</option>
+          ${(state.database ? state.database.profiles : []).map(item => `<option value="${esc(item.id)}" ${item.id === state.profileId ? 'selected' : ''}>${esc(profileLabel(item))} · ${esc(item.icao)}</option>`).join('')}
+        </select>
       </div>
-      <div class="e-small ${missing.length ? 'e-muted' : 'e-faint'}" style="margin-top:9px">${missing.length
-        ? `Still needed: ${esc(missing.join(', '))}.`
-        : 'Every input is present. Results below use only this dataset plus the conditions shown.'}</div>
-      ${observedAt ? `<div class="e-small e-faint" style="margin-top:4px">Weather observed ${esc(fmtAge(observedAt))}.</div>` : ''}
-      ${datasetError ? `<div class="e-notice bad" style="margin-top:8px">${esc(datasetError)}</div>` : ''}
-      <div class="e-row" style="margin-top:10px">
-        <button class="e-btn small primary" type="button" data-fill>Fill from plan, airport and weather</button>
-        <button class="e-btn small ghost" type="button" data-refresh-weather>Refresh weather</button>
-      </div>
-      ${suggestionLine}
+      <div class="e-small e-faint" style="margin-top:6px">${current
+        ? 'The profile ships with Stratos; no file is imported.'
+        : 'No profile is selected. Detection is a convenience, not a requirement.'}</div>
+      ${state.manualProfile && detected && detected.profile && detected.profile.id !== state.profileId
+        ? `<div class="e-row" style="margin-top:8px"><button class="e-btn small" type="button" data-use-detected>Use detected ${esc(profileLabel(detected.profile))}</button></div>`
+        : ''}
     </div>`;
   }
 
-  /** The readiness card's own actions, rewired whenever it is redrawn. */
-  function wireReady() {
-    const host = formEl.querySelector('#perf-ready');
-    if (!host) return;
-    host.querySelector('[data-fill]')?.addEventListener('click', async () => {
-      const touched = await fillFromSources();
-      if (destroyed) return;
-      if (touched.length) render();
-      else renderResults();
-    });
-    host.querySelector('[data-refresh-weather]')?.addEventListener('click', async () => {
-      await fillFromSources({ refresh: true });
-      if (!destroyed) render();
-    });
-    host.querySelector('[data-suggest-runway]')?.addEventListener('click', event => {
-      const button = event.target.closest('[data-suggest-runway]');
-      if (!button) return;
-      set('runway', button.dataset.suggestRunway);
-      const row = runwayRows.find(item => String(item.heading) === String(button.dataset.suggestRunway));
-      if (row && row.lengthFt && !String(state.runwayLengthFt || '').trim()) set('runwayLengthFt', row.lengthFt, 'airport');
-      render();
-    });
-  }
-
-  /** Redraw just the readiness card, after the runway list arrives. */
-  function refreshReady() {
-    const host = formEl.querySelector('#perf-ready');
-    if (!host) return;
-    host.innerHTML = readinessCard();
-    wireReady();
-  }
-
-  function renderForm() {
-    formEl.innerHTML = `
-      <div id="perf-ready">${readinessCard()}</div>
-      <h3>Analysis <span class="e-spacer"></span><span class="e-badge">${esc(aircraftLabel(state.aircraft))}</span></h3>
+  function formCard() {
+    const runwayOptions = ['<option value="">Not selected</option>', ...state.runwayRows.map(row => `<option value="${esc(row.key)}" ${row.key === state.runway ? 'selected' : ''}>${esc(row.id)} · ${esc(headingValue(row))}°${row.lengthFt ? ` · ${fmtNum(row.lengthFt)} ft` : ''}${row.ambiguous ? ' · suffix not published' : ''}</option>`)].join('');
+    return `<div class="e-card">
+      <h3>Inputs <span class="e-spacer"></span><span class="e-badge">${state.phase === 'takeoff' ? 'Takeoff' : 'Landing'}</span></h3>
       <div class="e-row" style="margin-bottom:10px">
         <div class="e-seg" role="group" aria-label="Phase">
-          ${Object.values(PHASE).map(phase => `<button type="button" data-phase="${phase.key}" aria-pressed="${state.phase === phase.key ? 'true' : 'false'}">${phase.label}</button>`).join('')}
+          <button type="button" data-phase="takeoff" aria-pressed="${state.phase === 'takeoff'}">Takeoff</button>
+          <button type="button" data-phase="landing" aria-pressed="${state.phase === 'landing'}">Landing</button>
         </div>
-        <span class="e-spacer"></span>
-        <button class="e-btn small ghost" type="button" data-reset>Reset</button>
-      </div>
-
-      <div class="e-field" style="margin-bottom:8px">
-        <label for="perf-aircraft">Aircraft variant</label>
-        <select class="e-select" id="perf-aircraft">${variantOptions(state.aircraft)}</select>
-      </div>
-
-      <div class="e-field" style="margin-bottom:8px">
-        <label for="perf-airport">Airport (ICAO)</label>
-        <input class="e-input small" id="perf-airport" data-key="airport" value="${esc(state.airport)}" placeholder="LFPG" autocomplete="off">
       </div>
 
       <div class="e-grid two" style="gap:8px">
-        ${field('elevationFt', 'Elevation', state.elevationFt, { unitLabel: 'ft' })}
-        ${field('qnhHpa', 'QNH', state.qnhHpa, { unitLabel: 'hPa' })}
-        ${field('oatC', 'OAT', state.oatC, { unitLabel: '°C' })}
-        ${field('weight', `Aircraft weight`, state.weight, { unitLabel: unit, hint: 'Actual takeoff or landing weight' })}
-      </div>
-
-      <div class="e-grid two" style="gap:8px;margin-top:8px">
+        <div class="e-field">
+          <label for="perf-airport">Airport (ICAO)</label>
+          <input class="e-input small" id="perf-airport" value="${esc(state.airport)}" placeholder="LFPG" autocomplete="off" spellcheck="false">
+          ${state.airportName ? `<span class="e-hint">${esc(state.airportName)}</span>` : ''}
+          ${state.airportMissing ? '<span class="e-hint">No airport record for this code; enter elevation and runway length manually. Wind components stay unresolved without a runway heading.</span>' : ''}
+        </div>
+        ${field('weight', state.phase === 'takeoff' ? 'Takeoff weight' : 'Landing weight', state.weight, { unit, hint: 'From X-Plane or the plan; edit it here' })}
+        ${field('elevationFt', 'Elevation', state.elevationFt, { unit: 'ft' })}
+        ${field('qnhHpa', 'QNH', state.qnhHpa, { unit: 'hPa' })}
+        ${field('oatC', 'OAT', state.oatC, { unit: '°C' })}
         <div class="e-field">
           <label for="perf-runway">Runway</label>
-          <select class="e-select" id="perf-runway"><option value="">Not selected</option></select>
+          <select class="e-select" id="perf-runway">${runwayOptions}</select>
+          ${state.runwayMissing ? `<span class="e-hint">${esc(state.runwayMissing)}</span>` : ''}
         </div>
-        ${field('runwayLengthFt', 'TORA / LDA', state.runwayLengthFt, { unitLabel: 'ft' })}
-        ${field('slopePct', 'Slope', state.slopePct, { unitLabel: '%', hint: 'Positive uphill in the direction of travel' })}
-        <div class="e-field">
-          <label for="perf-surface">Surface</label>
-          <select class="e-select" id="perf-surface">
-            ${[['dry', 'Dry'], ['wet', 'Wet'], ['contaminated', 'Contaminated']].map(([value, label]) => `<option value="${value}" ${state.surface === value ? 'selected' : ''}>${label}</option>`).join('')}
-          </select>
-        </div>
-        ${field('flap', 'Flap', state.flap, { placeholder: 'e.g. 1+F' })}
-        ${field('thrust', 'Thrust / derate', state.thrust, { placeholder: 'e.g. TOGA' })}
+        ${field('runwayLengthFt', 'TORA / LDA', state.runwayLengthFt, { unit: 'ft', hint: 'Used for the margin when a licensed field-length table exists.' })}
       </div>
 
       <h3 style="margin-top:14px">Wind</h3>
       <div class="e-grid three" style="gap:8px">
-        ${field('windFromDeg', 'From', state.windFromDeg, { unitLabel: '°' })}
-        ${field('windKt', 'Speed', state.windKt, { unitLabel: 'kt' })}
-        ${field('gustKt', 'Gust', state.gustKt, { unitLabel: 'kt' })}
+        ${field('windFromDeg', 'From', state.windFromDeg, { unit: '°' })}
+        ${field('windKt', 'Speed', state.windKt, { unit: 'kt' })}
+        ${field('gustKt', 'Gust', state.gustKt, { unit: 'kt' })}
       </div>
-      <div class="e-small e-faint" style="margin-top:8px">Values marked <span class="e-badge accent" style="transform:scale(.9)">OFP</span> or <span class="e-badge accent" style="transform:scale(.9)">METAR</span> were filled from the plan or the observation; edit any of them.</div>`;
-
-    const runwaySelect = formEl.querySelector('#perf-runway');
-    function fillRunways() {
-      runwaySelect.innerHTML = ['<option value="">Not selected</option>', ...runwayRows.map(row => `<option value="${row.heading}" ${String(row.heading) === String(state.runway) ? 'selected' : ''}>${esc(row.id)}${row.lengthFt ? ` · ${row.lengthFt.toLocaleString('en-US')} ft` : ''}</option>`)].join('');
-    }
-    fillRunways();
-
-    (async () => {
-      if (!runwayRows.length) {
-        const airport = state.airport ? await airportByCode(state.airport).catch(() => null) : null;
-        if (destroyed || !airport) return;
-        runwayRows = airportRunways(airport);
-      }
-      if (destroyed) return;
-      fillRunways();
-      // The wind suggestion needs the published runway list, which arrives after
-      // the first paint; the card is redrawn so it can offer it.
-      refreshReady();
-    })();
-
-    formEl.querySelectorAll('[data-key]').forEach(input => {
-      input.addEventListener('input', () => {
-        set(input.dataset.key, input.value);
-        renderResults();
-      });
-    });
-    formEl.querySelector('#perf-aircraft').addEventListener('change', event => {
-      set('aircraft', event.target.value);
-      render();
-    });
-    formEl.querySelector('#perf-runway').addEventListener('change', event => {
-      set('runway', event.target.value);
-      const rows = runwayRows.find(row => String(row.heading) === event.target.value);
-      if (rows && rows.lengthFt) {
-        // Only fill an empty length: a value the pilot typed is theirs.
-        if (!String(state.runwayLengthFt || '').trim()) {
-          set('runwayLengthFt', rows.lengthFt, 'airport');
-        }
-      }
-      render();
-    });
-    wireReady();
-    formEl.querySelector('#perf-airport').addEventListener('change', async event => {
-      set('airport', String(event.target.value || '').toUpperCase());
-      // A different airport invalidates its runway list and the weather that came
-      // with it; the values themselves are left for the pilot to replace.
-      runwayRows = [];
-      for (const key of ['runway', 'runwayLengthFt', 'elevationFt', 'qnhHpa', 'oatC', 'windFromDeg', 'windKt', 'gustKt']) {
-        if (state.prefill[key]) { delete state[key]; delete state.prefill[key]; }
-      }
-      render();
-    });
-    formEl.querySelector('#perf-surface').addEventListener('change', event => {
-      set('surface', event.target.value);
-      renderResults();
-    });
-    formEl.querySelectorAll('[data-phase]').forEach(button => {
-      button.addEventListener('click', () => { set('phase', button.dataset.phase); render(); });
-    });
-    formEl.querySelector('[data-reset]').addEventListener('click', () => {
-      for (const key of ['elevationFt', 'qnhHpa', 'oatC', 'runway', 'runwayLengthFt', 'slopePct', 'surface', 'flap', 'thrust', 'weight', 'windFromDeg', 'windKt', 'gustKt']) {
-        delete state[key];
-        delete state.prefill[key];
-      }
-      state.qnhHpa = 1013;
-      state.surface = 'dry';
-      saveInputs(state);
-      render();
-    });
+      ${state.windVariable ? '<div class="e-small e-faint" style="margin-top:6px">The observation reports a variable wind direction; enter the runway-relevant direction.</div>' : ''}
+      ${correctionNotice()}
+      <div class="e-row" style="margin-top:12px">
+        <button class="e-btn primary" type="button" data-calculate>Calculate</button>
+        ${state.stale ? '<span class="e-badge warn">Inputs changed</span>' : ''}
+      </div>
+      <div class="e-small e-faint" style="margin-top:8px">Every value can be edited. Badges show where a prefill came from; an edit replaces it.</div>
+      <div class="e-small e-faint" style="margin-top:4px">Airframe data: ${state.database ? `${esc(state.database.source.name)} · version ${esc(state.database.version)}` : 'not loaded'}.</div>
+      ${state.weatherAt ? `<div class="e-small e-faint" style="margin-top:4px">Weather prefill: METAR observed ${esc(fmtAge(state.weatherAt))}.${state.metarRaw ? `<details style="margin-top:3px"><summary>Raw observation</summary><div style="word-break:break-word">${esc(state.metarRaw)}</div></details>` : ''}</div>` : ''}
+    </div>`;
   }
 
-  function conditionRows(conditions) {
-    return [
+  function correctionNotice() {
+    const current = profile();
+    const corrections = current && current.corrections;
+    if (!corrections || corrections.status !== 'unsupported') return '';
+    const axes = (corrections.axes || []).map(axis => CORRECTION_LABELS[axis] || axis);
+    return `<div class="e-notice" style="margin-top:12px"><div>
+      <b>No performance correction is applied for ${esc(axes.join(', '))}.</b><br>${esc(corrections.reason)}
+      These inputs are not offered, because a value would not change any result.
+    </div></div>`;
+  }
+
+  function conditionsCard(conditions) {
+    const rows = [
       ['Pressure altitude', conditions.pressureAltitudeFt != null ? fmtFt(conditions.pressureAltitudeFt) : '—'],
       ['ISA temperature', conditions.isaTemperatureC != null ? `${conditions.isaTemperatureC}°C` : '—'],
       ['ISA deviation', conditions.isaDeviationC != null ? `${conditions.isaDeviationC > 0 ? '+' : ''}${conditions.isaDeviationC}°C` : '—'],
       ['Density altitude', conditions.densityAltitudeFt != null ? fmtFt(conditions.densityAltitudeFt) : '—'],
     ];
-  }
-
-  function warningsFor(conditions) {
-    const warnings = [];
-    if (conditions.wind) {
-      if (conditions.wind.tailwindKt > 0) warnings.push(`Tailwind of ${conditions.wind.tailwindKt} kt: performance data often excludes tailwind takeoffs.`);
-      if (conditions.wind.crosswindKt >= 20) warnings.push(`Crosswind ${conditions.wind.crosswindKt} kt: check the type's demonstrated crosswind before dispatch.`);
-      if (conditions.wind.gustKt && conditions.wind.gustKt > conditions.wind.speedKt) warnings.push(`Gusts to ${conditions.wind.gustKt} kt: use the gust for the wind components.`);
-    }
-    if (state.surface === 'contaminated') warnings.push('Contaminated runway: only a dataset that publishes contaminated distances can answer this. Surface condition factors are not applied by Stratos.');
-    if (conditions.densityAltitudeFt != null && conditions.densityAltitudeFt > (state.elevationFt === '' ? 0 : Number(state.elevationFt)) + 2000) {
-      warnings.push('Density altitude is more than 2,000 ft above field elevation.');
-    }
-    return warnings;
-  }
-
-  function conditionsCard(conditions) {
-    const rows = conditionRows(conditions);
+    const wind = conditions.wind;
     return `<div class="e-card" style="margin-bottom:12px">
       <h3>Conditions <em>computed</em></h3>
       <div class="e-grid two">
         <dl class="e-kv">${rows.map(([label, value]) => `<dt>${esc(label)}</dt><dd>${esc(value)}</dd>`).join('')}</dl>
         <div>
-          ${conditions.wind ? `<dl class="e-kv">
-            <dt>Runway</dt><dd>${conditions.wind.runwayHeading}°</dd>
-            <dt>Wind</dt><dd>${String(conditions.wind.windFrom).padStart(3, '0')}° / ${conditions.wind.speedKt} kt${conditions.wind.gustKt ? ` G${conditions.wind.gustKt}` : ''}</dd>
-            <dt>Head / tail</dt><dd>${conditions.wind.headwindKt >= 0 ? `${conditions.wind.headwindKt} kt head` : `${conditions.wind.tailwindKt} kt tail`}</dd>
-            <dt>Crosswind</dt><dd>${conditions.wind.crosswindKt} kt${conditions.wind.crosswindSide !== 'none' ? ` from the ${conditions.wind.crosswindSide}` : ''}</dd>
-          </dl>` : '<div class="e-small e-muted">Select a runway (or enter its heading) to resolve the wind.</div>'}
+          ${wind ? `<dl class="e-kv">
+            <dt>Runway</dt><dd>${wind.runwayHeading}°</dd>
+            <dt>Wind</dt><dd>${String(wind.windFrom).padStart(3, '0')}° / ${wind.speedKt} kt${wind.gustKt ? ` G${wind.gustKt}` : ''}</dd>
+            <dt>Head / tail</dt><dd>${wind.headwindKt >= 0 ? `${wind.headwindKt} kt head` : `${wind.tailwindKt} kt tail`}</dd>
+            <dt>Crosswind</dt><dd>${wind.crosswindKt} kt${wind.crosswindSide !== 'none' ? ` from the ${wind.crosswindSide}` : ''}</dd>
+          </dl>` : '<div class="e-small e-muted">Select a runway and enter wind to resolve the components.</div>'}
         </div>
       </div>
-      ${state.runwayLengthFt ? `<div class="e-notice" style="margin-top:10px">Available ${esc(fmtFt(state.runwayLengthFt))}${state.slopePct ? ` · slope ${esc(state.slopePct)}%` : ''} · ${esc(state.surface)} runway</div>` : ''}
+      <div class="e-small e-faint" style="margin-top:9px">Atmosphere and wind are computed from the inputs; they are not aircraft-specific data. Missing values stay missing.</div>
     </div>`;
   }
 
-  function datasetCard() {
-    const match = dataset && dataset.aircraft && String(dataset.aircraft.icao).toUpperCase() === String(state.aircraft).toUpperCase();
-    return `<div class="e-card" style="margin-bottom:12px">
-      <h3>Aircraft dataset <span class="e-spacer"></span>
-        ${dataset ? `<span class="e-badge ${match ? 'good' : 'warn'}">${match ? 'Loaded' : 'Different type'}</span>` : '<span class="e-badge bad">None</span>'}
-      </h3>
-      ${dataset ? `<div class="e-small e-muted">${esc(datasetLabel(dataset))}</div>
-        ${match ? '' : `<div class="e-notice warn" style="margin-top:8px">The loaded dataset is for <b>${esc(aircraftLabel(dataset.aircraft.icao))}</b>. It will not be used for ${esc(aircraftLabel(state.aircraft))} — variant data is never shared.</div>`}
-        <div class="e-row" style="margin-top:9px"><button class="e-btn small" type="button" data-replace>Replace dataset</button><button class="e-btn small ghost" type="button" data-clear>Remove</button></div>`
-        : `<div class="e-notice warn"><div><b>No validated performance dataset is loaded.</b><br>V-speeds and field lengths are specific to one type, weight, flap, thrust and runway condition, and Stratos has not been licensed an approved dataset for the A340-600, A321 or 777. The app will not invent them.</div></div>
-          <div class="e-small e-muted" style="margin-top:9px">Import an extract from a document you are entitled to use. Every result then names its source and revision, and any cell the dataset does not publish stays unavailable.</div>
-          <div class="e-row" style="margin-top:9px"><button class="e-btn small primary" type="button" data-import>Import dataset…</button><button class="e-btn small" type="button" data-template>Download template</button></div>`}
-      ${datasetError ? `<div class="e-notice bad" style="margin-top:8px">${esc(datasetError)}</div>` : ''}
-      <input type="file" accept="application/json,.json" id="perf-file" hidden>
+  function tile(item) {
+    const isWeight = WEIGHT_RESULTS.has(item.id);
+    const value = isWeight && item.value != null ? convertWeight(item.value, 'kg', unit) : item.value;
+    const unitText = item.unit ? ` ${esc(isWeight ? unit : item.unit)}` : '';
+    const tone = STATUS_TONE[item.status] || '';
+    return `<div class="perf-tile">
+      <div class="e-label">${esc(item.label)}</div>
+      <div class="e-big">${value != null ? `${fmtNum(value)}<small class="e-small e-faint">${unitText}</small>` : '<span class="e-small e-faint">Unavailable</span>'}</div>
+      <div class="e-row" style="margin-top:4px"><span class="e-badge ${tone}">${esc(STATUS_TEXT[item.status] || item.status)}</span></div>
+      <div class="e-small e-faint" style="margin-top:5px">${esc(item.note)}</div>
+      ${item.source ? `<div class="perf-source">${esc(item.source)}</div>` : ''}
     </div>`;
   }
 
-  function resultsCard() {
-    if (!dataset) {
-      return `<div class="e-card">
-        <h3>Takeoff and landing figures</h3>
-        <div class="e-empty"><b>Unavailable without an approved dataset</b>
-          <p>This is not a missing feature: a V-speed or field length produced without the aircraft's own data would be a guess with a professional-looking font. Stratos shows the calculation framework and the conditions it can compute exactly, and refuses the rest.</p>
-          <p class="e-small">A dataset is a JSON file with weight, pressure-altitude and temperature axes and the published values at each point. Download the template above for the exact shape.</p>
-        </div>
-      </div>`;
-    }
-    if (String(dataset.aircraft.icao).toUpperCase() !== String(state.aircraft).toUpperCase()) {
-      return `<div class="e-card"><h3>Takeoff and landing figures</h3>
-        <div class="e-notice warn">The loaded dataset is for another type, so no figures are produced. Load the dataset for ${esc(aircraftLabel(state.aircraft))}.</div></div>`;
-    }
-    const weight = Number(state.weight);
-    const elevation = Number(state.elevationFt);
-    const qnh = Number(state.qnhHpa);
-    const oat = Number(state.oatC);
-    if (![weight, elevation, qnh, oat].every(Number.isFinite)) {
-      return `<div class="e-card"><h3>Takeoff and landing figures</h3><div class="e-notice">Enter the weight, elevation, QNH and OAT. The lookup needs all four.</div></div>`;
-    }
-    const pressureAltitude = pressureAltitudeFt(elevation, qnh);
-    const lookup = lookupPerformance(dataset, state.phase, { weight, pressureAltitudeFt: pressureAltitude, oatC: oat });
-    const phase = PHASE[state.phase];
-    const distance = lookup[phase.distanceKey];
-    const speeds = phase.speedKeys.map(key => [key, lookup[key]]);
-    const available = Number(state.runwayLengthFt);
-    const cell = entry => {
-      if (!entry) return '<span class="e-faint">Not published</span>';
-      if (entry.unavailable) return `<span class="e-faint">${esc(entry.unavailable)}</span>`;
-      return fmtNum(entry.value);
-    };
-    const marginLine = distance && distance.value != null && Number.isFinite(available) && available > 0
-      ? `<div class="e-notice ${available - distance.value < 0 ? 'bad' : 'good'}" style="margin-top:10px">${distance.value <= available ? `${fmtNum(available - distance.value)} ft of runway remaining` : `Required distance exceeds the available ${fmtFt(available)} by ${fmtNum(distance.value - available)} ft`}</div>`
-      : '';
-    return `<div class="e-card">
-      <h3>${phase.label} figures <em>${esc(dataset.source)} · ${esc(dataset.revision)}</em></h3>
-      <div class="e-grid three">
-        <div><div class="e-label">${state.phase === 'takeoff' ? 'Takeoff distance' : 'Landing distance'}</div>
-          <div class="e-big">${distance && distance.value != null ? `${fmtNum(distance.value)}<small class="e-small e-faint"> ft</small>` : '<span class="e-small e-faint">Unavailable</span>'}</div></div>
-        ${speeds.map(([key, entry]) => `<div><div class="e-label">${esc(key.replace('Kt', '').toUpperCase())}</div>
-          <div class="e-big">${entry && entry.value != null ? `${fmtNum(entry.value)}<small class="e-small e-faint"> kt</small>` : '<span class="e-small e-faint">Unavailable</span>'}</div></div>`).join('')}
-      </div>
-      ${marginLine}
-      <dl class="e-kv" style="margin-top:12px">
-        <dt>Lookup weight</dt><dd>${fmtNum(weight)} ${esc(unit)}</dd>
-        <dt>Pressure altitude</dt><dd>${fmtFt(pressureAltitude)}</dd>
-        <dt>OAT</dt><dd>${esc(oat)}°C</dd>
-        <dt>Flap / thrust</dt><dd>${esc(state.flap || 'not specified')} · ${esc(state.thrust || 'not specified')}</dd>
+  function sourceCard(profileData, evaluation) {
+    const source = profileData.source || {};
+    const range = profileData.operatingRange || {};
+    return `<div class="e-card" style="margin-top:12px">
+      <h3>Data source and limits</h3>
+      <dl class="e-kv">
+        <dt>Profile</dt><dd>${esc(profileLabel(profileData))} (${esc(profileData.icao)})</dd>
+        <dt>Source</dt><dd>${esc(source.name || '')} · record ${esc(source.record || '')} · ${esc(source.release || '')}${source.retrieved ? ` · retrieved ${esc(source.retrieved)}` : ''}${source.url ? `<br><a href="${esc(source.url)}" target="_blank" rel="noopener">${esc(source.url)}</a>` : ''}</dd>
+        <dt>Database</dt><dd>${esc(state.database.version)} · released ${esc(state.database.released)} · ${esc(state.database.schema)}</dd>
+        <dt>Verification</dt><dd>${esc(profileData.verification)}</dd>
+        <dt>Data units</dt><dd>${esc(profileData.units.weight)}, ${esc(profileData.units.distance)}, ${esc(profileData.units.speed)}</dd>
+        <dt>Input window</dt><dd>${range.weightKg ? `${range.weightKg[0]}–${range.weightKg[1]} kg` : '—'} · ${range.pressureAltitudeFt ? `${range.pressureAltitudeFt[0]}–${range.pressureAltitudeFt[1]} ft PA` : '—'} · ${range.oatC ? `${range.oatC[0]}–${range.oatC[1]}°C` : '—'}${range.basis ? `<br><span class="e-faint">${esc(range.basis)}</span>` : ''}</dd>
+        <dt>${evaluation.phase === 'takeoff' ? 'Takeoff data' : 'Landing data'}</dt><dd>${profileData[evaluation.phase].status === 'supported' ? 'Licensed table bundled' : esc(profileData[evaluation.phase].reason)}</dd>
       </dl>
-      <div class="e-small e-faint" style="margin-top:9px">Interpolated between the dataset's published points. Not extrapolated. ${esc(dataset.mode === 'simulation' ? 'Simulation mode: not approved operational data.' : 'Operational dataset supplied by the operator.')}${dataset.approved ? '' : ' Unapproved.'}</div>
+      <div class="e-small e-faint" style="margin-top:9px">${esc((profileData.corrections && profileData.corrections.reason) || 'This profile publishes no correction factors.')} A field length is never shown unless a licensed table publishes it.</div>
     </div>`;
   }
 
-  function renderResults() {
-    limitsAndWarnings();
-  }
+  function outputHtml() {
+    if (state.dbError) {
+      return `<div class="e-card"><h3>Performance database</h3><div class="e-notice bad"><div>${esc(state.dbError)}</div></div></div>`;
+    }
+    if (!state.database) return '<div class="e-card"><h3>Performance database</h3><div class="e-small e-muted">Loading…</div></div>';
 
-  function limitsAndWarnings() {
-    const elevation = Number(state.elevationFt);
-    const qnh = Number(state.qnhHpa);
-    const oat = Number(state.oatC);
-    const runwayHeading = state.runway !== '' ? Number(state.runway) : null;
-    const conditions = analyseConditions({
-      elevationFt: Number.isFinite(elevation) ? elevation : null,
-      qnhHpa: Number.isFinite(qnh) ? qnh : 1013,
-      oatC: Number.isFinite(oat) ? oat : null,
-      runwayHeadingDeg: runwayHeading,
-      windFromDeg: state.windFromDeg === '' ? null : Number(state.windFromDeg),
-      windKt: state.windKt === '' ? null : Number(state.windKt),
-      gustKt: state.gustKt === '' ? null : Number(state.gustKt),
-      runwayLengthFt: state.runwayLengthFt,
-      slopePct: state.slopePct,
-    });
-    const usable = Number.isFinite(elevation) && Number.isFinite(oat);
-    const warnings = usable ? warningsFor(conditions) : [];
-    resultsEl.innerHTML = `
-      ${usable ? conditionsCard(conditions) : `<div class="e-card" style="margin-bottom:12px"><h3>Conditions</h3><div class="e-notice">Enter the airport elevation, QNH and OAT to compute pressure and density altitude.</div></div>`}
-      ${warnings.length ? `<div class="e-notice warn" style="margin-bottom:12px"><div>${warnings.map(warning => esc(warning)).join('<br>')}</div></div>` : ''}
-      ${datasetCard()}
-      ${resultsCard()}
-      <div class="e-card" style="margin-top:12px">
-        <h3>Method and assumptions</h3>
-        <dl class="e-kv">
-          <dt>Pressure altitude</dt><dd>ISA barometric relationship from elevation and QNH</dd>
-          <dt>Density altitude</dt><dd>Pressure altitude + 118.8 ft per °C from ISA</dd>
-          <dt>Wind components</dt><dd>Vector resolution on the runway heading, gusts included</dd>
-          <dt>Field length</dt><dd>Trilinear interpolation in the imported dataset, no extrapolation</dd>
-          <dt>Not applied</dt><dd>Runway slope, contamination, bleed, anti-ice and obstacle corrections unless the dataset itself publishes the result</dd>
-        </dl>
-        <div class="e-small e-faint" style="margin-top:8px">Simulator planning aid. Not certified performance and not for real-world dispatch.</div>
-      </div>`;
-    wireDatasetButtons();
-  }
+    const current = profile();
+    const errors = state.errors.length
+      ? `<div class="e-notice warn" style="margin-bottom:12px"><div>${state.errors.map(error => esc(error)).join('<br>')}</div></div>`
+      : '';
 
-  function wireDatasetButtons() {
-    resultsEl.querySelector('[data-import]')?.addEventListener('click', () => resultsEl.querySelector('#perf-file')?.click());
-    resultsEl.querySelector('[data-replace]')?.addEventListener('click', () => resultsEl.querySelector('#perf-file')?.click());
-    resultsEl.querySelector('#perf-file')?.addEventListener('change', async event => {
-      const file = event.target.files && event.target.files[0];
-      if (!file) return;
-      if (file.size > 400 * 1024) {
-        datasetError = 'That file is larger than 400 KB. A dataset should be a small table, not a dump.';
-        limitsAndWarnings();
-        return;
-      }
-      try {
-        const text = await file.text();
-        const checked = validateDataset(JSON.parse(text));
-        if (!checked.ok) {
-          datasetError = `The dataset was rejected: ${checked.problems.slice(0, 3).join(' ')}`;
-          limitsAndWarnings();
-          return;
-        }
-        dataset = checked.dataset;
-        datasetError = '';
-        try { localStorage.setItem(DATASET_KEY, JSON.stringify(dataset)); } catch (_) { datasetError = 'The dataset works for this session but could not be stored on this device.'; }
-        render();
-      } catch (error) {
-        datasetError = `That file is not valid JSON: ${error.message}`;
-        limitsAndWarnings();
-      }
-    });
-    resultsEl.querySelector('[data-clear]')?.addEventListener('click', () => {
-      dataset = null;
-      datasetError = '';
-      try { localStorage.removeItem(DATASET_KEY); } catch (_) { /* nothing stored */ }
-      render();
-    });
-    resultsEl.querySelector('[data-template]')?.addEventListener('click', () => {
-      const blob = new Blob([JSON.stringify(templateDataset(), null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'stratos-performance-template.json';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-    });
+    if (!current) {
+      return `${errors}<div class="e-card"><h3>Calculate</h3>
+        <div class="e-empty"><b>Choose an aircraft profile</b>
+          <p>Detection uses the X-Plane airframe. If it reports a type that is not in the bundled database, select a profile by hand or accept that this type is unsupported.</p>
+          <p class="e-small">Supported profiles: ${state.database.profiles.map(item => esc(`${item.manufacturer} ${item.name}`)).join(', ')}.</p>
+        </div></div>`;
+    }
+
+    if (!state.calculation) {
+      const blocked = state.errors.length > 0;
+      return `${errors}<div class="e-card"><h3>Calculate</h3>
+        <div class="e-empty"><b>${blocked ? 'Not ready to calculate' : 'Review the inputs'}</b>
+          <p>${blocked
+            ? 'Enter the missing values above, then press Calculate.'
+            : 'The inputs are prefilled from X-Plane, the flight plan, the airport database and the METAR where available. Check them, then press Calculate.'}</p>
+          <p class="e-small">${esc(current.takeoff.status === 'unsupported' || current.landing.status === 'unsupported'
+            ? 'This profile publishes weight limits and approach speed, but no licensed field-length table; field lengths will be shown as unavailable.'
+            : 'This profile publishes a licensed field-length table.')}</p>
+        </div></div>`;
+    }
+
+    const evaluation = state.calculation;
+    const profileData = current;
+    const supported = evaluation.supported;
+    const phaseName = evaluation.phase === 'takeoff' ? 'Takeoff' : 'Landing';
+    return `${errors}<div class="e-card" style="margin-bottom:12px">
+      <h3>${phaseName} · ${esc(profileLabel(profileData))} <span class="e-spacer"></span><span class="e-badge ${supported ? 'good' : 'warn'}">${supported ? 'Table' : 'Limits only'}</span></h3>
+      ${state.stale ? '<div class="e-notice warn" style="margin-bottom:10px"><div>Inputs changed since the calculation. Press Calculate again.</div></div>' : ''}
+      <div class="perf-results">${evaluation.results.map(tile).join('')}</div>
+      ${evaluation.warnings.length ? `<div class="e-notice warn" style="margin-top:12px"><div>${evaluation.warnings.map(esc).join('<br>')}</div></div>` : ''}
+      <div class="e-small e-faint" style="margin-top:10px">${esc(evaluation.note || '')}</div>
+    </div>
+    ${conditionsCard(evaluation.conditions)}
+    ${sourceCard(profileData, evaluation)}
+    <div class="e-card" style="margin-top:12px">
+      <h3>Method</h3>
+      <dl class="e-kv">
+        <dt>Pressure altitude</dt><dd>ISA barometric relationship from field elevation and QNH</dd>
+        <dt>Density altitude</dt><dd>Pressure altitude + 118.8 ft per °C from ISA</dd>
+        <dt>Wind</dt><dd>Vector resolution on the selected runway heading, gusts included</dd>
+        <dt>Limits</dt><dd>Published MTOW/MLW from the FAA ACD; the margin is the limit minus the entered weight</dd>
+        <dt>Field lengths</dt><dd>Published table interpolation only, inside its axes. No extrapolation and no model.</dd>
+      </dl>
+      <div class="e-small e-faint" style="margin-top:8px">Simulator planning aid. Not certified performance and not for real-world dispatch.</div>
+    </div>`;
   }
 
   function render() {
-    renderForm();
-    limitsAndWarnings();
+    root.innerHTML = `<div class="perf-layout" id="perf-layout">
+      <div class="perf-column">${detectionCard()}${formCard()}</div>
+      <div class="perf-column" id="perf-output">${outputHtml()}</div>
+    </div>`;
+    wire();
   }
 
+  function readInput(input) {
+    const key = input.dataset.key;
+    if (!key) return;
+    state[key] = input.value;
+    state.manual[key] = true;
+    // The value is now the pilot's, so the source badge must stop claiming it
+    // came from METAR or X-Plane.
+    delete state.prefill[key];
+    input.closest('.e-field')?.querySelector('.e-badge.accent')?.remove();
+    state.errors = [];
+    if (state.calculation) state.stale = true;
+    updateOutput();
+  }
+
+  function updateOutput() {
+    const output = root.querySelector('#perf-output');
+    if (output) output.innerHTML = outputHtml();
+    const stale = root.querySelector('[data-calculate]');
+    if (stale) {
+      const row = stale.closest('.e-row');
+      if (row) {
+        const badge = row.querySelector('.e-badge.warn');
+        if (state.stale && !badge) row.insertAdjacentHTML('beforeend', '<span class="e-badge warn">Inputs changed</span>');
+        if (!state.stale && badge) badge.remove();
+      }
+    }
+  }
+
+  function calculate() {
+    const current = profile();
+    const errors = [];
+    if (!current) errors.push('Choose an aircraft profile.');
+    if (!String(state.airport || '').trim()) errors.push('Enter the airport ICAO.');
+    if (numberOrNull(state.weight) == null || Number(state.weight) <= 0) errors.push('Enter the aircraft weight.');
+    if (numberOrNull(state.elevationFt) == null) errors.push('Enter the airport elevation.');
+    const qnh = numberOrNull(state.qnhHpa);
+    if (qnh == null) errors.push('Enter the QNH.');
+    else if (qnh < 850 || qnh > 1085) errors.push('Enter a QNH between 850 and 1085 hPa.');
+    if (numberOrNull(state.oatC) == null) errors.push('Enter the OAT.');
+    const wind = numberOrNull(state.windKt);
+    if (wind != null && wind < 0) errors.push('Wind speed cannot be negative.');
+    const gust = numberOrNull(state.gustKt);
+    if (gust != null && gust < 0) errors.push('Gust cannot be negative.');
+    const runwayLength = numberOrNull(state.runwayLengthFt);
+    if (runwayLength != null && runwayLength <= 0) errors.push('Runway length must be positive.');
+    if (errors.length) {
+      state.errors = errors;
+      state.calculation = null;
+      updateOutput();
+      return;
+    }
+    state.errors = [];
+    const evaluation = evaluatePhase(current, state.phase, {
+      weight: state.weight,
+      elevationFt: state.elevationFt,
+      qnhHpa: state.qnhHpa,
+      oatC: state.oatC,
+      windFromDeg: state.windFromDeg,
+      windKt: state.windKt,
+      gustKt: state.gustKt,
+      runwayHeadingDeg: numberOrNull((state.runwayRows.find(row => row.key === state.runway) || {}).heading),
+      runwayLengthFt: state.runwayLengthFt,
+      units: { weight: unit, distance: 'ft' },
+    });
+    state.calculation = evaluation;
+    state.stale = false;
+    render();
+  }
+
+  function switchPhase(phase) {
+    if (phase === state.phase) return;
+    state.phase = phase;
+    loadPlanPhase();
+    applySimulatorFields();
+    state.calculation = null;
+    state.stale = false;
+    state.errors = [];
+    render();
+    hydratePhase();
+  }
+
+  function wire() {
+    root.querySelector('#perf-profile')?.addEventListener('change', event => {
+      state.manualProfile = true;
+      state.profileId = event.target.value;
+      state.calculation = null;
+      state.stale = false;
+      state.errors = [];
+      render();
+    });
+    root.querySelector('[data-use-detected]')?.addEventListener('click', () => {
+      if (!state.detected || !state.detected.profile) return;
+      state.manualProfile = false;
+      state.profileId = state.detected.profile.id;
+      state.calculation = null;
+      state.stale = false;
+      state.errors = [];
+      render();
+    });
+    root.querySelectorAll('[data-phase]').forEach(button => {
+      button.addEventListener('click', () => switchPhase(button.dataset.phase));
+    });
+    root.querySelector('#perf-airport')?.addEventListener('change', async event => {
+      state.airport = String(event.target.value || '').trim().toUpperCase();
+      for (const key of ['elevationFt', 'qnhHpa', 'oatC', 'windFromDeg', 'windKt', 'gustKt', 'runway', 'runwayLengthFt']) {
+        state[key] = '';
+        delete state.prefill[key];
+        delete state.manual[key];
+      }
+      state.runwayRows = [];
+      state.runwayMissing = '';
+      state.weatherAt = 0;
+      state.metarRaw = '';
+      state.calculation = null;
+      state.stale = false;
+      state.errors = [];
+      render();
+      await hydratePhase();
+    });
+    root.querySelectorAll('[data-key]').forEach(input => {
+      input.addEventListener('input', () => readInput(input));
+    });
+    root.querySelector('#perf-runway')?.addEventListener('change', event => {
+      state.runway = String(event.target.value || '');
+      state.manual.runway = true;
+      const row = state.runwayRows.find(item => item.key === state.runway);
+      if (row && row.lengthFt && !state.manual.runwayLengthFt) setPrefill('runwayLengthFt', String(row.lengthFt), 'airport database');
+      if (state.calculation) state.stale = true;
+      state.errors = [];
+      render();
+    });
+    root.querySelector('[data-calculate]')?.addEventListener('click', calculate);
+  }
+
+  root.innerHTML = '<div class="e-card"><h3>Performance</h3><div class="e-small e-muted">Loading the bundled performance database…</div></div>';
+
+  try {
+    state.database = await loadDatabase();
+  } catch (error) {
+    state.dbError = error.message;
+    if (!destroyed) render();
+    return { destroy() { destroyed = true; } };
+  }
+  if (destroyed) return { destroy() { destroyed = true; } };
+
+  loadPlanPhase();
+  applySimulatorFields();
+  detect();
   render();
 
-  /* First paint fills from the plan, the airport and the observation. */
-  (async () => {
-    await fillFromSources();
-    if (!destroyed) render();
-  })();
+  const unsubscribe = onLive(applyLive);
+  hydratePhase();
 
   return {
-    destroy() { destroyed = true; },
+    destroy() {
+      destroyed = true;
+      unsubscribe?.();
+    },
   };
 }
