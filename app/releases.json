@@ -3,53 +3,50 @@
   "product": "stratos",
   "source": "https://github.com/Nyclyy/stratos-tracker",
   "latest": {
-    "version": "2.1.29",
-    "releasedAt": "2026-10-29",
+    "version": "2.1.30",
+    "releasedAt": "2026-10-31",
     "severity": "normal",
-    "summary": "Aircraft photos now resolve when only a Mode S address is reported and fall back to a labelled photo of another live aircraft of the same airline and type, while the Performance page is rebuilt around a bundled, versioned aircraft database.",
+    "summary": "1 new feature and 1 performance change.",
     "changelog": {
       "features": [
-        "Aircraft that report a Mode S address but no registration get their own Planespotters photo, linked to its page and credited to the photographer.",
-        "When the feed reports neither a registration nor an address, the card shows a labelled backup: a random live aircraft of the same airline and type, with its registration named.",
-        "The Performance page loads six bundled profiles — A321-200, A321neo, A340-600, 777-200ER, 777-200LR, 777-300ER — detects a ToLiss or FlightFactor airframe, and allows manual selection."
+        "Track flight position over the existing X-Plane link and ship the cabin audio."
       ],
-      "improvements": [
-        "Performance figures name their source and are labelled verified, interpolated, estimated or unavailable; field lengths and V-speeds say they are unavailable rather than being estimated.",
-        "Performance inputs prefill from the simulator and weather and stay editable, with no file import or dataset for a pilot to manage."
+      "improvements": [],
+      "fixes": [],
+      "performance": [
+        "Ship aircraft photo backups and the rebuilt performance calculator."
       ],
-      "fixes": [
-        "The tracker reads the ADS-B aircraft type field correctly, so real airliners are no longer rejected as backup photo candidates.",
-        "A failed ADS-B lookup is reported as unavailable instead of being described as no aircraft flying."
-      ],
-      "performance": [],
       "ui": [],
       "compatibility": [],
-      "other": []
-    },
-    "downloads": {
-      "windows": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.29/Stratos-Setup.exe",
-        "sha256": "0496a01d2c5760dc90a665c01a7c2bfd6b8a3c27401bd888e1fed92aee1611a1",
-        "size": 108115201
-      },
-      "mac-arm64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.29/Stratos-2.1.29-mac-arm64.dmg",
-        "sha256": "062e30a0be41ba264a7b73b334b3de4d17e2979fb92ceec1a72d4d4e63028ed9",
-        "size": 123991241
-      },
-      "mac-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.29/Stratos-2.1.29-mac-x64.dmg",
-        "sha256": "3b7d87356684acd8b5f9a3ca1ad6c19bd37c71e0831e9f7fa9661d0e390babbc",
-        "size": 129298651
-      },
-      "linux-x64": {
-        "url": "https://github.com/Nyclyy/stratos-tracker/releases/download/v2.1.29/Stratos-2.1.29-linux-x64.AppImage",
-        "sha256": "25b7a7da229d54f4250b9ded6c7c5ca545a400d342839c43d5110b9d8b6155e4",
-        "size": 144883216
-      }
+      "other": [
+        "Publish the 2.1.29 download table.",
+        "Publish the 2.1.28 download table."
+      ]
     }
   },
   "releases": [
+    {
+      "version": "2.1.30",
+      "releasedAt": "2026-10-31",
+      "severity": "normal",
+      "summary": "1 new feature and 1 performance change.",
+      "changelog": {
+        "features": [
+          "Track flight position over the existing X-Plane link and ship the cabin audio."
+        ],
+        "improvements": [],
+        "fixes": [],
+        "performance": [
+          "Ship aircraft photo backups and the rebuilt performance calculator."
+        ],
+        "ui": [],
+        "compatibility": [],
+        "other": [
+          "Publish the 2.1.29 download table.",
+          "Publish the 2.1.28 download table."
+        ]
+      }
+    },
     {
       "version": "2.1.29",
       "releasedAt": "2026-10-29",
