@@ -257,7 +257,7 @@ export async function mount(root, ctx) {
           ${diagnostics ? `<details open style="margin-top:10px"><summary>Bridge diagnostics</summary><pre class="mono" style="max-height:260px;overflow:auto;white-space:pre-wrap;font-size:11px">${esc(diagnostics)}</pre></details>` : ''}
           <div class="notice" style="margin-top:12px">
             <div><strong>Setup.</strong><br>
-            X-Plane 11/12: Settings → Data Output, tick “Network via UDP” for rows 3, 17 and 20, send to this PC on port ${health?.ports?.udp || 49003}.<br>
+            X-Plane 11/12: nothing to set. Start a flight and the bridge finds the simulator on this PC.<br>
             MSFS 2020/2024: run <code>pip install SimConnect</code> once (optional connector), then start a flight.<br>
             The bridge is started automatically by the Stratos desktop app. If you run it manually, <code>python stratos_bridge.py</code>.
             </div>

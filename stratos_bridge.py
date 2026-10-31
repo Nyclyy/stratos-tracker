@@ -45,6 +45,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import stratos_cifp as nav_cifp
 import stratos_navdata as nav_near
+from stratos_cabin import CabinAudio, CabinError
 
 from bridge_logbook_addon import (
     VERSION,
@@ -585,6 +586,12 @@ def save_aircraft_identity(data):
         pass
 
 
+# Cabin announcements reach the PC's speakers through one player, so two presses
+# on a tablet never overlap. Its state also carries the honest sentence about
+# X-Plane's own sound bus, which the EFB repeats word for word.
+CABIN = CabinAudio(DATA_DIR, log=lambda message: log(message))
+
+
 # ── Traffic trails ─────────────────────────────────────────────────
 # The public traffic feeds publish one position per aircraft, so a trail is what
 # this bridge has observed. The page posts the positions it sees; they are kept
@@ -1051,6 +1058,21 @@ XPLANE_NUMERIC_DATAREFS = (
     ("weight", "sim/flightmodel/weight/m_total"),
     ("flap", "sim/cockpit2/controls/flap_ratio"),
 )
+# Position arrives on the same RREF channel, so tracking needs no X-Plane
+# Data Output setting and no IP address. Units are converted to the bridge's
+# own (ft, knots, degrees).
+XPLANE_POSITION_DATAREFS = (
+    ("lat", "sim/flightmodel/position/latitude", 4, 1.0),
+    ("lon", "sim/flightmodel/position/longitude", 4, 1.0),
+    ("alt", "sim/flightmodel/position/elevation", 4, 3.28084),
+    ("agl", "sim/flightmodel/position/y_agl", 4, 3.28084),
+    ("gs", "sim/flightmodel/position/groundspeed", 4, 1.94384),
+    ("hdg", "sim/flightmodel/position/true_psi", 4, 1.0),
+    ("vs", "sim/flightmodel/position/vh_ind_fpm", 4, 1.0),
+)
+RREF_POSITION_INDEX_BASE = 9100
+RREF_POSITION_SLOTS = {}
+_XPLANE_POSITION = {}
 RREF_INDEX_BASE = 9000
 RREF_NUMERIC_INDEX_BASE = 9200
 RREF_SLOTS = {}
@@ -1079,6 +1101,12 @@ def build_rref_requests():
     for key, path in XPLANE_NUMERIC_DATAREFS:
         RREF_NUMERIC_SLOTS[index] = key
         RREF_REQUESTS.append((index, path))
+        index += 1
+    RREF_POSITION_SLOTS.clear()
+    index = RREF_POSITION_INDEX_BASE
+    for key, path, _rate, scale in XPLANE_POSITION_DATAREFS:
+        RREF_POSITION_SLOTS[index] = (key, scale)
+        RREF_REQUESTS.append((index, path, 4))
         index += 1
 
 
@@ -1187,6 +1215,27 @@ def apply_xplane_performance():
     )
 
 
+def apply_xplane_position():
+    """Publish the position datarefs over the RREF channel, as the UDP rows do."""
+    lat = _XPLANE_POSITION.get("lat")
+    lon = _XPLANE_POSITION.get("lon")
+    if lat is None or lon is None or not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return
+    now = time.time()
+    with state_lock:
+        state.update(lat=lat, lon=lon, t=now, src="X-Plane")
+        for key in ("alt", "agl", "gs", "vs"):
+            if key in _XPLANE_POSITION:
+                state[key] = _XPLANE_POSITION[key]
+        if "hdg" in _XPLANE_POSITION:
+            state["hdg"] = _XPLANE_POSITION["hdg"] % 360
+        snapshot = dict(state)
+    try:
+        process_telemetry_for_logbook(snapshot, airports)
+    except Exception as exc:
+        log("Logbook processing error: %s" % exc)
+
+
 def xplane_identity_loop():
     """Ask X-Plane for the loaded airframe's names, gently: 1 Hz, no polling loop."""
     if not RREF_REQUESTS:
@@ -1209,9 +1258,11 @@ def xplane_identity_loop():
         # Re-subscribing is harmless and recovers after X-Plane restarts.
         if now - sent_at > 10:
             sent_at = now
-            for index, dataref in RREF_REQUESTS:
+            for request in RREF_REQUESTS:
+                index, dataref = request[0], request[1]
+                rate = request[2] if len(request) > 2 else 1
                 try:
-                    sock.sendto(rref_request(index, dataref, 1), target)
+                    sock.sendto(rref_request(index, dataref, rate), target)
                 except OSError as exc:
                     xplane_identity_status["error"] = str(exc)
                     break
@@ -1223,7 +1274,14 @@ def xplane_identity_loop():
             return
         changed = False
         changed_numbers = False
+        changed_position = False
         for index, value in rref_values(data):
+            position = RREF_POSITION_SLOTS.get(index)
+            if position:
+                if math.isfinite(value):
+                    _XPLANE_POSITION[position[0]] = value * position[1]
+                    changed_position = True
+                continue
             slot = RREF_SLOTS.get(index)
             if slot:
                 chars = _XPLANE_CHARS[slot[0]]
@@ -1240,6 +1298,8 @@ def xplane_identity_loop():
             apply_xplane_identity()
         if changed_numbers:
             apply_xplane_performance()
+        if changed_position:
+            apply_xplane_position()
 
 
 build_rref_requests()
@@ -1753,6 +1813,37 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/descent.json":
             _handle_descent(self)
             return
+        if path == "/cabin/play":
+            data, error = self.read_json(8 * 1024)
+            if error:
+                self.send_json({"ok": False, "error": error}, 400)
+                return
+            if not isinstance(data, dict):
+                self.send_json({"ok": False, "error": "Invalid request"}, 400)
+                return
+            try:
+                snapshot = CABIN.play(data.get("id"), data.get("voice"), data.get("text"),
+                                      data.get("output") or "xplane", data.get("volume"))
+            except CabinError as exc:
+                self.send_json({"ok": False, "error": str(exc)}, exc.status)
+                return
+            self.send_json({"ok": True, **snapshot})
+            return
+        if path == "/cabin/control":
+            data, error = self.read_json(4 * 1024)
+            if error:
+                self.send_json({"ok": False, "error": error}, 400)
+                return
+            if not isinstance(data, dict):
+                self.send_json({"ok": False, "error": "Invalid request"}, 400)
+                return
+            try:
+                snapshot = CABIN.control(str(data.get("action") or ""), data.get("volume"))
+            except CabinError as exc:
+                self.send_json({"ok": False, "error": str(exc)}, exc.status)
+                return
+            self.send_json({"ok": True, **snapshot})
+            return
         if path == "/config":
             data, error = self.read_json(64 * 1024)
             if error:
@@ -2111,6 +2202,18 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/descent.json":
             _handle_descent(self)
             return
+        if path == "/cabin/audio":
+            audio = CABIN.audio_bytes()
+            if audio is None:
+                self.send_json({"ok": False, "error": "No announcement is waiting for the EFB"}, 404)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "audio/wav")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(audio)))
+            self.end_headers()
+            self.wfile.write(audio)
+            return
         if path == "/stream":
             self.handle_stream(parsed)
             return
@@ -2164,6 +2267,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/weather":
             self.handle_weather(parsed)
+            return
+        if path == "/cabin":
+            self.send_json(CABIN.state())
             return
         self.serve_static(path)
 
@@ -2855,7 +2961,7 @@ def main():
     print("  Phone:        http://%s:%d on the phone, or Stratos > Settings > Phone access"
           % (MDNS_HOST, HTTP_PORT))
     print("  Access token: %s" % TOKEN)
-    print("  X-Plane: Settings > Data Output, enable rows 3, 17 and 20 to UDP %s:%d" % (lan_ip(), UDP_PORT))
+    print("  X-Plane: no setting needed; position comes over the bridge's own X-Plane link")
     print("  MSFS: start a flight (install the connector once with  pip install SimConnect )")
     print("  Token file:   %s" % TOKEN_FILE)
     print("")

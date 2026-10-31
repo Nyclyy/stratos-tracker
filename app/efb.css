@@ -2207,3 +2207,75 @@ body.view-nav .efb-main { background: #04070b; }
 @media (max-width: 1180px) {
   .perf-layout { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── cabin experience ─────────────────────────────────────────────────────
+   One square icon per announcement, two per row on a tablet and one on a
+   phone, grouped by flight phase. The playback panel is the only sticky
+   control surface: the tiles themselves are deliberately quiet. */
+
+.cab-panel { margin-bottom: 12px; }
+.cab-now { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cab-now-glyph {
+  width: 40px; height: 40px; flex: none; display: grid; place-items: center;
+  border-radius: 9px; border: 1px solid var(--efb-accent-line);
+  background: var(--efb-accent-soft); color: var(--efb-accent);
+}
+.cab-now-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cab-now-text b { font-size: 14px; font-weight: 650; }
+.cab-sub { font-size: 10.5px; color: var(--efb-faint); }
+.cab-progress {
+  height: 4px; margin: 12px 0 8px; border-radius: 99px; overflow: hidden;
+  background: rgba(148, 163, 184, .12);
+}
+.cab-progress i {
+  display: block; width: 0; height: 100%; background: var(--efb-accent);
+  transition: width .35s linear;
+}
+.cab-range { width: 120px; accent-color: var(--efb-accent); }
+
+.cab-phases { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.cab-phase {
+  padding: 12px 12px 10px; border: 1px solid var(--efb-line);
+  border-radius: var(--efb-r);
+  background: linear-gradient(180deg, rgba(17, 24, 34, .72), rgba(11, 16, 23, .55));
+}
+.cab-phase-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.cab-phase-head h3 { margin: 0; font-size: 12px; letter-spacing: .02em; }
+
+.cab-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.cab-item { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cab-tile {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 58px;
+  padding: 9px 10px; text-align: left; color: var(--efb-text); cursor: pointer;
+  background: rgba(148, 163, 184, .04); border: 1px solid var(--efb-line);
+  border-radius: var(--efb-r-sm);
+  transition: border-color .12s, background .12s;
+}
+.cab-tile:hover:not(:disabled) { border-color: var(--efb-accent-line); background: var(--efb-accent-soft); }
+.cab-tile:focus-visible { outline: 2px solid var(--efb-accent); outline-offset: 1px; }
+.cab-tile:disabled { opacity: .55; cursor: not-allowed; }
+.cab-glyph {
+  width: 34px; height: 34px; flex: none; display: grid; place-items: center;
+  border-radius: 8px; color: var(--efb-accent);
+  border: 1px solid rgba(34, 211, 238, .16); background: rgba(34, 211, 238, .07);
+}
+.cab-tile-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.cab-tile-text b { font-size: 11.5px; font-weight: 650; line-height: 1.3; }
+.cab-tile-text span { font-size: 9.5px; color: var(--efb-faint); }
+.cab-go { flex: none; color: var(--efb-accent); opacity: .8; }
+.cab-item-foot { display: flex; align-items: center; gap: 6px; min-height: 14px; padding-left: 2px; }
+.cab-auto, .cab-switch {
+  display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+  font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--efb-faint);
+}
+.cab-auto input, .cab-switch input { width: 12px; height: 12px; accent-color: var(--efb-accent); }
+.cab-manual { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: #56657a; }
+.cab-needs { font-size: 9px; letter-spacing: .06em; text-transform: uppercase; color: var(--efb-warn); }
+
+.cab-alert { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.cab-alert span { flex: 1; min-width: 0; }
+
+@media (max-width: 760px) {
+  .cab-tiles { grid-template-columns: minmax(0, 1fr); }
+  .cab-range { width: 90px; }
+}

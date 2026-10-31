@@ -38,3 +38,4 @@ tmp-natural-earth/
 
 # FAA CIFP and OurAirports downloads kept by scripts/build-navdata.py
 .navdata-cache/
+cabin/cache/

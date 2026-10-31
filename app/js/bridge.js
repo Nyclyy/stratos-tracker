@@ -117,6 +117,25 @@ export async function pairRelay(url, name, base = defaultBridgeBase()) {
    /pair/new is loopback-only: the QR code is created on the PC and the phone
    exchanges its short-lived token for the bridge cookie. */
 
+export async function cabinAudio(base = defaultBridgeBase()) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(String(base).replace(/\/+$/, '') + '/cabin/audio', {
+      credentials: location.protocol === 'file:' ? 'omit' : 'include',
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    if (!response.ok) await readJsonResponse(response);
+    return await response.blob();
+  } catch (error) {
+    if (error.name === 'AbortError') throw new Error('The bridge did not send the audio in time.');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function newPairing(base = defaultBridgeBase()) {
   return request(base, '/pair/new', { timeout: 8000 });
 }
@@ -156,6 +175,20 @@ export async function revokeRelayDevice(id, base = defaultBridgeBase()) {
 
 export async function saveAircraftIdentity(identity, base = defaultBridgeBase()) {
   return request(base, '/config', { method: 'POST', body: identity, timeout: 4000 });
+}
+
+/* Cabin announcements are played by the PC, not by the tablet, so the tablet
+   only asks the bridge. Synthesis can take a few seconds on the first request. */
+export async function cabinState(base = defaultBridgeBase()) {
+  return request(base, '/cabin', { timeout: 4000 });
+}
+
+export async function cabinPlay(payload, base = defaultBridgeBase()) {
+  return request(base, '/cabin/play', { method: 'POST', body: payload, timeout: 25000 });
+}
+
+export async function cabinControl(payload, base = defaultBridgeBase()) {
+  return request(base, '/cabin/control', { method: 'POST', body: payload, timeout: 8000 });
 }
 
 /** EventSource wrapper with explicit states and a bounded reconnect backoff. */

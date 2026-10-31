@@ -61,6 +61,10 @@ export const APPS = [
     icon: 'checklists', module: './efb/checklists.js',
   },
   {
+    id: 'cabin', group: 'Cabin', name: 'Cabin', title: 'Cabin Experience', subtitle: 'Passenger announcements on the PC or this tablet',
+    icon: 'cabin', module: './efb/cabin.js',
+  },
+  {
     id: 'notepad', group: 'Tools', name: 'Notepad', title: 'Notepad', subtitle: 'Typed note, kept on this device',
     icon: 'notepad', module: './efb/notepad.js',
   },
@@ -74,7 +78,7 @@ export const APPS = [
   },
 ];
 
-const GROUP_ORDER = ['Flight', 'Aircraft', 'Tools', 'Records'];
+const GROUP_ORDER = ['Flight', 'Aircraft', 'Cabin', 'Tools', 'Records'];
 const HOME_ROUTE = 'home';
 const DEFAULT_ROUTE = HOME_ROUTE;
 
@@ -104,6 +108,8 @@ const ICONS = {
   fuel: '<path d="M6 20V5.5h7V20"/><path d="M6 9.2h7"/><path d="M13 12h2.4a1.8 1.8 0 0 1 1.8 1.8v3.4a1.2 1.2 0 0 0 2.4 0V9.6l-2.2-2.2"/><path d="M4.6 20h9.8"/>',
   checklists: '<path d="M9 4.8h6v2.4H9z"/><path d="M15 6h2.4A1.6 1.6 0 0 1 19 7.6v11.8H5V7.6A1.6 1.6 0 0 1 6.6 6H9"/><path d="m8.6 12.4 1.9 1.9 4-4.1"/><path d="M8.6 17.2h6.8"/>',
   notepad: '<path d="M4.8 19.2h4.4L19 9.4l-4.4-4.4L4.8 14.8z"/><path d="m13.4 6.2 4.4 4.4"/><path d="M4.8 19.2 8 18.6"/>',
+  // Cabin: a cabin speaker with its own wave, not a generic horn.
+  cabin: '<path d="M4.4 9.4h3.2L14 5.6v12.8l-6.4-3.8H4.4z"/><path d="M17 9.2a4.4 4.4 0 0 1 0 5.6"/><path d="M19.2 6.8a8 8 0 0 1 0 10.4"/>',
   home: '<path d="M4.2 10.6 12 4.2l7.8 6.4V20H4.2z"/><path d="M9.6 20v-5.6h4.8V20"/>',
   logbook: '<path d="M6 4.5h11.4A1.6 1.6 0 0 1 19 6.1v13.4H7.6A2.1 2.1 0 0 1 5.5 17.4V6a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M9 8h6.4M9 11.2h4.4"/><path d="M5.6 17.2h13.3"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.2M12 18.8V21M4.2 7.5l1.9 1.1M17.9 15.4l1.9 1.1M4.2 16.5l1.9-1.1M17.9 8.6l1.9-1.1"/>',

@@ -522,8 +522,8 @@ class XPlaneIdentityTests(unittest.TestCase):
         self.assertEqual(bridge.plausible_registration("MD-82"), "", "a type with a hyphen is still a type")
 
     def test_the_subscription_covers_every_character_and_numeric_row(self):
-        self.assertEqual(len(bridge.RREF_REQUESTS), 10 + 8 + 48 + 3)
-        names = [dataref for _index, dataref in bridge.RREF_REQUESTS]
+        self.assertEqual(len(bridge.RREF_REQUESTS), 10 + 8 + 48 + 3 + len(bridge.XPLANE_POSITION_DATAREFS))
+        names = [request[1] for request in bridge.RREF_REQUESTS]
         self.assertIn("sim/aircraft/view/acf_tailnum[0]", names)
         self.assertIn("sim/aircraft/view/acf_tailnum[9]", names)
         self.assertIn("sim/weather/region/altimeter_setting_inhg", names)
